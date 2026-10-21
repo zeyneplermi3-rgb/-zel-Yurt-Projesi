@@ -1,0 +1,160 @@
+@import "tailwindcss";
+
+:root {
+  --background: #FAF7F2;
+  --foreground: #3D110B;
+}
+
+@theme {
+  /* User-Provided 5-Color Palette */
+  --color-palette-espresso: #3D110B;
+  --color-palette-mahogany: #662B16;
+  --color-palette-caramel: #99501B;
+  --color-palette-amber: #D1841A;
+  --color-palette-gold: #FFC90C;
+
+  /* Modern Flat Surfaces & Neutral Accents */
+  --color-flat-bg: #FAF7F2;
+  --color-flat-surface: #FFFFFF;
+  --color-flat-surface-alt: #F5EFE6;
+  --color-flat-border: #E8DCCF;
+  --color-flat-border-strong: #D4C2B0;
+  --color-flat-border-accent: #D1841A;
+
+  /* Harmonized Yellow & Amber Utility Remapping */
+  --color-yellow-50: #FAF6F0;
+  --color-yellow-100: #F4ECE1;
+  --color-yellow-200: #E8DCCF;
+  --color-yellow-300: #FFC90C;
+  --color-yellow-400: #D1841A;
+  --color-yellow-500: #99501B;
+  --color-yellow-600: #662B16;
+  --color-yellow-700: #52200F;
+  --color-yellow-800: #3D110B;
+  --color-yellow-900: #290A06;
+  --color-yellow-950: #1A0704;
+
+  /* Harmonized Dark Text (Espresso & Mahogany Tones) */
+  --color-stone-950: #250B07;
+  --color-stone-900: #3D110B;
+  --color-stone-800: #542213;
+  --color-stone-700: #6B3322;
+  --color-stone-600: #855342;
+  --color-stone-500: #9C7262;
+  --color-stone-400: #B8998C;
+  --color-stone-300: #D6C2B8;
+  --color-stone-200: #EADFD8;
+  --color-stone-100: #F6F0EC;
+  --color-stone-50: #FDFBF9;
+}
+
+html {
+  scrollbar-gutter: stable both-edges;
+  overflow-y: scroll;
+}
+
+body {
+  background: #FAF7F2;
+  color: #3D110B;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Modern Flat Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #F4ECE1;
+}
+::-webkit-scrollbar-thumb {
+  background: #D1841A;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #99501B;
+}
+
+/* Selection Highlight */
+::selection {
+  background-color: #FFC90C;
+  color: #3D110B;
+}
+
+/* Modern Flat Utility Enhancements */
+.flat-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E8DCCF;
+  box-shadow: none;
+}
+.flat-card-interactive {
+  background-color: #FFFFFF;
+  border: 1px solid #E8DCCF;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.flat-card-interactive:hover {
+  border-color: #D1841A;
+}
+
+.flat-btn-gold {
+  background-color: #FFC90C;
+  color: #3D110B;
+  font-weight: 700;
+  border: 1px solid #E5B409;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.flat-btn-gold:hover {
+  background-color: #D1841A;
+  color: #FFFFFF;
+  border-color: #BA7313;
+}
+
+.flat-btn-caramel {
+  background-color: #99501B;
+  color: #FFFFFF;
+  font-weight: 700;
+  border: 1px solid #824314;
+  transition: background-color 0.15s ease;
+}
+.flat-btn-caramel:hover {
+  background-color: #662B16;
+}
+
+.flat-btn-mahogany {
+  background-color: #662B16;
+  color: #FFFFFF;
+  font-weight: 700;
+  border: 1px solid #52200F;
+  transition: background-color 0.15s ease;
+}
+.flat-btn-mahogany:hover {
+  background-color: #3D110B;
+}
+
+.flat-btn-espresso {
+  background-color: #3D110B;
+  color: #FFC90C;
+  font-weight: 700;
+  border: 1px solid #290A06;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.flat-btn-espresso:hover {
+  background-color: #662B16;
+  color: #FFFFFF;
+}
+
+.flat-input {
+  background-color: #FFFFFF;
+  border: 1px solid #E8DCCF;
+  color: #3D110B;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.flat-input:focus {
+  outline: none;
+  border-color: #D1841A;
+  box-shadow: 0 0 0 2px rgba(255, 201, 12, 0.25);
+}
+
