@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getTodayDateKey } from "../../lib/menuUtils";
-import { getDynamicSlotStatus, parseSlotMinutes } from "../../lib/laundryUtils";
+import { cleanMachineName, getDynamicSlotStatus, parseSlotMinutes } from "../../lib/laundryUtils";
 import {
   Announcement,
   MaintenanceTicket,
@@ -114,7 +114,7 @@ export default function StudentPortalView({
 
   // Yeni çamaşır randevusu alma state'leri
   const defaultMachineId =
-    laundryMachines[0]?.id || "Makine 1 (A-1)";
+    cleanMachineName(laundryMachines[0]?.name || laundryMachines[0]?.id || "Makine 1");
   const [selectedLaundryDate, setSelectedLaundryDate] = useState("");
   const [selectedMachine, setSelectedMachine] = useState(defaultMachineId);
   const [selectedStartTime, setSelectedStartTime] = useState("");
@@ -122,6 +122,12 @@ export default function StudentPortalView({
   useEffect(() => {
     setSelectedLaundryDate(getTodayDateKey());
   }, []);
+
+  useEffect(() => {
+    if (laundryMachines.length > 0 && (!selectedMachine || selectedMachine.includes("-1793"))) {
+      setSelectedMachine(cleanMachineName(laundryMachines[0].name || laundryMachines[0].id));
+    }
+  }, [laundryMachines]);
 
   // Öğrencinin oda ve kat bilgisini dinamik olarak tespit et
   const currentStudent = students?.find(
@@ -311,7 +317,7 @@ export default function StudentPortalView({
       id: "lnd-" + Date.now(),
       ogrenciAd: currentUser.name,
       odaNo: odaNo,
-      makineNo: selectedMachine,
+      makineNo: cleanMachineName(selectedMachine),
       tarih: selectedLaundryDate,
       saatAraligi: formattedRange,
       program: selectedMachine.includes("Kurutma") ? "Kurutma & Havalandırma" : "Renkli & Karışık",
@@ -655,16 +661,19 @@ export default function StudentPortalView({
                     className="w-full bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-xl p-2.5 text-stone-900 dark:text-[#F1F5F9] font-medium focus:outline-none focus:border-[#0284C7]"
                   >
                     {laundryMachines.length > 0 ? (
-                      laundryMachines.map((m) => (
-                        <option key={m.id} value={m.name || m.id}>
-                          {m.name || m.id} ({m.tur === "kurutma" ? "Kurutma" : "Yıkama"})
-                        </option>
-                      ))
+                      laundryMachines.map((m) => {
+                        const cleanName = cleanMachineName(m.name || m.id);
+                        return (
+                          <option key={m.id} value={cleanName}>
+                            {cleanName} ({m.tur === "kurutma" ? "Kurutma" : "Yıkama"})
+                          </option>
+                        );
+                      })
                     ) : (
                       <>
-                        <option value="Makine 1 (A-1)">Makine 1 (Yıkama)</option>
-                        <option value="Makine 2 (A-2)">Makine 2 (Yıkama)</option>
-                        <option value="Kurutma 1 (K-1)">Kurutma 1 (Kurutma)</option>
+                        <option value="Makine 1">Makine 1 (Yıkama)</option>
+                        <option value="Makine 2">Makine 2 (Yıkama)</option>
+                        <option value="Kurutma 1">Kurutma 1 (Kurutma)</option>
                       </>
                     )}
                   </select>
@@ -723,7 +732,7 @@ export default function StudentPortalView({
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-xs sm:text-sm text-[#0F172A] dark:text-[#F1F5F9]">
-                            {slot.makineNo}
+                            {cleanMachineName(slot.makineNo)}
                           </span>
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
@@ -740,7 +749,7 @@ export default function StudentPortalView({
                           </span>
                         </div>
                         <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-                          Tarih: <strong className="text-[#0F172A] dark:text-[#F1F5F9]">{slot.tarih}</strong> • Saat: <strong className="text-[#0F172A] dark:text-[#F1F5F9]">{slot.saatAraligi}</strong> • {slot.program}
+                          Tarih: <strong className="text-[#0F172A] dark:text-[#F1F5F9]">{slot.tarih}</strong> • Saat: <strong className="text-[#0F172A] dark:text-[#F1F5F9]">{slot.saatAraligi}</strong>
                         </p>
                       </div>
 

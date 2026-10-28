@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { LaundryMachine } from "../../types";
+import { cleanMachineName } from "../../lib/laundryUtils";
 
 interface AddLaundryModalProps {
   isOpen: boolean;
@@ -108,11 +109,14 @@ export function AddLaundryModal({
                 onChange={(e) => setNewLaundry({ ...newLaundry, makineNo: e.target.value })}
                 className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-2.5 text-[#0F172A] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/25 font-medium transition-all"
               >
-                {laundryMachines.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name} ({m.tip})
-                  </option>
-                ))}
+                {laundryMachines.map((m) => {
+                  const cleanName = cleanMachineName(m.name || m.id);
+                  return (
+                    <option key={m.id} value={cleanName}>
+                      {cleanName} ({m.tip})
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -488,7 +492,7 @@ export function ManageMachinesModal({
                     {m.tur === "kurutma" || m.id.includes("Kurutma") ? "Kurutma" : "Yıkama"}
                   </span>
                   <div>
-                    <span className="font-bold text-[#0F172A] block">{m.name}</span>
+                    <span className="font-bold text-[#0F172A] block">{cleanMachineName(m.name || m.id)}</span>
                     <span className="text-[10px] text-[#64748B]">{m.tip}</span>
                   </div>
                 </div>

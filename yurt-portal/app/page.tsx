@@ -36,6 +36,7 @@ import {
   syncSlotsWithCurrentTime,
   parseSlotMinutes,
   normalizeDateStr,
+  cleanMachineName,
 } from "../lib/laundryUtils";
 import AddYurtModal from "../components/modals/AddYurtModal";
 import { AddRoomModal, EditRoomModal } from "../components/modals/RoomModals";
@@ -201,10 +202,10 @@ export default function Home() {
   // Tüm çamaşırhane randevularının canlı saate göre anlık dinamik durumları
   const liveLaundrySlots = useMemo(() => {
     return laundrySlots.map((slot) => {
-      if (slot.durum === "İptal") return slot;
-      const dynamicStatus = getDynamicSlotStatus(slot);
+      const dynamicStatus = slot.durum === "İptal" ? "İptal" : getDynamicSlotStatus(slot);
       return {
         ...slot,
+        makineNo: cleanMachineName(slot.makineNo),
         durum: dynamicStatus,
       };
     });
@@ -846,7 +847,15 @@ export default function Home() {
         const savedMachines = localStorage.getItem("yurtify_laundry_machines");
         if (savedMachines) {
           try {
-            setLaundryMachines(JSON.parse(savedMachines));
+            const parsed = JSON.parse(savedMachines);
+            if (Array.isArray(parsed)) {
+              setLaundryMachines(
+                parsed.map((m: any) => ({
+                  ...m,
+                  name: cleanMachineName(m.name || m.id),
+                }))
+              );
+            }
           } catch (e) {
             console.error("Machines parse error:", e);
           }
@@ -1576,7 +1585,7 @@ export default function Home() {
       id: `lnd-${Date.now()}`,
       ogrenciAd: newLaundry.ogrenciAd.trim(),
       odaNo: newLaundry.odaNo.trim(),
-      makineNo: newLaundry.makineNo,
+      makineNo: cleanMachineName(newLaundry.makineNo),
       tarih: newLaundry.tarih,
       saatAraligi: formattedRange,
       program: newLaundry.program,
@@ -1761,7 +1770,7 @@ export default function Home() {
       : typeLabel;
 
     const createdMachine: LaundryMachine = {
-      id: `${displayName}-${Date.now()}`,
+      id: `mach_${Date.now()}`,
       name: displayName,
       tip: tipText,
       tur: newCustomMachine.tur,
@@ -4180,7 +4189,7 @@ export default function Home() {
                                     <div className="min-w-0">
                                       <div className="flex items-center gap-1.5 flex-wrap">
                                         <span className="font-bold text-xs text-[#0F172A] dark:text-[#F1F5F9] truncate">
-                                          {slot.makineNo}
+                                          {cleanMachineName(slot.makineNo)}
                                         </span>
                                       </div>
                                       <p className="font-semibold text-xs text-[#0F172A] dark:text-[#F1F5F9] mt-0.5 truncate">
@@ -4617,7 +4626,7 @@ export default function Home() {
                                                     Oda {booking.odaNo}
                                                   </span>
                                                   <span className="text-[10px] px-2 py-0.5 rounded-lg bg-white font-bold border border-[#E2E8F0] text-[#64748B]">
-                                                    {booking.makineNo}
+                                                    {cleanMachineName(booking.makineNo)}
                                                   </span>
                                                 </div>
 
@@ -6061,7 +6070,12 @@ export default function Home() {
                 saatAraligi: formattedRange,
                 durum: slot.durum,
               });
-              const normalizedSlot = { ...slot, saatAraligi: formattedRange, durum: dynamicStatus };
+              const normalizedSlot = {
+                ...slot,
+                makineNo: cleanMachineName(slot.makineNo),
+                saatAraligi: formattedRange,
+                durum: dynamicStatus,
+              };
 
               let currentSlots = laundrySlots;
               if (typeof window !== "undefined") {

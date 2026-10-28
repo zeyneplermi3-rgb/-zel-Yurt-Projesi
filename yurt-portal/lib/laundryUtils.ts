@@ -2,6 +2,15 @@ import { LaundrySlot } from "../types";
 import { getTodayDateKey } from "./menuUtils";
 
 /**
+ * Makine numarasındaki gereksiz kimlik sayılarını veya zaman damgalarını (örn: "Makine 1-1793192242945" -> "Makine 1")
+ * temizleyerek kullanıcıya sade ve okunaklı isim sunar.
+ */
+export function cleanMachineName(name?: string): string {
+  if (!name) return "Makine 1";
+  return name.replace(/-\d{6,}.*$/, "").trim();
+}
+
+/**
  * Tarih dizesini (örn: "28.10.2026" veya "2026-10-28") standart 'YYYY-MM-DD' formatına dönüştürür.
  */
 export function normalizeDateStr(dateStr?: string): string {
@@ -122,12 +131,11 @@ export function syncSlotsWithCurrentTime(
   let hasChanges = false;
 
   const updatedSlots = slots.map((slot) => {
-    if (slot.durum === "İptal") return slot;
-
-    const dynamicStatus = getDynamicSlotStatus(slot, now);
-    if (dynamicStatus !== slot.durum) {
+    const cleanedMachine = cleanMachineName(slot.makineNo);
+    const dynamicStatus = slot.durum === "İptal" ? "İptal" : getDynamicSlotStatus(slot, now);
+    if (dynamicStatus !== slot.durum || cleanedMachine !== slot.makineNo) {
       hasChanges = true;
-      return { ...slot, durum: dynamicStatus };
+      return { ...slot, makineNo: cleanedMachine, durum: dynamicStatus };
     }
     return slot;
   });
