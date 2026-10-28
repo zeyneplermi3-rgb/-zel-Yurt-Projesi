@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createClient } from "../lib/supabaseClient";
 
 import type {
@@ -623,6 +623,224 @@ export default function Home() {
       console.warn("Veritabanı bağlantı notu:", err);
     }
   };
+
+  // ==========================================
+  // PULL-TO-REFRESH (AŞAĞI KAYDIRARAK GÜNCELLEME)
+  // ==========================================
+  const [pullDistance, setPullDistance] = useState(0);
+  const [pullX, setPullX] = useState<number | null>(null);
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+
+  const pullStartYRef = useRef(0);
+  const pullStartXRef = useRef(0);
+  const isPullingRef = useRef(false);
+  const pullDistanceRef = useRef(0);
+  const isRefreshingRef = useRef(false);
+
+  useEffect(() => {
+    isRefreshingRef.current = isPullRefreshing;
+  }, [isPullRefreshing]);
+
+  const handleRefreshAll = useCallback(async () => {
+    try {
+      await fetchDbData();
+    } catch (e) {
+      console.warn("fetchDbData error:", e);
+    }
+
+    if (typeof window !== "undefined") {
+      try {
+        const sStudents = localStorage.getItem("yurtify_students");
+        if (sStudents) setStudents(JSON.parse(sStudents));
+
+        const sRooms = localStorage.getItem("yurtify_rooms");
+        if (sRooms) setRooms(JSON.parse(sRooms));
+
+        const sAnc = localStorage.getItem("yurtify_announcements");
+        if (sAnc) setAnnouncements(JSON.parse(sAnc));
+
+        const sMenu = localStorage.getItem("yurtify_menu");
+        if (sMenu) setDailyMenu(JSON.parse(sMenu));
+
+        const sTickets = localStorage.getItem("yurtify_tickets");
+        if (sTickets) setMaintenanceTickets(JSON.parse(sTickets));
+
+        const sAtt = localStorage.getItem("yurtify_meal_attendance");
+        if (sAtt) setMealAttendance(JSON.parse(sAtt));
+
+        const sLaundry = localStorage.getItem("yurtify_laundry_slots");
+        if (sLaundry) {
+          const { updatedSlots } = syncSlotsWithCurrentTime(JSON.parse(sLaundry));
+          setLaundrySlots(updatedSlots);
+        }
+
+        const sSettings = localStorage.getItem("yurtify_settings");
+        if (sSettings) setYurtSettings(JSON.parse(sSettings));
+      } catch (e) {
+        console.warn("Local storage refresh error:", e);
+      }
+    }
+    showToast("Sayfa güncellendi.");
+  }, []);
+
+  const handleRefreshAllRef = useRef(handleRefreshAll);
+  handleRefreshAllRef.current = handleRefreshAll;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const clampX = (x: number) => Math.max(32, Math.min(window.innerWidth - 32, x));
+
+    // Dokunmatik (Mobil / Tablet)
+    const handleTouchStart = (e: TouchEvent) => {
+      if (isRefreshingRef.current) return;
+      if (window.scrollY <= 2) {
+        const touch = e.touches[0];
+        pullStartYRef.current = touch.clientY;
+        pullStartXRef.current = touch.clientX;
+        pullDistanceRef.current = 0;
+        isPullingRef.current = true;
+        setPullX(clampX(touch.clientX));
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isPullingRef.current || isRefreshingRef.current) return;
+      const touch = e.touches[0];
+      const diffY = touch.clientY - pullStartYRef.current;
+      const diffX = Math.abs(touch.clientX - pullStartXRef.current);
+
+      if (diffX > diffY && diffX > 10) {
+        isPullingRef.current = false;
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+        return;
+      }
+
+      if (diffY > 0 && window.scrollY <= 2) {
+        const distance = Math.min(diffY * 0.42, 85);
+        pullDistanceRef.current = distance;
+        setPullDistance(distance);
+        setPullX(clampX(touch.clientX));
+
+        if (distance > 12 && e.cancelable) {
+          e.preventDefault();
+        }
+      } else {
+        isPullingRef.current = false;
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+      }
+    };
+
+    const handleTouchEnd = async () => {
+      if (!isPullingRef.current || isRefreshingRef.current) return;
+      isPullingRef.current = false;
+
+      const currentDistance = pullDistanceRef.current;
+      if (currentDistance >= 50) {
+        setIsPullRefreshing(true);
+        pullDistanceRef.current = 65;
+        setPullDistance(65);
+
+        const startTime = Date.now();
+        await handleRefreshAllRef.current();
+        const elapsed = Date.now() - startTime;
+        if (elapsed < 600) {
+          await new Promise((r) => setTimeout(r, 600 - elapsed));
+        }
+
+        setIsPullRefreshing(false);
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+      } else {
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+      }
+    };
+
+    // Masaüstü Test için Fare Sürükleme
+    let isMouseDown = false;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (isRefreshingRef.current) return;
+      if (window.scrollY <= 2 && e.clientY <= 120 && e.button === 0) {
+        pullStartYRef.current = e.clientY;
+        pullStartXRef.current = e.clientX;
+        pullDistanceRef.current = 0;
+        isMouseDown = true;
+        setPullX(clampX(e.clientX));
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isMouseDown || isRefreshingRef.current) return;
+      const diffY = e.clientY - pullStartYRef.current;
+      const diffX = Math.abs(e.clientX - pullStartXRef.current);
+
+      if (diffX > diffY && diffX > 15) {
+        isMouseDown = false;
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+        return;
+      }
+
+      if (diffY > 0 && window.scrollY <= 2) {
+        const distance = Math.min(diffY * 0.42, 85);
+        pullDistanceRef.current = distance;
+        setPullDistance(distance);
+        setPullX(clampX(e.clientX));
+      } else {
+        isMouseDown = false;
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+      }
+    };
+
+    const handleMouseUp = async () => {
+      if (!isMouseDown || isRefreshingRef.current) return;
+      isMouseDown = false;
+
+      const currentDistance = pullDistanceRef.current;
+      if (currentDistance >= 50) {
+        setIsPullRefreshing(true);
+        pullDistanceRef.current = 65;
+        setPullDistance(65);
+
+        const startTime = Date.now();
+        await handleRefreshAllRef.current();
+        const elapsed = Date.now() - startTime;
+        if (elapsed < 600) {
+          await new Promise((r) => setTimeout(r, 600 - elapsed));
+        }
+
+        setIsPullRefreshing(false);
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+      } else {
+        pullDistanceRef.current = 0;
+        setPullDistance(0);
+      }
+    };
+
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+
+    window.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+
+      window.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
 
   useEffect(() => {
     // A. Sayfa yenilendiğinde kullanıcıyı atmaması için (Persistent Session)
@@ -2630,6 +2848,39 @@ export default function Home() {
     );
   };
 
+  // Pull-to-refresh Yükleme Göstergesi (Logo olmadan, sadece zarif dönen çark)
+  const renderPullIndicator = () => {
+    if (pullDistance <= 0 && !isPullRefreshing) return null;
+    return (
+      <div
+        className={`fixed z-[9990] pointer-events-none ${
+          isPullRefreshing || pullDistance === 0 ? "transition-all duration-300 ease-out" : "transition-transform duration-75"
+        }`}
+        style={{
+          top: -46,
+          left: pullX !== null ? `${pullX}px` : "50%",
+          transform: `translate(-50%, ${pullDistance}px)`,
+          opacity: pullDistance > 6 ? Math.min(1, pullDistance / 28) : 0,
+        }}
+      >
+        <div className="w-10 h-10 rounded-full bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] shadow-lg flex items-center justify-center text-[#0284C7] dark:text-[#38BDF8]">
+          <svg
+            className={`w-5 h-5 ${isPullRefreshing ? "animate-spin" : ""}`}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={!isPullRefreshing ? { transform: `rotate(${pullDistance * 4}deg)` } : undefined}
+          >
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+        </div>
+      </div>
+    );
+  };
+
   if (isAuthChecking) {
     return renderSplashOverlay();
   }
@@ -2641,6 +2892,7 @@ export default function Home() {
     return (
       <div className="login-screen-container min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col justify-center items-center p-3 sm:p-6 relative overflow-hidden font-sans">
         {renderSplashOverlay()}
+        {renderPullIndicator()}
         
         {/* Canlı Realtime & DB Durum Rozeti ve Tema Değiştirici */}
         <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-2 z-20">
@@ -2889,6 +3141,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col font-sans">
       {renderSplashOverlay()}
+      {renderPullIndicator()}
       {/* Toast Bildirimi */}
       {notification && (
         <div className="fixed top-5 right-5 z-50 bg-[#0284C7] text-white text-xs font-bold px-4 py-2.5 rounded-xl border border-[#0369A1] shadow-none animate-bounce">
