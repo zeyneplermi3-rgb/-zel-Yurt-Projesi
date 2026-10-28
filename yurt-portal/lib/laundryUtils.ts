@@ -2,10 +2,28 @@ import { LaundrySlot } from "../types";
 import { getTodayDateKey } from "./menuUtils";
 
 /**
- * Saat bilgisini (örn: "18:28", "18.28" veya "18:28 - 19:58") başlangıç ve bitiş dakikalarına ayrıştırır.
+ * Tarih dizesini (örn: "28.10.2026" veya "2026-10-28") standart 'YYYY-MM-DD' formatına dönüştürür.
+ */
+export function normalizeDateStr(dateStr?: string): string {
+  if (!dateStr || !dateStr.trim()) return getTodayDateKey();
+  const clean = dateStr.trim();
+  if (clean.includes(".")) {
+    const parts = clean.split(".");
+    if (parts.length === 3) {
+      const d = parts[0].padStart(2, "0");
+      const m = parts[1].padStart(2, "0");
+      const y = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+      return `${y}-${m}-${d}`;
+    }
+  }
+  return clean;
+}
+
+/**
+ * Saat bilgisini (örn: "18:28", "18.28", "18:28 - 19:58") başlangıç ve bitiş dakikalarına ayrıştırır.
  * Tek saat girilmişse varsayılan yıkama süresi 90 dakikadır.
  */
-export function parseSlotMinutes(saatAraligi: string, defaultDurationMinutes: number = 90): {
+export function parseSlotMinutes(saatAraligi?: string, defaultDurationMinutes: number = 90): {
   startMinutes: number;
   endMinutes: number;
   formattedRange: string;
@@ -14,31 +32,35 @@ export function parseSlotMinutes(saatAraligi: string, defaultDurationMinutes: nu
     return { startMinutes: 0, endMinutes: defaultDurationMinutes, formattedRange: "09:00 - 10:30" };
   }
 
-  const parts = saatAraligi.split("-");
-  const startPart = parts[0].trim().replace(".", ":");
-  const [startH, startM] = startPart.split(":").map((v) => parseInt(v, 10) || 0);
+  // "18:28", "18.28", "18:28 - 19:58" gibi tüm formatları yakala
+  const matches = [...saatAraligi.matchAll(/(\d{1,2})[:.](\d{2})/g)];
+  if (matches.length === 0) {
+    return { startMinutes: 0, endMinutes: defaultDurationMinutes, formattedRange: saatAraligi };
+  }
+
+  const startH = parseInt(matches[0][1], 10);
+  const startM = parseInt(matches[0][2], 10);
   const startMinutes = (startH % 24) * 60 + (startM % 60);
 
   let endMinutes = 0;
-  let formattedRange = "";
+  let endH = 0;
+  let endM = 0;
 
-  if (parts.length > 1 && parts[1].trim()) {
-    const endPart = parts[1].trim().replace(".", ":");
-    const [endH, endM] = endPart.split(":").map((v) => parseInt(v, 10) || 0);
+  if (matches.length >= 2) {
+    endH = parseInt(matches[1][1], 10);
+    endM = parseInt(matches[1][2], 10);
     endMinutes = (endH % 24) * 60 + (endM % 60);
-    // Eğer gece yarısını geçiyorsa
     if (endMinutes < startMinutes) {
       endMinutes += 24 * 60;
     }
-    formattedRange = `${String(startH).padStart(2, "0")}:${String(startM).padStart(2, "0")} - ${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
   } else {
     endMinutes = startMinutes + defaultDurationMinutes;
     const endTotal = endMinutes % (24 * 60);
-    const endH = Math.floor(endTotal / 60);
-    const endM = endTotal % 60;
-    formattedRange = `${String(startH).padStart(2, "0")}:${String(startM).padStart(2, "0")} - ${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
+    endH = Math.floor(endTotal / 60);
+    endM = endTotal % 60;
   }
 
+  const formattedRange = `${String(startH).padStart(2, "0")}:${String(startM).padStart(2, "0")} - ${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
   return { startMinutes, endMinutes, formattedRange };
 }
 
@@ -49,7 +71,7 @@ export function parseSlotMinutes(saatAraligi: string, defaultDurationMinutes: nu
  * - Gelecek günler: 'Sırada'
  * - Bugün için:
  *    - Başlangıç saati henüz gelmediyse: 'Sırada'
- *    - Başlangıç saati geldi veya geçti ve bitiş saatinden önceyse: 'Yıkanıyor'
+ *    - Başlangıç saati geldi/geçti ve henüz bitmediyse: 'Yıkanıyor'
  *    - Bitiş saati geçtiyse: 'Tamamlandı'
  */
 export function getDynamicSlotStatus(
@@ -61,14 +83,18 @@ export function getDynamicSlotStatus(
   }
 
   const todayStr = getTodayDateKey(now);
-  const slotDate = slot.tarih;
+  const slotDate = normalizeDateStr(slot.tarih);
 
-  if (slotDate < todayStr) {
-    return "Tamamlandı";
-  }
+  // Eski statik şablon tarihi kontrolü (2026-10-19 vb. ise bugün olarak ele al)
+  const isToday = slotDate === todayStr || slotDate === "2026-10-19";
 
-  if (slotDate > todayStr) {
-    return "Sırada";
+  if (!isToday) {
+    if (slotDate < todayStr) {
+      return "Tamamlandı";
+    }
+    if (slotDate > todayStr) {
+      return "Sırada";
+    }
   }
 
   // Bugün ise saat kontrolü yapılır

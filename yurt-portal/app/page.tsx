@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "../lib/supabaseClient";
 
 import type {
@@ -35,6 +35,7 @@ import {
   getDynamicSlotStatus,
   syncSlotsWithCurrentTime,
   parseSlotMinutes,
+  normalizeDateStr,
 } from "../lib/laundryUtils";
 import AddYurtModal from "../components/modals/AddYurtModal";
 import { AddRoomModal, EditRoomModal } from "../components/modals/RoomModals";
@@ -188,6 +189,26 @@ export default function Home() {
 
   // Çamaşırhane Sırası & Takvim State'leri
   const [laundrySlots, setLaundrySlots] = useState<LaundrySlot[]>([]);
+  const [laundryClockTick, setLaundryClockTick] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLaundryClockTick((t) => t + 1);
+    }, 15000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Tüm çamaşırhane randevularının canlı saate göre anlık dinamik durumları
+  const liveLaundrySlots = useMemo(() => {
+    return laundrySlots.map((slot) => {
+      if (slot.durum === "İptal") return slot;
+      const dynamicStatus = getDynamicSlotStatus(slot);
+      return {
+        ...slot,
+        durum: dynamicStatus,
+      };
+    });
+  }, [laundrySlots, laundryClockTick]);
   const [selectedLaundryDate, setSelectedLaundryDate] = useState<string>("");
   const [laundryViewYear, setLaundryViewYear] = useState<number>(2026);
   const [laundryViewMonth, setLaundryViewMonth] = useState<number>(9);
@@ -2690,10 +2711,10 @@ export default function Home() {
     },
     {
       id: "camasirhane",
-      label: `Çamaşırhane (${laundrySlots.filter(s => s.tarih === selectedLaundryDate && s.durum !== "Tamamlandı" && s.durum !== "İptal").length})`,
+      label: `Çamaşırhane (${liveLaundrySlots.filter(s => normalizeDateStr(s.tarih) === selectedLaundryDate && s.durum !== "Tamamlandı" && s.durum !== "İptal").length})`,
       name: "Çamaşırhane",
       shortName: "Çamaşır",
-      badge: `${laundrySlots.filter(s => s.tarih === selectedLaundryDate && s.durum !== "Tamamlandı" && s.durum !== "İptal").length} Aktif`,
+      badge: `${liveLaundrySlots.filter(s => normalizeDateStr(s.tarih) === selectedLaundryDate && s.durum !== "Tamamlandı" && s.durum !== "İptal").length} Aktif`,
       icon: (
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4V4zm8 12a4 4 0 100-8 4 4 0 000 8zm-5-9h.01M10 7h.01" />
@@ -3230,10 +3251,10 @@ export default function Home() {
                         <div className="mt-2 sm:mt-2.5">
                           <div className="flex items-baseline gap-1">
                             <span className="text-lg sm:text-2xl font-black text-[#0F172A]">
-                              {laundrySlots.filter((s) => s.tarih === selectedLaundryDate && s.durum === "Yıkanıyor").length}
+                              {liveLaundrySlots.filter((s) => normalizeDateStr(s.tarih) === selectedLaundryDate && s.durum === "Yıkanıyor").length}
                             </span>
                             <span className="text-[11px] sm:text-xs text-[#64748B]">
-                              Çalışıyor • {laundrySlots.filter((s) => s.tarih === selectedLaundryDate && s.durum === "Sırada").length} Sırada
+                              Çalışıyor • {liveLaundrySlots.filter((s) => normalizeDateStr(s.tarih) === selectedLaundryDate && s.durum === "Sırada").length} Sırada
                             </span>
                           </div>
                         </div>
@@ -3940,7 +3961,7 @@ export default function Home() {
                   setSelectedLaundryDate(nowStr);
                 };
 
-                const daySlots = laundrySlots.filter((s) => s.tarih === selectedLaundryDate);
+                const daySlots = liveLaundrySlots.filter((s) => normalizeDateStr(s.tarih) === selectedLaundryDate);
                 const filteredSlots = daySlots.filter((s) => {
                   if (laundryMachineFilter === "all") return true;
                   if (laundryMachineFilter === "yikama") return s.makineNo.includes("Makine") || laundryMachines.find(m => m.id === s.makineNo)?.tur === "yikama";
@@ -3948,8 +3969,8 @@ export default function Home() {
                   return s.makineNo === laundryMachineFilter;
                 });
 
-                const activeWashingCount = laundrySlots.filter(s => s.tarih === selectedLaundryDate && s.durum === "Yıkanıyor").length;
-                const inQueueCount = laundrySlots.filter(s => s.tarih === selectedLaundryDate && s.durum === "Sırada").length;
+                const activeWashingCount = liveLaundrySlots.filter(s => normalizeDateStr(s.tarih) === selectedLaundryDate && s.durum === "Yıkanıyor").length;
+                const inQueueCount = liveLaundrySlots.filter(s => normalizeDateStr(s.tarih) === selectedLaundryDate && s.durum === "Sırada").length;
 
                 // Seçili günün haftalık gün şeridi (iOS Takvim Tarzı: Pazartesi - Pazar)
                 const [selY, selM, selD] = selectedLaundryDate.split("-").map(Number);
@@ -3962,9 +3983,9 @@ export default function Home() {
                 for (let i = 0; i < 7; i++) {
                   const dObj = new Date(mondayDateObj.getFullYear(), mondayDateObj.getMonth(), mondayDateObj.getDate() + i);
                   const dateStr = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, "0")}-${String(dObj.getDate()).padStart(2, "0")}`;
-                  const slotsCount = laundrySlots.filter(s => s.tarih === dateStr && s.durum !== "İptal").length;
-                  const activeCount = laundrySlots.filter(s => s.tarih === dateStr && s.durum === "Yıkanıyor").length;
-                  const queueCount = laundrySlots.filter(s => s.tarih === dateStr && s.durum === "Sırada").length;
+                  const slotsCount = liveLaundrySlots.filter(s => normalizeDateStr(s.tarih) === dateStr && s.durum !== "İptal").length;
+                  const activeCount = liveLaundrySlots.filter(s => normalizeDateStr(s.tarih) === dateStr && s.durum === "Yıkanıyor").length;
+                  const queueCount = liveLaundrySlots.filter(s => normalizeDateStr(s.tarih) === dateStr && s.durum === "Sırada").length;
                   weekStripDays.push({
                     dateStr,
                     dayNum: dObj.getDate(),
@@ -4002,7 +4023,8 @@ export default function Home() {
                 const getSlotsForHour = (hourStr: string) => {
                   const hourNum = parseInt(hourStr.split(":")[0], 10);
                   return filteredSlots.filter((slot) => {
-                    const startHour = parseInt(slot.saatAraligi.split("-")[0].trim().split(":")[0], 10);
+                    const { startMinutes } = parseSlotMinutes(slot.saatAraligi);
+                    const startHour = Math.floor(startMinutes / 60);
                     return startHour === hourNum;
                   });
                 };
@@ -4010,7 +4032,7 @@ export default function Home() {
                 // ========================================================
                 // CANLI / ŞU ANKİ SIRA VE MAKİNE DURUMU HESAPLAMALARI
                 // ========================================================
-                const allActiveSlots = laundrySlots.filter(
+                const allActiveSlots = liveLaundrySlots.filter(
                   (s) => s.durum === "Yıkanıyor" || s.durum === "Sırada"
                 );
 
@@ -4020,22 +4042,22 @@ export default function Home() {
                 const waitingQueueList = currentDisplayedQueue.filter((s) => s.durum === "Sırada");
 
                 const runningMachinesCount = laundryMachines.filter((m) =>
-                  laundrySlots.some((s) => s.makineNo === m.id && s.durum === "Yıkanıyor")
+                  liveLaundrySlots.some((s) => s.makineNo === m.id && s.durum === "Yıkanıyor")
                 ).length;
 
-                const queuedSlotsCount = laundrySlots.filter((s) => s.durum === "Sırada").length;
+                const queuedSlotsCount = liveLaundrySlots.filter((s) => s.durum === "Sırada").length;
                 const freeMachinesCount = Math.max(0, laundryMachines.length - runningMachinesCount);
 
                 const freeMachinesList = laundryMachines.filter(
-                  (m) => !laundrySlots.some((s) => s.makineNo === m.id && s.durum === "Yıkanıyor")
+                  (m) => !liveLaundrySlots.some((s) => s.makineNo === m.id && s.durum === "Yıkanıyor")
                 );
 
                 const machineStatusList = laundryMachines.map((m) => {
-                  const activeSlot = laundrySlots.find(
+                  const activeSlot = liveLaundrySlots.find(
                     (s) => s.makineNo === m.id && s.durum === "Yıkanıyor"
                   );
                   const nextQueueSlot = !activeSlot
-                    ? laundrySlots.find((s) => s.makineNo === m.id && s.durum === "Sırada")
+                    ? liveLaundrySlots.find((s) => s.makineNo === m.id && s.durum === "Sırada")
                     : null;
                   return {
                     machine: m,
@@ -4371,8 +4393,8 @@ export default function Home() {
                         {/* iOS Minimalist Gün Izgarası (Akıcı Geçişli Dokunma Hedefleri) */}
                         <div className="grid grid-cols-7 gap-y-2 pt-3">
                           {calendarCells.map((cell) => {
-                            const slotsForDay = laundrySlots.filter(
-                              (s) => s.tarih === cell.dateStr && s.durum !== "İptal"
+                            const slotsForDay = liveLaundrySlots.filter(
+                              (s) => normalizeDateStr(s.tarih) === cell.dateStr && s.durum !== "İptal"
                             );
                             const isToday = cell.dateStr === todayDateStr;
                             const isSelected = selectedLaundryDate === cell.dateStr;
@@ -6030,7 +6052,7 @@ export default function Home() {
             maintenanceTickets={maintenanceTickets}
             rooms={rooms}
             students={students}
-            laundrySlots={laundrySlots}
+            laundrySlots={liveLaundrySlots}
             laundryMachines={laundryMachines}
             onAddLaundrySlot={(slot) => {
               const { formattedRange } = parseSlotMinutes(slot.saatAraligi);
