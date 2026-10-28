@@ -75,6 +75,25 @@ export default function Home() {
   } | null>(null);
 
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
+  const [isSplashMounted, setIsSplashMounted] = useState<boolean>(true);
+  const [splashFading, setSplashFading] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!isAuthChecking && isSplashMounted) {
+      const timer = setTimeout(() => {
+        setSplashFading(true);
+      }, 60);
+
+      const unmountTimer = setTimeout(() => {
+        setIsSplashMounted(false);
+      }, 600);
+
+      return () => {
+        clearTimeout(timer);
+        clearTimeout(unmountTimer);
+      };
+    }
+  }, [isAuthChecking, isSplashMounted]);
 
   const [activeRole, setActiveRole] = useState<Role>("superadmin");
   const [username, setUsername] = useState("");
@@ -2590,16 +2609,29 @@ export default function Home() {
   const activeYurtlar = yurtlar.filter((y) => y.durum === "aktif").length;
 
   // ==========================================
-  // OTURUM KONTROLÜ (GİRİŞ EKRANI PARLAMASINI ÖNLER)
+  // OTURUM KONTROLÜ (GİRİŞ EKRANI PARLAMASINI ÖNLER & AKICI GEÇİŞ)
   // ==========================================
-  if (isAuthChecking) {
+  const renderSplashOverlay = () => {
+    if (!isSplashMounted) return null;
     return (
-      <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0F172A] flex flex-col justify-center items-center p-4 relative font-sans">
-        <div className="w-14 h-14 rounded-2xl bg-[#0284C7] border border-[#0369A1] flex items-center justify-center text-white font-black text-2xl shadow-xs animate-pulse">
+      <div
+        className={`fixed inset-0 z-[9999] bg-[#F8FAFC] dark:bg-[#0F172A] flex flex-col justify-center items-center p-4 transition-all duration-500 ease-out ${
+          splashFading ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <div
+          className={`w-14 h-14 rounded-2xl bg-[#0284C7] border border-[#0369A1] flex items-center justify-center text-white font-black text-2xl shadow-xs transition-all duration-500 ease-out ${
+            splashFading ? "opacity-0 scale-75" : "opacity-100 scale-100 animate-pulse"
+          }`}
+        >
           Y
         </div>
       </div>
     );
+  };
+
+  if (isAuthChecking) {
+    return renderSplashOverlay();
   }
 
   // ==========================================
@@ -2608,6 +2640,7 @@ export default function Home() {
   if (!currentUser) {
     return (
       <div className="login-screen-container min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col justify-center items-center p-3 sm:p-6 relative overflow-hidden font-sans">
+        {renderSplashOverlay()}
         
         {/* Canlı Realtime & DB Durum Rozeti ve Tema Değiştirici */}
         <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-2 z-20">
@@ -2855,6 +2888,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col font-sans">
+      {renderSplashOverlay()}
       {/* Toast Bildirimi */}
       {notification && (
         <div className="fixed top-5 right-5 z-50 bg-[#0284C7] text-white text-xs font-bold px-4 py-2.5 rounded-xl border border-[#0369A1] shadow-none animate-bounce">
