@@ -3397,151 +3397,94 @@ export default function Home() {
                       </button>
                     </div>
 
-                    {/* 3. Günlük Yemeğe Katılım Durumu Kartı (Ana Sayfada Canlı Katılım ve Sayaçlar) */}
-                    <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-4 sm:p-6 rounded-2xl sm:rounded-3xl space-y-4 shadow-xs transition-colors">
-                      {/* Üst Başlık ve Aksiyonlar */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E8F0] dark:border-[#334155]">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm sm:text-base font-bold text-[#0F172A] dark:text-[#F1F5F9]">
-                              Günlük Yemeğe Katılım Durumu
-                            </h3>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
-                              Canlı Katılım
-                            </span>
-                          </div>
-                          <p className="text-xs text-[#64748B] dark:text-[#94A3B8] mt-0.5">
-                            Tarih: {formatTurkishDate(todayMealDateKey)} • Öğrencilerin bildirdiği anlık katılım sayıları
-                          </p>
+                    {/* 3. Günlük Yemeğe Katılım Durumu Kartı (Sade ve Net Görünüm) */}
+                    <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-4 sm:p-5 rounded-2xl sm:rounded-3xl space-y-3.5 shadow-xs transition-colors">
+                      <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#E2E8F0] dark:border-[#334155]">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm sm:text-base font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                            Yemek Katılımı
+                          </h3>
+                          <span className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+                            Bugün
+                          </span>
                         </div>
-
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => setIsAttendanceListOpen(!isAttendanceListOpen)}
-                            className="px-3 py-1.5 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] hover:bg-[#F1F5F9] dark:hover:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] text-xs font-bold text-[#0284C7] cursor-pointer transition-colors min-h-[38px]"
-                          >
-                            {isAttendanceListOpen ? "Listeyi Gizle" : "Öğrenci Listesini Göster"} ({todayMealAttendance.length})
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setManagerTab("yemekhane")}
-                            className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold cursor-pointer transition-all min-h-[38px] shadow-xs active:scale-95"
-                          >
-                            <span>Menüyü Düzenle</span>
-                            <span>→</span>
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setManagerTab("yemekhane")}
+                          className="text-xs font-bold text-[#0284C7] hover:underline cursor-pointer"
+                        >
+                          Menüye Git →
+                        </button>
                       </div>
 
-                      {/* 3 İstatistik Kartı */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {/* Katılacak (Varım) */}
-                        <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 space-y-1">
-                          <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 block">
-                            Katılacak Öğrenci Sayısı (Varım)
-                          </span>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-400">
+                      {/* 2 Sade Sayaç */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 block">
+                              Varım (Katılacak)
+                            </span>
+                            <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400">
                               {attendingCount}
                             </span>
-                            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
-                              Öğrenci
-                            </span>
                           </div>
-                          <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80">
-                            Yemekhanede bulunacak (Porsiyon hazırlanacak)
-                          </p>
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
                         </div>
 
-                        {/* Katılmayacak (Yokum) */}
-                        <div className="p-3.5 sm:p-4 rounded-2xl bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 space-y-1">
-                          <span className="text-[11px] font-bold text-rose-800 dark:text-rose-300 block">
-                            Katılmayacak Öğrenci Sayısı (Yokum)
-                          </span>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-2xl sm:text-3xl font-black text-rose-700 dark:text-rose-400">
+                        <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-semibold text-rose-800 dark:text-rose-300 block">
+                              Yokum (Katılmayacak)
+                            </span>
+                            <span className="text-2xl font-black text-rose-700 dark:text-rose-400">
                               {notAttendingCount}
                             </span>
-                            <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold">
-                              Öğrenci
-                            </span>
                           </div>
-                          <p className="text-[10px] text-rose-700/80 dark:text-rose-400/80">
-                            Yemek almayacağını bildirenler
-                          </p>
-                        </div>
-
-                        {/* Katılım Oranı */}
-                        <div className="p-3.5 sm:p-4 rounded-2xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] space-y-1">
-                          <span className="text-[11px] font-bold text-[#64748B] dark:text-[#94A3B8] block">
-                            Bildirim Yapan / Toplam Öğrenci
-                          </span>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-2xl sm:text-3xl font-black text-[#0F172A] dark:text-[#F1F5F9]">
-                              {todayMealAttendance.length}
-                            </span>
-                            <span className="text-xs text-[#64748B] dark:text-[#94A3B8]">
-                              / {students.length} Öğrenci
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">
-                            {students.length > 0 ? `%${Math.round((attendingCount / students.length) * 100)} tahmini katılım oranı` : "Öğrenci kaydı yok"}
-                          </p>
+                          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
                         </div>
                       </div>
 
-                      {/* Öğrenci Detay Listesi (Açılır/Kapanır) */}
-                      {isAttendanceListOpen && (
-                        <div className="pt-3 space-y-2.5 border-t border-[#E2E8F0] dark:border-[#334155]">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-xs font-bold text-[#0F172A] dark:text-[#F1F5F9]">
-                              Öğrenci Bildirim Detayları ({todayMealAttendance.length})
-                            </h4>
-                            <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-                              {attendingCount} Varım • {notAttendingCount} Yokum
-                            </span>
-                          </div>
+                      {/* Alt Kısım: Öğrenci Listesi Aç/Kapat */}
+                      <div className="pt-1 flex items-center justify-between text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setIsAttendanceListOpen(!isAttendanceListOpen)}
+                          className="font-bold text-[#0284C7] hover:underline cursor-pointer"
+                        >
+                          {isAttendanceListOpen ? "Listeyi Kapat" : `Öğrenci Listesi (${todayMealAttendance.length})`}
+                        </button>
+                        <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                          Toplam {students.length} öğrenci
+                        </span>
+                      </div>
 
+                      {/* Açılır Liste */}
+                      {isAttendanceListOpen && (
+                        <div className="pt-2 border-t border-[#E2E8F0] dark:border-[#334155] grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                           {todayMealAttendance.length === 0 ? (
-                            <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic py-2">
-                              Bugün için henüz katılım bildiren öğrenci bulunmuyor.
+                            <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic py-1 col-span-2">
+                              Henüz bildirim yapılmadı.
                             </p>
                           ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-60 overflow-y-auto p-1">
-                              {todayMealAttendance.map((att) => {
-                                const matched = students.find(
-                                  (s) =>
-                                    s.adSoyad.toLowerCase() === att.studentName.toLowerCase() ||
-                                    (s.eposta && s.eposta.toLowerCase() === att.studentKey.toLowerCase())
-                                );
-                                return (
-                                  <div
-                                    key={att.id}
-                                    className="p-2.5 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between text-xs"
-                                  >
-                                    <div>
-                                      <span className="font-bold text-[#0F172A] dark:text-[#F1F5F9] block">
-                                        {att.studentName}
-                                      </span>
-                                      <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">
-                                        {matched?.odaNo ? `Oda ${matched.odaNo}` : "Oda Bilgisi Yok"} • Saat: {att.updatedAt}
-                                      </span>
-                                    </div>
-                                    <span
-                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                                        att.status === "var"
-                                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300"
-                                          : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300"
-                                      }`}
-                                    >
-                                      {att.status === "var" ? "Varım" : "Yokum"}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                            todayMealAttendance.map((att) => (
+                              <div
+                                key={att.id}
+                                className="p-2 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between text-xs"
+                              >
+                                <span className="font-semibold text-[#0F172A] dark:text-[#F1F5F9]">
+                                  {att.studentName}
+                                </span>
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                    att.status === "var"
+                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                      : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                                  }`}
+                                >
+                                  {att.status === "var" ? "Varım" : "Yokum"}
+                                </span>
+                              </div>
+                            ))
                           )}
                         </div>
                       )}
@@ -3762,127 +3705,80 @@ export default function Home() {
               {/* ======================================================== */}
               {managerTab === "yemekhane" && (
                 <div className="w-full space-y-4">
-                  {/* 1. GÜNLÜK YEMEK KATILIM BİLDİRİMİ (ÖĞRENCİ VARIM / YOKUM SAYILARI) */}
-                  <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-5 sm:p-6 rounded-2xl sm:rounded-3xl space-y-4 shadow-xs transition-colors">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E8F0] dark:border-[#334155]">
-                      <div>
-                        <h3 className="text-base sm:text-lg font-bold text-[#0F172A] dark:text-[#F1F5F9]">
-                          Günlük Yemek Katılım Durumu
+                  {/* 1. GÜNLÜK YEMEK KATILIM BİLDİRİMİ */}
+                  <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-4 sm:p-5 rounded-2xl sm:rounded-3xl space-y-3.5 shadow-xs transition-colors">
+                    <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#E2E8F0] dark:border-[#334155]">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm sm:text-base font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                          Yemek Katılımı
                         </h3>
-                        <p className="text-xs text-[#64748B] dark:text-[#94A3B8] mt-0.5">
-                          Tarih: {formatTurkishDate(todayMealDateKey)} • Öğrenci panelinden gelen anlık tercihler.
-                        </p>
+                        <span className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+                          Bugün
+                        </span>
                       </div>
                       <button
                         type="button"
                         onClick={() => setIsAttendanceListOpen(!isAttendanceListOpen)}
-                        className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] hover:bg-[#F1F5F9] dark:hover:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] text-xs font-bold text-[#0284C7] cursor-pointer transition-colors min-h-[38px]"
+                        className="text-xs font-bold text-[#0284C7] hover:underline cursor-pointer"
                       >
-                        {isAttendanceListOpen ? "Listeyi Gizle" : "Öğrenci Listesini Göster"} ({todayMealAttendance.length})
+                        {isAttendanceListOpen ? "Listeyi Kapat" : `Öğrenci Listesi (${todayMealAttendance.length})`}
                       </button>
                     </div>
 
-                    {/* 3 Özet İstatistik Kartı */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {/* Katılacak (Varım) */}
-                      <div className="p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 space-y-1">
-                        <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 block">
-                          Katılacak Öğrenci Sayısı (Varım)
-                        </span>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-400">
+                    {/* 2 Sade Sayaç */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 block">
+                            Varım (Katılacak)
+                          </span>
+                          <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400">
                             {attendingCount}
                           </span>
-                          <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
-                            Öğrenci
-                          </span>
                         </div>
-                        <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80">
-                          Mutfak bu sayıya göre porsiyon hazırlar
-                        </p>
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
                       </div>
 
-                      {/* Katılmayacak (Yokum) */}
-                      <div className="p-4 rounded-2xl bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 space-y-1">
-                        <span className="text-[11px] font-bold text-rose-800 dark:text-rose-300 block">
-                          Katılmayacak Öğrenci Sayısı (Yokum)
-                        </span>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl sm:text-3xl font-black text-rose-700 dark:text-rose-400">
+                      <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-semibold text-rose-800 dark:text-rose-300 block">
+                            Yokum (Katılmayacak)
+                          </span>
+                          <span className="text-2xl font-black text-rose-700 dark:text-rose-400">
                             {notAttendingCount}
                           </span>
-                          <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold">
-                            Öğrenci
-                          </span>
                         </div>
-                        <p className="text-[10px] text-rose-700/80 dark:text-rose-400/80">
-                          Yemeğe katılmayacağını bildirenler
-                        </p>
-                      </div>
-
-                      {/* Toplam Bildirim / Katılım Oranı */}
-                      <div className="p-4 rounded-2xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] space-y-1">
-                        <span className="text-[11px] font-bold text-[#64748B] dark:text-[#94A3B8] block">
-                          Bildirim Yapan / Toplam Öğrenci
-                        </span>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl sm:text-3xl font-black text-[#0F172A] dark:text-[#F1F5F9]">
-                            {todayMealAttendance.length}
-                          </span>
-                          <span className="text-xs text-[#64748B] dark:text-[#94A3B8]">
-                            / {students.length} Öğrenci
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">
-                          {students.length > 0 ? `%${Math.round((attendingCount / students.length) * 100)} tahmini katılım oranı` : "Öğrenci kaydı yok"}
-                        </p>
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
                       </div>
                     </div>
 
-                    {/* Katılım Bildiren Öğrenciler Listesi (Açılır Detay) */}
+                    {/* Açılır Öğrenci Listesi */}
                     {isAttendanceListOpen && (
-                      <div className="pt-3 space-y-2 border-t border-[#E2E8F0] dark:border-[#334155]">
-                        <h4 className="text-xs font-bold text-[#0F172A] dark:text-[#F1F5F9]">
-                          Öğrenci Tercih Detayları ({todayMealAttendance.length})
-                        </h4>
+                      <div className="pt-2 border-t border-[#E2E8F0] dark:border-[#334155] grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                         {todayMealAttendance.length === 0 ? (
-                          <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic py-2">
-                            Bugün için henüz katılım bildiren öğrenci bulunmuyor.
+                          <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic py-1 col-span-2">
+                            Henüz bildirim yapılmadı.
                           </p>
                         ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-60 overflow-y-auto p-1">
-                            {todayMealAttendance.map((att) => {
-                              const matched = students.find(
-                                (s) =>
-                                  s.adSoyad.toLowerCase() === att.studentName.toLowerCase() ||
-                                  (s.eposta && s.eposta.toLowerCase() === att.studentKey.toLowerCase())
-                              );
-                              return (
-                                <div
-                                  key={att.id}
-                                  className="p-2.5 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between text-xs"
-                                >
-                                  <div>
-                                    <span className="font-bold text-[#0F172A] dark:text-[#F1F5F9] block">
-                                      {att.studentName}
-                                    </span>
-                                    <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">
-                                      {matched?.odaNo ? `Oda ${matched.odaNo}` : "Oda Bilgisi Yok"} • Saat: {att.updatedAt}
-                                    </span>
-                                  </div>
-                                  <span
-                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                                      att.status === "var"
-                                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300"
-                                        : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300"
-                                    }`}
-                                  >
-                                    {att.status === "var" ? "Varım" : "Yokum"}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
+                          todayMealAttendance.map((att) => (
+                            <div
+                              key={att.id}
+                              className="p-2 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between text-xs"
+                            >
+                              <span className="font-semibold text-[#0F172A] dark:text-[#F1F5F9]">
+                                {att.studentName}
+                              </span>
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                  att.status === "var"
+                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                    : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                                }`}
+                              >
+                                {att.status === "var" ? "Varım" : "Yokum"}
+                              </span>
+                            </div>
+                          ))
                         )}
                       </div>
                     )}
