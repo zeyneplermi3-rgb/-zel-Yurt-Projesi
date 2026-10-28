@@ -3397,31 +3397,37 @@ export default function Home() {
                       </button>
                     </div>
 
-                    {/* 3. Günün Yemek Menüsü Kartı (Öğrenciye Yansıyan Canlı Görünüm) */}
-                    <div className="bg-white border border-[#E2E8F0] p-3.5 sm:p-6 rounded-2xl sm:rounded-3xl space-y-3.5 sm:space-y-4 transition-colors shadow-xs">
-                      {/* Üst Başlık ve Bilgi Etiketleri */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-[#E2E8F0]">
-                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
-                          <h3 className="text-sm sm:text-base font-bold text-[#0F172A]">
-                            Günün Yemek Menüsü
-                          </h3>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 border border-emerald-500/30 shrink-0">
-                            Öğrenci Görünümü
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            Katılacak: {attendingCount} Öğrenci
-                          </span>
-                          {notAttendingCount > 0 && (
-                            <span className="text-[11px] font-bold px-2.5 py-1 rounded-xl bg-rose-50 text-rose-700 border border-rose-200">
-                              Katılmayacak: {notAttendingCount}
+                    {/* 3. Günlük Yemeğe Katılım Durumu Kartı (Ana Sayfada Canlı Katılım ve Sayaçlar) */}
+                    <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-4 sm:p-6 rounded-2xl sm:rounded-3xl space-y-4 shadow-xs transition-colors">
+                      {/* Üst Başlık ve Aksiyonlar */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E8F0] dark:border-[#334155]">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm sm:text-base font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                              Günlük Yemeğe Katılım Durumu
+                            </h3>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 shrink-0">
+                              Canlı Katılım
                             </span>
-                          )}
+                          </div>
+                          <p className="text-xs text-[#64748B] dark:text-[#94A3B8] mt-0.5">
+                            Tarih: {formatTurkishDate(todayMealDateKey)} • Öğrencilerin bildirdiği anlık katılım sayıları
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => setIsAttendanceListOpen(!isAttendanceListOpen)}
+                            className="px-3 py-1.5 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] hover:bg-[#F1F5F9] dark:hover:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] text-xs font-bold text-[#0284C7] cursor-pointer transition-colors min-h-[38px]"
+                          >
+                            {isAttendanceListOpen ? "Listeyi Gizle" : "Öğrenci Listesini Göster"} ({todayMealAttendance.length})
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => setManagerTab("yemekhane")}
-                            className="shrink-0 inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#F1F5F9] hover:bg-[#E2E8F0] border border-[#E2E8F0] text-[11px] sm:text-xs font-bold text-[#0284C7] hover:underline cursor-pointer transition-colors"
+                            className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold cursor-pointer transition-all min-h-[38px] shadow-xs active:scale-95"
                           >
                             <span>Menüyü Düzenle</span>
                             <span>→</span>
@@ -3429,166 +3435,115 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* Menü Kartları (Öğrencilerin Gördüğü Canlı Format) */}
-                      {dailyMenu.gorunumModu === "birlikte" ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
-                          {/* Sabah Kahvaltısı */}
-                          <div
-                            onClick={() => setManagerTab("yemekhane")}
-                            className="p-4 sm:p-4.5 bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#0284C7]/60 dark:hover:border-[#38BDF8]/60 rounded-2xl space-y-2.5 shadow-2xs cursor-pointer transition-all group"
-                          >
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="text-xs font-bold text-[#0284C7] dark:text-[#38BDF8] px-3 py-1 rounded-full bg-[#F1F5F9] dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] group-hover:border-[#0284C7]/40 transition-colors">
-                                Sabah Kahvaltısı
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                {dailyMenu.kaloriGoster && dailyMenu.kahvaltiKalori && (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                                    {dailyMenu.kahvaltiKalori}
-                                  </span>
-                                )}
-                                <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8] bg-white dark:bg-[#1E293B] px-2.5 py-0.5 rounded-lg border border-[#E2E8F0] dark:border-[#334155]">
-                                  {dailyMenu.kahvaltiSaat}
-                                </span>
-                              </div>
-                            </div>
-                            <p className="text-xs sm:text-[13px] text-stone-700 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-line min-h-[38px]">
-                              {dailyMenu.kahvalti || (
-                                <span className="text-stone-400 dark:text-slate-500 italic">Menü girilmedi.</span>
-                              )}
-                            </p>
-                            <div className="text-[11px] text-stone-500 dark:text-slate-400 pt-2 border-t border-[#E2E8F0] dark:border-[#334155] flex justify-between items-center">
-                              <span>Günün Servisi</span>
-                              {dailyMenu.kahvalti ? (
-                                <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 text-[11px]">
-                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Servis Hazır
-                                </span>
-                              ) : (
-                                <span className="text-stone-400 dark:text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
-                                  <span className="w-2 h-2 rounded-full bg-stone-300 dark:bg-slate-600" /> Menü Bekleniyor
-                                </span>
-                              )}
-                            </div>
+                      {/* 3 İstatistik Kartı */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {/* Katılacak (Varım) */}
+                        <div className="p-3.5 sm:p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 space-y-1">
+                          <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 block">
+                            Katılacak Öğrenci Sayısı (Varım)
+                          </span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-400">
+                              {attendingCount}
+                            </span>
+                            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                              Öğrenci
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80">
+                            Yemekhanede bulunacak (Porsiyon hazırlanacak)
+                          </p>
+                        </div>
+
+                        {/* Katılmayacak (Yokum) */}
+                        <div className="p-3.5 sm:p-4 rounded-2xl bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 space-y-1">
+                          <span className="text-[11px] font-bold text-rose-800 dark:text-rose-300 block">
+                            Katılmayacak Öğrenci Sayısı (Yokum)
+                          </span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-2xl sm:text-3xl font-black text-rose-700 dark:text-rose-400">
+                              {notAttendingCount}
+                            </span>
+                            <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold">
+                              Öğrenci
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-rose-700/80 dark:text-rose-400/80">
+                            Yemek almayacağını bildirenler
+                          </p>
+                        </div>
+
+                        {/* Katılım Oranı */}
+                        <div className="p-3.5 sm:p-4 rounded-2xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] space-y-1">
+                          <span className="text-[11px] font-bold text-[#64748B] dark:text-[#94A3B8] block">
+                            Bildirim Yapan / Toplam Öğrenci
+                          </span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-2xl sm:text-3xl font-black text-[#0F172A] dark:text-[#F1F5F9]">
+                              {todayMealAttendance.length}
+                            </span>
+                            <span className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+                              / {students.length} Öğrenci
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">
+                            {students.length > 0 ? `%${Math.round((attendingCount / students.length) * 100)} tahmini katılım oranı` : "Öğrenci kaydı yok"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Öğrenci Detay Listesi (Açılır/Kapanır) */}
+                      {isAttendanceListOpen && (
+                        <div className="pt-3 space-y-2.5 border-t border-[#E2E8F0] dark:border-[#334155]">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                              Öğrenci Bildirim Detayları ({todayMealAttendance.length})
+                            </h4>
+                            <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                              {attendingCount} Varım • {notAttendingCount} Yokum
+                            </span>
                           </div>
 
-                          {/* Akşam Yemeği */}
-                          <div
-                            onClick={() => setManagerTab("yemekhane")}
-                            className="p-4 sm:p-4.5 bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#0284C7]/60 dark:hover:border-[#38BDF8]/60 rounded-2xl space-y-2.5 shadow-2xs cursor-pointer transition-all group"
-                          >
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="text-xs font-bold text-[#0284C7] dark:text-[#38BDF8] px-3 py-1 rounded-full bg-[#F1F5F9] dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] group-hover:border-[#0284C7]/40 transition-colors">
-                                Akşam Yemeği
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                {dailyMenu.kaloriGoster && dailyMenu.aksamKalori && (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                                    {dailyMenu.aksamKalori}
-                                  </span>
-                                )}
-                                <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8] bg-white dark:bg-[#1E293B] px-2.5 py-0.5 rounded-lg border border-[#E2E8F0] dark:border-[#334155]">
-                                  {dailyMenu.aksamSaat}
-                                </span>
-                              </div>
-                            </div>
-                            <p className="text-xs sm:text-[13px] text-stone-700 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-line min-h-[38px]">
-                              {dailyMenu.aksam || (
-                                <span className="text-stone-400 dark:text-slate-500 italic">Menü girilmedi.</span>
-                              )}
+                          {todayMealAttendance.length === 0 ? (
+                            <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic py-2">
+                              Bugün için henüz katılım bildiren öğrenci bulunmuyor.
                             </p>
-                            <div className="text-[11px] text-stone-500 dark:text-slate-400 pt-2 border-t border-[#E2E8F0] dark:border-[#334155] flex justify-between items-center">
-                              <span>Günün Servisi</span>
-                              {dailyMenu.aksam ? (
-                                <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 text-[11px]">
-                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Sıcak Servis
-                                </span>
-                              ) : (
-                                <span className="text-stone-400 dark:text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
-                                  <span className="w-2 h-2 rounded-full bg-stone-300 dark:bg-slate-600" /> Menü Bekleniyor
-                                </span>
-                              )}
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-60 overflow-y-auto p-1">
+                              {todayMealAttendance.map((att) => {
+                                const matched = students.find(
+                                  (s) =>
+                                    s.adSoyad.toLowerCase() === att.studentName.toLowerCase() ||
+                                    (s.eposta && s.eposta.toLowerCase() === att.studentKey.toLowerCase())
+                                );
+                                return (
+                                  <div
+                                    key={att.id}
+                                    className="p-2.5 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between text-xs"
+                                  >
+                                    <div>
+                                      <span className="font-bold text-[#0F172A] dark:text-[#F1F5F9] block">
+                                        {att.studentName}
+                                      </span>
+                                      <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">
+                                        {matched?.odaNo ? `Oda ${matched.odaNo}` : "Oda Bilgisi Yok"} • Saat: {att.updatedAt}
+                                      </span>
+                                    </div>
+                                    <span
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                        att.status === "var"
+                                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300"
+                                          : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300"
+                                      }`}
+                                    >
+                                      {att.status === "var" ? "Varım" : "Yokum"}
+                                    </span>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          </div>
+                          )}
                         </div>
-                      ) : (
-                        /* Tek Öğün Görünümü */
-                        dailyMenu.aktifOgun === "kahvalti" ? (
-                          <div
-                            onClick={() => setManagerTab("yemekhane")}
-                            className="p-4 sm:p-5 bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#0284C7]/60 dark:hover:border-[#38BDF8]/60 rounded-2xl space-y-2.5 shadow-2xs cursor-pointer transition-all group"
-                          >
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="text-xs font-bold text-[#0284C7] dark:text-[#38BDF8] px-3 py-1 rounded-full bg-[#F1F5F9] dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155]">
-                                Sabah Kahvaltısı Servisi
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                {dailyMenu.kaloriGoster && dailyMenu.kahvaltiKalori && (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                                    {dailyMenu.kahvaltiKalori}
-                                  </span>
-                                )}
-                                <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8] bg-white dark:bg-[#1E293B] px-2.5 py-0.5 rounded-lg border border-[#E2E8F0] dark:border-[#334155]">
-                                  {dailyMenu.kahvaltiSaat}
-                                </span>
-                              </div>
-                            </div>
-                            <p className="text-xs sm:text-sm text-stone-700 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-line min-h-[38px]">
-                              {dailyMenu.kahvalti || (
-                                <span className="text-stone-400 dark:text-slate-500 italic">Menü girilmedi.</span>
-                              )}
-                            </p>
-                            <div className="text-[11px] text-stone-500 dark:text-slate-400 pt-2 border-t border-[#E2E8F0] dark:border-[#334155] flex justify-between items-center">
-                              <span>Günün Servisi</span>
-                              {dailyMenu.kahvalti ? (
-                                <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 text-[11px]">
-                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Servis Hazır
-                                </span>
-                              ) : (
-                                <span className="text-stone-400 dark:text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
-                                  <span className="w-2 h-2 rounded-full bg-stone-300 dark:bg-slate-600" /> Menü Bekleniyor
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <div
-                            onClick={() => setManagerTab("yemekhane")}
-                            className="p-4 sm:p-5 bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#0284C7]/60 dark:hover:border-[#38BDF8]/60 rounded-2xl space-y-2.5 shadow-2xs cursor-pointer transition-all group"
-                          >
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="text-xs font-bold text-[#0284C7] dark:text-[#38BDF8] px-3 py-1 rounded-full bg-[#F1F5F9] dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155]">
-                                Akşam Yemeği Servisi
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                {dailyMenu.kaloriGoster && dailyMenu.aksamKalori && (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                                    {dailyMenu.aksamKalori}
-                                  </span>
-                                )}
-                                <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8] bg-white dark:bg-[#1E293B] px-2.5 py-0.5 rounded-lg border border-[#E2E8F0] dark:border-[#334155]">
-                                  {dailyMenu.aksamSaat}
-                                </span>
-                              </div>
-                            </div>
-                            <p className="text-xs sm:text-sm text-stone-700 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-line min-h-[38px]">
-                              {dailyMenu.aksam || (
-                                <span className="text-stone-400 dark:text-slate-500 italic">Menü girilmedi.</span>
-                              )}
-                            </p>
-                            <div className="text-[11px] text-stone-500 dark:text-slate-400 pt-2 border-t border-[#E2E8F0] dark:border-[#334155] flex justify-between items-center">
-                              <span>Günün Servisi</span>
-                              {dailyMenu.aksam ? (
-                                <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 text-[11px]">
-                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Sıcak Servis
-                                </span>
-                              ) : (
-                                <span className="text-stone-400 dark:text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
-                                  <span className="w-2 h-2 rounded-full bg-stone-300 dark:bg-slate-600" /> Menü Bekleniyor
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        )
                       )}
                     </div>
 
