@@ -12,6 +12,7 @@ import {
   LaundrySlot,
   LaundryMachine,
   Role,
+  MealAttendanceRecord,
 } from "../../types";
 
 export type StudentTab = "anasayfa" | "camasirhane" | "ariza" | "ayarlar";
@@ -58,6 +59,8 @@ interface StudentPortalViewProps {
     studentName: string,
     updates: { kullaniciAdi?: string; eposta?: string; sifre?: string }
   ) => void;
+  mealAttendance?: MealAttendanceRecord[];
+  onSaveMealAttendance?: (status: "var" | "yok") => void;
   theme?: "light" | "dark";
   onToggleTheme?: () => void;
   onSelectTheme?: (theme: "light" | "dark") => void;
@@ -81,6 +84,8 @@ export default function StudentPortalView({
   onCancelLaundrySlot,
   onUpdateStudentPassword,
   onUpdateStudentProfile,
+  mealAttendance = [],
+  onSaveMealAttendance,
   theme = "light",
   onToggleTheme,
   onSelectTheme,
@@ -172,6 +177,41 @@ export default function StudentPortalView({
       r.odaNo.trim().toLowerCase() === odaNo!.trim().toLowerCase() ||
       r.odaNo.replace(/\D/g, "") === odaNo!.replace(/\D/g, "")
   );
+
+  // Günlük yemek katılım (Varım / Yokum) tespiti ve durumu
+  const todayDateStr = getTodayDateKey();
+  const currentAttendance = mealAttendance?.find(
+    (a) =>
+      a.date === todayDateStr &&
+      (a.studentKey.toLowerCase() === (currentStudent?.eposta || "").toLowerCase() ||
+        a.studentKey.toLowerCase() === currentUser.name.toLowerCase() ||
+        a.studentName.toLowerCase() === currentUser.name.toLowerCase())
+  );
+
+  const [selectedAttendance, setSelectedAttendance] = useState<"var" | "yok" | null>(
+    currentAttendance?.status || null
+  );
+
+  useEffect(() => {
+    if (currentAttendance?.status) {
+      setSelectedAttendance(currentAttendance.status);
+    }
+  }, [currentAttendance?.status]);
+
+  const handleSaveAttendance = () => {
+    if (!selectedAttendance) {
+      showToast("Lütfen 'Varım' veya 'Yokum' seçeneklerinden birini işaretleyiniz.");
+      return;
+    }
+    if (onSaveMealAttendance) {
+      onSaveMealAttendance(selectedAttendance);
+    }
+    showToast(
+      selectedAttendance === "var"
+        ? "Yemek tercihiniz 'Varım (Katılacağım)' olarak kaydedildi!"
+        : "Yemek tercihiniz 'Yokum (Katılmayacağım)' olarak kaydedildi!"
+    );
+  };
 
   let katDisplay: string | number = "";
   if (matchedRoom?.kat !== undefined) {
@@ -578,6 +618,71 @@ export default function StudentPortalView({
                 </div>
               </div>
             )}
+
+            {/* Yemek Katılım Bildirimi (Varım / Yokum & Kaydet) */}
+            <div className="pt-3.5 border-t border-[#E2E8F0] dark:border-[#334155] space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                    Bugünkü Yemeğe Katılacak mısınız?
+                  </h4>
+                  <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                    Yemekhane porsiyon planlaması ve israfı önlemek için tercihinizi belirtiniz.
+                  </p>
+                </div>
+                {currentAttendance?.status && (
+                  <span
+                    className={`text-[11px] font-bold px-2.5 py-1 rounded-full border self-start sm:self-auto ${
+                      currentAttendance.status === "var"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                        : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
+                    }`}
+                  >
+                    Kayıtlı Durum: {currentAttendance.status === "var" ? "Varım" : "Yokum"}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                {/* Varım Butonu */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedAttendance("var")}
+                  className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer min-h-[44px] active:scale-95 ${
+                    selectedAttendance === "var"
+                      ? "bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-500/30 font-black"
+                      : "bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] hover:border-emerald-500 hover:text-emerald-700"
+                  }`}
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full ${selectedAttendance === "var" ? "bg-white" : "bg-emerald-500"}`} />
+                  Varım
+                </button>
+
+                {/* Yokum Butonu */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedAttendance("yok")}
+                  className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer min-h-[44px] active:scale-95 ${
+                    selectedAttendance === "yok"
+                      ? "bg-rose-600 text-white shadow-xs ring-2 ring-rose-500/30 font-black"
+                      : "bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] hover:border-rose-500 hover:text-rose-700"
+                  }`}
+                >
+                  <span className={`w-2.5 h-2.5 rounded-full ${selectedAttendance === "yok" ? "bg-white" : "bg-rose-500"}`} />
+                  Yokum
+                </button>
+
+                {/* Kaydet Butonu */}
+                <button
+                  type="button"
+                  onClick={handleSaveAttendance}
+                  disabled={!selectedAttendance}
+                  className="sm:w-auto px-6 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm rounded-xl cursor-pointer transition-all shadow-xs active:scale-95 min-h-[44px] border border-[#0369A1]"
+                >
+                  Kaydet
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Duyurular */}

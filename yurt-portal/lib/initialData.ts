@@ -5,6 +5,7 @@ import {
   LaundryMachine,
   MaintenanceTicket,
   Announcement,
+  MealAttendanceRecord,
 } from "../types";
 
 export const defaultStudents: Student[] = [
@@ -206,3 +207,10 @@ export const defaultYurtSettings = {
   hizliGirisIzin: true,
   guvenliOturum: true,
 };
+
+export const defaultMealAttendance: MealAttendanceRecord[] = [
+  { id: "att-1", studentKey: "zeynep.lermi@gmail.com", studentName: "Zeynep Lermi", date: "2026-10-28", status: "var", updatedAt: "12:00" },
+  { id: "att-2", studentKey: "elif.yilmaz@gmail.com", studentName: "Elif Yılmaz", date: "2026-10-28", status: "var", updatedAt: "12:15" },
+  { id: "att-3", studentKey: "ayse.demir@gmail.com", studentName: "Ayşe Demir", date: "2026-10-28", status: "yok", updatedAt: "12:30" },
+  { id: "att-4", studentKey: "fatma.kaya@gmail.com", studentName: "Fatma Kaya", date: "2026-10-28", status: "var", updatedAt: "12:45" },
+];

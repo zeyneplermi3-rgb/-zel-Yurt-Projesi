@@ -128,6 +128,15 @@ export interface DailyMenu {
   };
 }
 
+export interface MealAttendanceRecord {
+  id: string;
+  studentKey: string;
+  studentName: string;
+  date: string; // YYYY-MM-DD
+  status: "var" | "yok";
+  updatedAt: string;
+}
+
 export interface YurtSettings {
   haftaIciGiris: string;
   haftaSonuGiris: string;

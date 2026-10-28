@@ -12,6 +12,7 @@ import type {
   Announcement,
   LaundrySlot,
   LaundryMachine,
+  MealAttendanceRecord,
 } from "../types";
 import {
   defaultStudents,
@@ -22,6 +23,7 @@ import {
   defaultAnnouncements,
   defaultDailyMenu,
   defaultYurtSettings,
+  defaultMealAttendance,
 } from "../lib/initialData";
 import {
   getTodayDateKey,
@@ -351,6 +353,24 @@ export default function Home() {
     tarih: "",
   });
   const [isEditingMenu, setIsEditingMenu] = useState(false);
+
+  // Günlük Yemek Katılım Bildirimi State'i (Öğrenci Varım / Yokum tercihleri)
+  const [mealAttendance, setMealAttendance] = useState<MealAttendanceRecord[]>([]);
+  const [isAttendanceListOpen, setIsAttendanceListOpen] = useState(false);
+
+  // Günün yemek katılım hesaplamaları (Müdürün göreceği sayılar)
+  const todayMealDateKey = getTodayDateKey();
+  const todayMealAttendance = useMemo(() => {
+    return mealAttendance.filter((a) => a.date === todayMealDateKey);
+  }, [mealAttendance, todayMealDateKey]);
+
+  const attendingCount = useMemo(() => {
+    return todayMealAttendance.filter((a) => a.status === "var").length;
+  }, [todayMealAttendance]);
+
+  const notAttendingCount = useMemo(() => {
+    return todayMealAttendance.filter((a) => a.status === "yok").length;
+  }, [todayMealAttendance]);
 
   // Zaman Seçici (Time Range Wheel Picker) Modalı State'i
   const [timePickerModal, setTimePickerModal] = useState<{
@@ -930,6 +950,23 @@ export default function Home() {
             console.error("Settings parse error:", e);
           }
         }
+
+        const savedAttendance = localStorage.getItem("yurtify_meal_attendance");
+        if (savedAttendance) {
+          try {
+            const parsed = JSON.parse(savedAttendance);
+            if (Array.isArray(parsed)) {
+              setMealAttendance(parsed);
+            }
+          } catch (e) {
+            console.error("Meal attendance parse error:", e);
+          }
+        } else {
+          const todayKey = getTodayDateKey();
+          const seeded = defaultMealAttendance.map((a) => ({ ...a, date: todayKey }));
+          setMealAttendance(seeded);
+          localStorage.setItem("yurtify_meal_attendance", JSON.stringify(seeded));
+        }
       } catch (e) {
         console.error("Local storage error:", e);
       } finally {
@@ -1055,6 +1092,14 @@ export default function Home() {
           if (Array.isArray(parsed)) setMaintenanceTickets(parsed);
         }
       } catch {}
+
+      try {
+        const freshAttendance = localStorage.getItem("yurtify_meal_attendance");
+        if (freshAttendance) {
+          const parsed = JSON.parse(freshAttendance);
+          if (Array.isArray(parsed)) setMealAttendance(parsed);
+        }
+      } catch {}
     };
 
     const handleVisibility = () => {
@@ -1098,6 +1143,14 @@ export default function Home() {
           const updated = JSON.parse(e.newValue);
           if (Array.isArray(updated)) {
             setMaintenanceTickets(updated);
+          }
+        } catch {}
+      }
+      if (e.key === "yurtify_meal_attendance" && e.newValue) {
+        try {
+          const updated = JSON.parse(e.newValue);
+          if (Array.isArray(updated)) {
+            setMealAttendance(updated);
           }
         } catch {}
       }
@@ -2035,6 +2088,55 @@ export default function Home() {
       localStorage.setItem("yurtify_menu", JSON.stringify(updated));
     }
     showToast(`Tek öğün modunda "${meal === "kahvalti" ? "Sabah Kahvaltısı" : "Akşam Yemeği"}" seçildi.`);
+  };
+
+  // Günlük yemek katılım tercihini kaydet (Öğrenci Varım / Yokum tercihi)
+  const handleSaveMealAttendance = (
+    status: "var" | "yok",
+    studentName?: string,
+    studentKey?: string
+  ) => {
+    const today = getTodayDateKey();
+    const sName = studentName || currentUser?.name || "Öğrenci";
+    const sKey = studentKey || currentUser?.details || currentUser?.name || "ogrenci";
+
+    let current = mealAttendance;
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("yurtify_meal_attendance");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) current = parsed;
+        }
+      } catch {}
+    }
+
+    const filtered = current.filter(
+      (r) =>
+        !(
+          r.date === today &&
+          (r.studentKey.toLowerCase() === sKey.toLowerCase() ||
+            r.studentName.toLowerCase() === sName.toLowerCase())
+        )
+    );
+
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
+    const newRecord: MealAttendanceRecord = {
+      id: `att-${Date.now()}`,
+      studentKey: sKey,
+      studentName: sName,
+      date: today,
+      status: status,
+      updatedAt: timeStr,
+    };
+
+    const updated = [newRecord, ...filtered];
+    setMealAttendance(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("yurtify_meal_attendance", JSON.stringify(updated));
+    }
   };
 
   const handleSelectMealMode = (mode: "kahvalti" | "aksam" | "birlikte") => {
@@ -3298,7 +3400,7 @@ export default function Home() {
                     {/* 3. Günün Yemek Menüsü Kartı (Öğrenciye Yansıyan Canlı Görünüm) */}
                     <div className="bg-white border border-[#E2E8F0] p-3.5 sm:p-6 rounded-2xl sm:rounded-3xl space-y-3.5 sm:space-y-4 transition-colors shadow-xs">
                       {/* Üst Başlık ve Bilgi Etiketleri */}
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-[#E2E8F0]">
                         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
                           <h3 className="text-sm sm:text-base font-bold text-[#0F172A]">
                             Günün Yemek Menüsü
@@ -3307,14 +3409,24 @@ export default function Home() {
                             Öğrenci Görünümü
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setManagerTab("yemekhane")}
-                          className="shrink-0 inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#F1F5F9] hover:bg-[#E2E8F0] border border-[#E2E8F0] text-[11px] sm:text-xs font-bold text-[#0284C7] hover:underline cursor-pointer transition-colors"
-                        >
-                          <span>Menüyü Düzenle</span>
-                          <span>→</span>
-                        </button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Katılacak: {attendingCount} Öğrenci
+                          </span>
+                          {notAttendingCount > 0 && (
+                            <span className="text-[11px] font-bold px-2.5 py-1 rounded-xl bg-rose-50 text-rose-700 border border-rose-200">
+                              Katılmayacak: {notAttendingCount}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setManagerTab("yemekhane")}
+                            className="shrink-0 inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#F1F5F9] hover:bg-[#E2E8F0] border border-[#E2E8F0] text-[11px] sm:text-xs font-bold text-[#0284C7] hover:underline cursor-pointer transition-colors"
+                          >
+                            <span>Menüyü Düzenle</span>
+                            <span>→</span>
+                          </button>
+                        </div>
                       </div>
 
                       {/* Menü Kartları (Öğrencilerin Gördüğü Canlı Format) */}
@@ -3695,6 +3807,132 @@ export default function Home() {
               {/* ======================================================== */}
               {managerTab === "yemekhane" && (
                 <div className="w-full space-y-4">
+                  {/* 1. GÜNLÜK YEMEK KATILIM BİLDİRİMİ (ÖĞRENCİ VARIM / YOKUM SAYILARI) */}
+                  <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-5 sm:p-6 rounded-2xl sm:rounded-3xl space-y-4 shadow-xs transition-colors">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E8F0] dark:border-[#334155]">
+                      <div>
+                        <h3 className="text-base sm:text-lg font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                          Günlük Yemek Katılım Durumu
+                        </h3>
+                        <p className="text-xs text-[#64748B] dark:text-[#94A3B8] mt-0.5">
+                          Tarih: {formatTurkishDate(todayMealDateKey)} • Öğrenci panelinden gelen anlık tercihler.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsAttendanceListOpen(!isAttendanceListOpen)}
+                        className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] hover:bg-[#F1F5F9] dark:hover:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] text-xs font-bold text-[#0284C7] cursor-pointer transition-colors min-h-[38px]"
+                      >
+                        {isAttendanceListOpen ? "Listeyi Gizle" : "Öğrenci Listesini Göster"} ({todayMealAttendance.length})
+                      </button>
+                    </div>
+
+                    {/* 3 Özet İstatistik Kartı */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* Katılacak (Varım) */}
+                      <div className="p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 space-y-1">
+                        <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 block">
+                          Katılacak Öğrenci Sayısı (Varım)
+                        </span>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-400">
+                            {attendingCount}
+                          </span>
+                          <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                            Öğrenci
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80">
+                          Mutfak bu sayıya göre porsiyon hazırlar
+                        </p>
+                      </div>
+
+                      {/* Katılmayacak (Yokum) */}
+                      <div className="p-4 rounded-2xl bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 space-y-1">
+                        <span className="text-[11px] font-bold text-rose-800 dark:text-rose-300 block">
+                          Katılmayacak Öğrenci Sayısı (Yokum)
+                        </span>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl sm:text-3xl font-black text-rose-700 dark:text-rose-400">
+                            {notAttendingCount}
+                          </span>
+                          <span className="text-xs text-rose-600 dark:text-rose-400 font-semibold">
+                            Öğrenci
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-rose-700/80 dark:text-rose-400/80">
+                          Yemeğe katılmayacağını bildirenler
+                        </p>
+                      </div>
+
+                      {/* Toplam Bildirim / Katılım Oranı */}
+                      <div className="p-4 rounded-2xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] space-y-1">
+                        <span className="text-[11px] font-bold text-[#64748B] dark:text-[#94A3B8] block">
+                          Bildirim Yapan / Toplam Öğrenci
+                        </span>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl sm:text-3xl font-black text-[#0F172A] dark:text-[#F1F5F9]">
+                            {todayMealAttendance.length}
+                          </span>
+                          <span className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+                            / {students.length} Öğrenci
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">
+                          {students.length > 0 ? `%${Math.round((attendingCount / students.length) * 100)} tahmini katılım oranı` : "Öğrenci kaydı yok"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Katılım Bildiren Öğrenciler Listesi (Açılır Detay) */}
+                    {isAttendanceListOpen && (
+                      <div className="pt-3 space-y-2 border-t border-[#E2E8F0] dark:border-[#334155]">
+                        <h4 className="text-xs font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                          Öğrenci Tercih Detayları ({todayMealAttendance.length})
+                        </h4>
+                        {todayMealAttendance.length === 0 ? (
+                          <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic py-2">
+                            Bugün için henüz katılım bildiren öğrenci bulunmuyor.
+                          </p>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-60 overflow-y-auto p-1">
+                            {todayMealAttendance.map((att) => {
+                              const matched = students.find(
+                                (s) =>
+                                  s.adSoyad.toLowerCase() === att.studentName.toLowerCase() ||
+                                  (s.eposta && s.eposta.toLowerCase() === att.studentKey.toLowerCase())
+                              );
+                              return (
+                                <div
+                                  key={att.id}
+                                  className="p-2.5 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between text-xs"
+                                >
+                                  <div>
+                                    <span className="font-bold text-[#0F172A] dark:text-[#F1F5F9] block">
+                                      {att.studentName}
+                                    </span>
+                                    <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">
+                                      {matched?.odaNo ? `Oda ${matched.odaNo}` : "Oda Bilgisi Yok"} • Saat: {att.updatedAt}
+                                    </span>
+                                  </div>
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                      att.status === "var"
+                                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300"
+                                        : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300"
+                                    }`}
+                                  >
+                                    {att.status === "var" ? "Varım" : "Yokum"}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Menü Girişi Formu */}
                   <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-5 sm:p-7 rounded-2xl sm:rounded-3xl space-y-5 shadow-xs transition-colors">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E8F0] dark:border-[#334155]">
@@ -6061,6 +6299,8 @@ export default function Home() {
             maintenanceTickets={maintenanceTickets}
             rooms={rooms}
             students={students}
+            mealAttendance={mealAttendance}
+            onSaveMealAttendance={handleSaveMealAttendance}
             laundrySlots={liveLaundrySlots}
             laundryMachines={laundryMachines}
             onAddLaundrySlot={(slot) => {
