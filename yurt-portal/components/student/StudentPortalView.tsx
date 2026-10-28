@@ -191,6 +191,7 @@ export default function StudentPortalView({
   const [selectedAttendance, setSelectedAttendance] = useState<"var" | "yok" | null>(
     currentAttendance?.status || null
   );
+  const [justSaved, setJustSaved] = useState(false);
 
   useEffect(() => {
     if (currentAttendance?.status) {
@@ -198,11 +199,19 @@ export default function StudentPortalView({
     }
   }, [currentAttendance?.status]);
 
+  const handleSelectAttendance = (status: "var" | "yok") => {
+    setSelectedAttendance(status);
+    if (currentAttendance?.status !== status) {
+      setJustSaved(false);
+    }
+  };
+
   const handleSaveAttendance = () => {
     if (!selectedAttendance) {
       showToast("Lütfen 'Varım' veya 'Yokum' seçeneklerinden birini işaretleyiniz.");
       return;
     }
+    setJustSaved(true);
     if (onSaveMealAttendance) {
       onSaveMealAttendance(selectedAttendance);
     }
@@ -638,45 +647,70 @@ export default function StudentPortalView({
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
-                {/* Varım Butonu */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedAttendance("var")}
-                  className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] active:scale-95 ${
-                    selectedAttendance === "var"
-                      ? "bg-emerald-600 text-white shadow-xs font-black ring-2 ring-emerald-500/30"
-                      : "bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] hover:border-emerald-500"
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${selectedAttendance === "var" ? "bg-white" : "bg-emerald-500"}`} />
-                  Varım
-                </button>
+              {(() => {
+                const isSaved = Boolean(
+                  justSaved ||
+                  (currentAttendance?.status && currentAttendance.status === selectedAttendance)
+                );
+                const isUpdate = Boolean(
+                  currentAttendance?.status && selectedAttendance && currentAttendance.status !== selectedAttendance
+                );
 
-                {/* Yokum Butonu */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedAttendance("yok")}
-                  className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] active:scale-95 ${
-                    selectedAttendance === "yok"
-                      ? "bg-rose-600 text-white shadow-xs font-black ring-2 ring-rose-500/30"
-                      : "bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] hover:border-rose-500"
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${selectedAttendance === "yok" ? "bg-white" : "bg-rose-500"}`} />
-                  Yokum
-                </button>
+                return (
+                  <div className="flex items-center gap-2">
+                    {/* Varım Butonu */}
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAttendance("var")}
+                      className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] active:scale-95 ${
+                        selectedAttendance === "var"
+                          ? "bg-emerald-600 text-white shadow-xs font-black ring-2 ring-emerald-500/30"
+                          : "bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] hover:border-emerald-500"
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${selectedAttendance === "var" ? "bg-white" : "bg-emerald-500"}`} />
+                      Varım
+                    </button>
 
-                {/* Kaydet Butonu */}
-                <button
-                  type="button"
-                  onClick={handleSaveAttendance}
-                  disabled={!selectedAttendance}
-                  className="px-5 py-2 bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm rounded-xl cursor-pointer transition-all shadow-xs active:scale-95 min-h-[44px]"
-                >
-                  Kaydet
-                </button>
-              </div>
+                    {/* Yokum Butonu */}
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAttendance("yok")}
+                      className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] active:scale-95 ${
+                        selectedAttendance === "yok"
+                          ? "bg-rose-600 text-white shadow-xs font-black ring-2 ring-rose-500/30"
+                          : "bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] hover:border-rose-500"
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${selectedAttendance === "yok" ? "bg-white" : "bg-rose-500"}`} />
+                      Yokum
+                    </button>
+
+                    {/* Kaydet / Kaydedildi / Güncelle Butonu */}
+                    {isSaved ? (
+                      <button
+                        type="button"
+                        disabled
+                        className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs sm:text-sm rounded-xl shadow-xs min-h-[44px] flex items-center justify-center gap-1.5 cursor-default transition-all"
+                      >
+                        <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Kaydedildi</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSaveAttendance}
+                        disabled={!selectedAttendance}
+                        className="px-5 py-2 bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm rounded-xl cursor-pointer transition-all shadow-xs active:scale-95 min-h-[44px] flex items-center justify-center gap-1.5"
+                      >
+                        <span>{isUpdate ? "Güncelle" : "Kaydet"}</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
