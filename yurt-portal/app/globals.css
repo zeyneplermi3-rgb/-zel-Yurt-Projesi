@@ -1,160 +1,546 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #FAF7F2;
-  --foreground: #3D110B;
+  --background: #F8FAFC;
+  --foreground: #0F172A;
 }
 
 @theme {
-  /* User-Provided 5-Color Palette */
-  --color-palette-espresso: #3D110B;
-  --color-palette-mahogany: #662B16;
-  --color-palette-caramel: #99501B;
-  --color-palette-amber: #D1841A;
-  --color-palette-gold: #FFC90C;
+  /* Asil Dark & Minimal Light Color Palette Tokens */
+  --color-palette-bg: #F8FAFC;
+  --color-palette-surface: #FFFFFF;
+  --color-palette-text: #0F172A;
+  --color-palette-primary: #0284C7;
+  --color-palette-primary-hover: #0369A1;
+  --color-palette-accent: #0284C7;
+  --color-palette-accent-hover: #0369A1;
+  --color-palette-border: #E2E8F0;
 
   /* Modern Flat Surfaces & Neutral Accents */
-  --color-flat-bg: #FAF7F2;
+  --color-flat-bg: #F8FAFC;
   --color-flat-surface: #FFFFFF;
-  --color-flat-surface-alt: #F5EFE6;
-  --color-flat-border: #E8DCCF;
-  --color-flat-border-strong: #D4C2B0;
-  --color-flat-border-accent: #D1841A;
+  --color-flat-surface-alt: #F1F5F9;
+  --color-flat-border: #E2E8F0;
+  --color-flat-border-strong: #CBD5E1;
+  --color-flat-border-accent: #0284C7;
 
-  /* Harmonized Yellow & Amber Utility Remapping */
-  --color-yellow-50: #FAF6F0;
-  --color-yellow-100: #F4ECE1;
-  --color-yellow-200: #E8DCCF;
-  --color-yellow-300: #FFC90C;
-  --color-yellow-400: #D1841A;
-  --color-yellow-500: #99501B;
-  --color-yellow-600: #662B16;
-  --color-yellow-700: #52200F;
-  --color-yellow-800: #3D110B;
-  --color-yellow-900: #290A06;
-  --color-yellow-950: #1A0704;
+  /* Slate & Sky Utility Remapping */
+  --color-yellow-50: #F8FAFC;
+  --color-yellow-100: #F1F5F9;
+  --color-yellow-200: #E2E8F0;
+  --color-yellow-300: #38BDF8;
+  --color-yellow-400: #0284C7;
+  --color-yellow-500: #0369A1;
+  --color-yellow-600: #075985;
+  --color-yellow-700: #0F172A;
+  --color-yellow-800: #0B1220;
+  --color-yellow-900: #070D18;
+  --color-yellow-950: #030712;
 
-  /* Harmonized Dark Text (Espresso & Mahogany Tones) */
-  --color-stone-950: #250B07;
-  --color-stone-900: #3D110B;
-  --color-stone-800: #542213;
-  --color-stone-700: #6B3322;
-  --color-stone-600: #855342;
-  --color-stone-500: #9C7262;
-  --color-stone-400: #B8998C;
-  --color-stone-300: #D6C2B8;
-  --color-stone-200: #EADFD8;
-  --color-stone-100: #F6F0EC;
-  --color-stone-50: #FDFBF9;
+  /* Slate Text Tones */
+  --color-stone-950: #020617;
+  --color-stone-900: #0F172A;
+  --color-stone-800: #1E293B;
+  --color-stone-700: #334155;
+  --color-stone-600: #475569;
+  --color-stone-500: #64748B;
+  --color-stone-400: #94A3B8;
+  --color-stone-300: #CBD5E1;
+  --color-stone-200: #E2E8F0;
+  --color-stone-100: #F1F5F9;
+  --color-stone-50: #F8FAFC;
 }
 
 html {
   scrollbar-gutter: stable both-edges;
   overflow-y: scroll;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
+/* Telefon ve tablet ekranlarında her şeyin ekstra devasa görünmesini engelleyen kompakt orantılama */
+@media (max-width: 768px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 360px) {
+  html {
+    font-size: 12px;
+  }
+}
+
+
 body {
-  background: #FAF7F2;
-  color: #3D110B;
+  background: #F8FAFC;
+  color: #0F172A;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: clip;
+  width: 100%;
 }
 
-/* Modern Flat Scrollbar */
+/* Oturum mevcutken ilk renderda giriş ekranının parlamasını önle */
+html.has-session .login-screen-container {
+  display: none !important;
+}
+
+/* Otomatik Boyutlanan ve Tutamacı Gizlenmiş Textarea Standartları */
+textarea {
+  resize: none !important;
+  field-sizing: content;
+  max-height: 480px;
+}
+
+/* Modern Flat Scrollbar - Light */
 ::-webkit-scrollbar {
   width: 7px;
   height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: #F4ECE1;
+  background: #F1F5F9;
 }
 ::-webkit-scrollbar-thumb {
-  background: #D1841A;
+  background: #0284C7;
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #99501B;
+  background: #0369A1;
 }
 
-/* Selection Highlight */
+/* Selection Highlight - Light */
 ::selection {
-  background-color: #FFC90C;
-  color: #3D110B;
+  background-color: #0284C7;
+  color: #FFFFFF;
 }
 
-/* Modern Flat Utility Enhancements */
+/* Modern Flat Utility Enhancements - Light */
 .flat-card {
   background-color: #FFFFFF;
-  border: 1px solid #E8DCCF;
+  border: 1px solid #E2E8F0;
   box-shadow: none;
 }
 .flat-card-interactive {
   background-color: #FFFFFF;
-  border: 1px solid #E8DCCF;
+  border: 1px solid #E2E8F0;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 .flat-card-interactive:hover {
-  border-color: #D1841A;
+  border-color: #0284C7;
 }
 
 .flat-btn-gold {
-  background-color: #FFC90C;
-  color: #3D110B;
+  background-color: #0284C7;
+  color: #FFFFFF;
   font-weight: 700;
-  border: 1px solid #E5B409;
+  border: 1px solid #0369A1;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 .flat-btn-gold:hover {
-  background-color: #D1841A;
+  background-color: #0369A1;
   color: #FFFFFF;
-  border-color: #BA7313;
+  border-color: #0284C7;
 }
 
 .flat-btn-caramel {
-  background-color: #99501B;
+  background-color: #0284C7;
   color: #FFFFFF;
   font-weight: 700;
-  border: 1px solid #824314;
+  border: 1px solid #0369A1;
   transition: background-color 0.15s ease;
 }
 .flat-btn-caramel:hover {
-  background-color: #662B16;
+  background-color: #0369A1;
 }
 
 .flat-btn-mahogany {
-  background-color: #662B16;
+  background-color: #0F172A;
   color: #FFFFFF;
   font-weight: 700;
-  border: 1px solid #52200F;
+  border: 1px solid #020617;
   transition: background-color 0.15s ease;
 }
 .flat-btn-mahogany:hover {
-  background-color: #3D110B;
+  background-color: #020617;
 }
 
 .flat-btn-espresso {
-  background-color: #3D110B;
-  color: #FFC90C;
+  background-color: #0284C7;
+  color: #FFFFFF;
   font-weight: 700;
-  border: 1px solid #290A06;
+  border: 1px solid #0369A1;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 .flat-btn-espresso:hover {
-  background-color: #662B16;
+  background-color: #0369A1;
   color: #FFFFFF;
 }
 
 .flat-input {
   background-color: #FFFFFF;
-  border: 1px solid #E8DCCF;
-  color: #3D110B;
+  border: 1px solid #E2E8F0;
+  color: #0F172A;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .flat-input:focus {
   outline: none;
-  border-color: #D1841A;
-  box-shadow: 0 0 0 2px rgba(255, 201, 12, 0.25);
+  border-color: #0284C7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25);
 }
 
+/* Günün Yemek Menüsü Butonları - Aydınlık Mod */
+.meal-card-btn {
+  background-color: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  transition: all 0.15s ease;
+}
+.meal-card-btn:hover {
+  background-color: #F1F5F9;
+  border-color: #0284C7;
+}
+.meal-card-title {
+  color: #0F172A;
+  transition: color 0.15s ease;
+}
+.meal-card-btn:hover .meal-card-title {
+  color: #0284C7;
+}
+.meal-card-desc {
+  color: #64748B;
+}
+.meal-time-badge {
+  background-color: #FFFFFF;
+  color: #0284C7;
+  border: 1px solid #E2E8F0;
+}
+
+/* ========================================================================== */
+/* DARK MODE (KARANLIK MOD - ASİL VE PRESTİJLİ)                                */
+/* ========================================================================== */
+html.dark, .dark {
+  color-scheme: dark;
+}
+
+html.dark body, .dark body {
+  background-color: #0F172A;
+  color: #F1F5F9;
+}
+
+/* Koyu Mod Kaydırma Çubuğu & Seçim Vurgusu */
+.dark ::-webkit-scrollbar-track {
+  background: #0F172A;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 2px;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #38BDF8;
+}
+.dark ::selection {
+  background-color: #38BDF8;
+  color: #0F172A;
+}
+
+/* Koyu Mod Arka Planlar & Yüzeyler (Slate 900 & Slate 800) */
+.dark .bg-white {
+  background-color: #1E293B !important;
+}
+.dark .bg-\[\#F8FAFC\],
+.dark .bg-\[\#F4F6F4\],
+.dark .bg-slate-50,
+.dark .bg-gray-50 {
+  background-color: #0F172A !important;
+}
+.dark .bg-\[\#F1F5F9\],
+.dark .bg-\[\#EDF2EE\] {
+  background-color: #162032 !important;
+}
+.dark .bg-\[\#F0F9FF\],
+.dark .bg-sky-50 {
+  background-color: #162032 !important;
+}
+.dark .bg-white\/95 {
+  background-color: rgba(30, 41, 59, 0.95) !important;
+}
+.dark .bg-white\/90 {
+  background-color: rgba(30, 41, 59, 0.90) !important;
+}
+.dark .bg-white\/80 {
+  background-color: rgba(30, 41, 59, 0.85) !important;
+}
+
+/* Koyu Mod Metinler (Slate 100 Kırık Beyaz & Slate 400 Yumuşak Gri) */
+.dark .text-\[\#0F172A\],
+.dark .text-\[\#2C3E35\],
+.dark .text-\[\#1E2E25\],
+.dark .text-stone-900,
+.dark .text-slate-900 {
+  color: #F1F5F9 !important;
+}
+.dark .text-\[\#64748B\],
+.dark .text-\[\#5A7367\],
+.dark .text-stone-700,
+.dark .text-stone-600,
+.dark .text-stone-500,
+.dark .text-slate-600,
+.dark .text-slate-500 {
+  color: #94A3B8 !important;
+}
+.dark .text-stone-800,
+.dark .text-slate-800 {
+  color: #E2E8F0 !important;
+}
+
+/* Koyu Mod Kenarlıklar (Slate 700) */
+.dark .border-\[\#E2E8F0\],
+.dark .border-\[\#E2E8E4\],
+.dark .border-stone-200,
+.dark .border-slate-200,
+.dark .border-slate-100 {
+  border-color: #334155 !important;
+}
+.dark .border-t-\[\#0284C7\],
+.dark .border-t-\[\#4E7867\] {
+  border-top-color: #38BDF8 !important;
+}
+.dark .hover\:border-\[\#0284C7\]:hover,
+.dark .hover\:border-\[\#4E7867\]:hover {
+  border-color: #38BDF8 !important;
+}
+.dark .divide-\[\#E2E8F0\] > :not([hidden]) ~ :not([hidden]),
+.dark .divide-\[\#E2E8E4\] > :not([hidden]) ~ :not([hidden]) {
+  border-color: #334155 !important;
+}
+
+/* Koyu Mod Aktif Sekme / Butonlar (Sky 400 - #38BDF8) */
+.dark .bg-\[\#0284C7\],
+.dark .bg-\[\#4E7867\] {
+  background-color: #38BDF8 !important;
+  color: #0F172A !important;
+}
+.dark .text-\[\#0284C7\],
+.dark .text-\[\#4E7867\] {
+  color: #38BDF8 !important;
+}
+.dark .hover\:bg-\[\#0369A1\]:hover,
+.dark .hover\:bg-\[\#3D6152\]:hover {
+  background-color: #0284C7 !important;
+  color: #FFFFFF !important;
+}
+.dark .hover\:text-\[\#0284C7\]:hover {
+  color: #38BDF8 !important;
+}
+.dark .ring-\[\#0284C7\]\/40 {
+  --tw-ring-color: rgba(56, 189, 248, 0.45) !important;
+}
+
+/* Koyu Mod Form Inputları & Select Kutuları */
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #1E293B !important;
+  color: #F1F5F9 !important;
+  border-color: #334155 !important;
+}
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+  border-color: #38BDF8 !important;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25) !important;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748B !important;
+}
+
+/* Koyu Mod Header & Navigasyon */
+.dark header {
+  background-color: rgba(30, 41, 59, 0.95) !important;
+  border-color: #334155 !important;
+}
+.dark nav {
+  background-color: rgba(30, 41, 59, 0.95) !important;
+  border-color: #334155 !important;
+}
+
+/* Koyu Mod Flat Bileşenler */
+.dark .flat-card,
+.dark .flat-card-interactive {
+  background-color: #1E293B !important;
+  border-color: #334155 !important;
+}
+.dark .flat-card-interactive:hover {
+  border-color: #38BDF8 !important;
+}
+.dark .flat-input {
+  background-color: #1E293B !important;
+  border-color: #334155 !important;
+  color: #F1F5F9 !important;
+}
+.dark .flat-input:focus {
+  border-color: #38BDF8 !important;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25) !important;
+}
+.dark .flat-btn-gold,
+.dark .flat-btn-caramel {
+  background-color: #38BDF8 !important;
+  color: #0F172A !important;
+  border-color: #0284C7 !important;
+}
+.dark .flat-btn-gold:hover,
+.dark .flat-btn-caramel:hover {
+  background-color: #0284C7 !important;
+  color: #FFFFFF !important;
+}
+.dark .flat-btn-mahogany {
+  background-color: #0F172A !important;
+  color: #F1F5F9 !important;
+  border-color: #334155 !important;
+}
+.dark .flat-btn-espresso {
+  background-color: #38BDF8 !important;
+  color: #0F172A !important;
+  border-color: #0284C7 !important;
+}
+.dark .flat-btn-espresso:hover {
+  background-color: #0284C7 !important;
+  color: #FFFFFF !important;
+}
+
+/* Koyu Mod Geçiş Gradyanları */
+.dark .from-\[\#F8FAFC\],
+.dark .from-\[\#F4F6F4\] {
+  --tw-gradient-from: #0F172A var(--tw-gradient-from-position) !important;
+}
+.dark .via-\[\#F8FAFC\]\/80,
+.dark .via-\[\#F4F6F4\]\/80 {
+  --tw-gradient-via: rgba(15, 23, 42, 0.8) var(--tw-gradient-via-position) !important;
+}
+
+/* Günün Yemek Menüsü Butonları - Karanlık Mod */
+.dark .meal-card-btn {
+  background-color: #0F172A !important;
+  border-color: #334155 !important;
+}
+.dark .meal-card-btn:hover {
+  background-color: #131D31 !important;
+  border-color: #38BDF8 !important;
+}
+.dark .meal-card-title {
+  color: #F1F5F9 !important;
+}
+.dark .meal-card-btn:hover .meal-card-title {
+  color: #38BDF8 !important;
+}
+.dark .meal-card-desc {
+  color: #94A3B8 !important;
+}
+.dark .meal-time-badge {
+  background-color: #1E293B !important;
+  color: #38BDF8 !important;
+  border-color: #334155 !important;
+}
+
+/* iOS Takvim Akıcı Animasyonları (Apple Spring & GPU Destekli) */
+@keyframes iosSlideUpWeek {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes iosPopUpHours {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes iosMonthFadeIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0) scale(0.996);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes iosTimelineSwitch {
+  0% {
+    opacity: 0.35;
+    transform: translate3d(0, 8px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-ios-week {
+  animation: iosSlideUpWeek 0.32s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.animate-ios-hours {
+  animation: iosPopUpHours 0.36s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.animate-ios-month {
+  animation: iosMonthFadeIn 0.28s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.animate-ios-day-switch {
+  animation: iosTimelineSwitch 0.22s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+@keyframes slideDownAccordion {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -12px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-accordion-down {
+  animation: slideDownAccordion 0.28s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}

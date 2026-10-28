@@ -3,85 +3,60 @@
 import { useState, useEffect } from "react";
 import { createClient } from "../lib/supabaseClient";
 
-type Role = "superadmin" | "yonetici" | "ogrenci";
+import type {
+  Role,
+  Yurt,
+  Student,
+  Room,
+  MaintenanceTicket,
+  Announcement,
+  LaundrySlot,
+  LaundryMachine,
+} from "../types";
+import {
+  defaultStudents,
+  defaultRooms,
+  defaultLaundrySlots,
+  defaultLaundryMachines,
+  defaultMaintenanceTickets,
+  defaultAnnouncements,
+  defaultDailyMenu,
+  defaultYurtSettings,
+} from "../lib/initialData";
+import {
+  getTodayDateKey,
+  getMsUntilMidnight,
+  getAutoGunTipi,
+  getResetDailyMenu,
+  formatTurkishDate,
+  DailyMenuType,
+} from "../lib/menuUtils";
+import {
+  getDynamicSlotStatus,
+  syncSlotsWithCurrentTime,
+  parseSlotMinutes,
+} from "../lib/laundryUtils";
+import AddYurtModal from "../components/modals/AddYurtModal";
+import { AddRoomModal, EditRoomModal } from "../components/modals/RoomModals";
+import {
+  AddStudentModal,
+  EditStudentModal,
+  StudentDetailModal,
+  NewStudentData,
+} from "../components/modals/StudentModals";
+import {
+  AddMaintenanceModal,
+  AddAnnouncementModal,
+} from "../components/modals/MaintenanceAnnouncementModals";
+import {
+  AddLaundryModal,
+  ManageMachinesModal,
+} from "../components/modals/LaundryModals";
+import StudentPortalView from "../components/student/StudentPortalView";
+import MobileBottomNav from "../components/navigation/MobileBottomNav";
+import MenuTimePickerModal from "../components/modals/MenuTimePickerModal";
+import EntryTimeModal from "../components/modals/EntryTimeModal";
 
-interface Yurt {
-  id: string;
-  ad: string;
-  sehir: string;
-  ilce: string;
-  adres?: string;
-  kapasite: number;
-  mevcutOgrenci: number;
-  yetkiliAd: string;
-  yetkiliTel: string;
-  yetkiliEposta: string;
-  durum: "aktif" | "askida" | "deneme";
-  yurtTuru: string;
-  kayitTarihi: string;
-}
-
-export interface Student {
-  id: string;
-  adSoyad: string;
-  telefon: string;
-  eposta: string;
-  odaNo: string;
-  yatakNo: string;
-  veliAd: string;
-  veliTel: string;
-  kayitTarihi: string;
-}
-
-export interface Room {
-  id: string;
-  odaNo: string;
-  blok: string;
-  kat: number;
-  kapasite: number;
-  doluYatak: number;
-  odaTipi: string;
-  durum: "Aktif" | "Bakımda";
-}
-
-export interface MaintenanceTicket {
-  id: string;
-  odaNo: string;
-  baslik: string;
-  kategori: "Tesisat" | "Elektrik" | "İnternet" | "Mobilya" | "Diğer";
-  oncelik: "Düşük" | "Orta" | "Acil";
-  durum: "Açık" | "İnceleniyor" | "Çözüldü";
-  bildiren: string;
-  tarih: string;
-}
-
-export interface Announcement {
-  id: string;
-  baslik: string;
-  icerik: string;
-  oncelik: "Normal" | "Önemli" | "Acil";
-  tarih: string;
-}
-
-export interface LaundrySlot {
-  id: string;
-  ogrenciAd: string;
-  odaNo: string;
-  makineNo: string; // "Makine 1 (A-1)", "Makine 2 (A-2)", "Makine 3 (B-1)", "Makine 4 (B-2)", "Kurutma 1 (K-1)", "Kurutma 2 (K-2)"
-  tarih: string; // YYYY-MM-DD
-  saatAraligi: string; // "09:00 - 10:30", "10:30 - 12:00", "13:00 - 14:30", "15:00 - 16:30", "17:00 - 18:30", "19:00 - 20:30", "20:30 - 22:00"
-  program: "Renkli & Karışık" | "Beyazlar & Pamuklu" | "Hızlı Yıkama (30 dk)" | "Kurutma & Havalandırma";
-  durum: "Yıkanıyor" | "Sırada" | "Tamamlandı" | "İptal";
-  not?: string;
-}
-
-export interface LaundryMachine {
-  id: string;
-  name: string;
-  tip: string;
-  tur: "yikama" | "kurutma";
-  kapasiteKg?: number;
-}
 
 
 export default function Home() {
@@ -95,11 +70,58 @@ export default function Home() {
     selectedYurtName?: string;
   } | null>(null);
 
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
+
   const [activeRole, setActiveRole] = useState<Role>("superadmin");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Karanlık / Aydınlık Mod State'i (Dark / Light Theme)
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("yurtify_theme") as "light" | "dark" | null;
+      if (saved === "dark" || saved === "light") {
+        setTheme(saved);
+        if (saved === "dark") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      } else if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        setTheme("dark");
+        document.documentElement.classList.add("dark");
+      }
+    } catch {
+      // localStorage erişim güvenliği
+    }
+  }, []);
+
+  const selectTheme = (selectedTheme: "light" | "dark", notify: boolean = false) => {
+    setTheme(selectedTheme);
+    try {
+      localStorage.setItem("yurtify_theme", selectedTheme);
+    } catch {
+      // localStorage güvenliği
+    }
+
+    if (selectedTheme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+
+    if (notify) {
+      showToast(selectedTheme === "dark" ? "Karanlık tema aktif edildi." : "Aydınlık tema aktif edildi.");
+    }
+  };
+
+  const toggleTheme = () => {
+    selectTheme(theme === "dark" ? "light" : "dark", true);
+  };
 
   // Veritabanı ve Realtime Durumu
   const [isDbConnected, setIsDbConnected] = useState<boolean | null>(null);
@@ -112,8 +134,35 @@ export default function Home() {
   // YÖNETİCİ PANELİ STATE & VERİLERİ
   // ==========================================
   const [managerTab, setManagerTab] = useState<
-    "odalar" | "ogrenciler" | "yemekhane" | "camasirhane" | "arizalar" | "duyurular" | "ayarlar"
-  >("odalar");
+    "anasayfa" | "odalar" | "ogrenciler" | "yemekhane" | "camasirhane" | "arizalar" | "duyurular" | "ayarlar"
+  >("anasayfa");
+
+  // Ayarlar Sekmesi Genişletilebilir Bölüm Butonları State'i
+  const [openSettingsSections, setOpenSettingsSections] = useState<Record<string, boolean>>({
+    bilgiler: false,
+    guvenlik: false,
+    kurallar: false,
+    ogrenciler: false,
+    yemekhane: false,
+    camasirhane: false,
+  });
+
+  const toggleSettingsSection = (
+    sectionKey: "ogrenciler" | "bilgiler" | "guvenlik" | "kurallar" | "yemekhane" | "camasirhane" | "yurt"
+  ) => {
+    setOpenSettingsSections((prev) => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey],
+    }));
+  };
+
+  // Öğrenciler veya Duyurular doğrudan tetiklenirse uygun sekmeye yönlendir
+  useEffect(() => {
+    if (managerTab === "ogrenciler") {
+      setManagerTab("ayarlar");
+      setOpenSettingsSections((prev) => ({ ...prev, ogrenciler: true }));
+    }
+  }, [managerTab]);
 
   const [students, setStudents] = useState<Student[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -139,14 +188,20 @@ export default function Home() {
 
   // Çamaşırhane Sırası & Takvim State'leri
   const [laundrySlots, setLaundrySlots] = useState<LaundrySlot[]>([]);
-  const [selectedLaundryDate, setSelectedLaundryDate] = useState<string>("2026-10-19");
+  const [selectedLaundryDate, setSelectedLaundryDate] = useState<string>("");
+  const [laundryViewYear, setLaundryViewYear] = useState<number>(2026);
+  const [laundryViewMonth, setLaundryViewMonth] = useState<number>(9);
+  const [laundryCalendarView, setLaundryCalendarView] = useState<"month" | "day">("month");
+  const [isDayTimelineOpen, setIsDayTimelineOpen] = useState<boolean>(true);
+  const [isLiveQueueExpanded, setIsLiveQueueExpanded] = useState<boolean>(true);
+  const [liveQueueScope, setLiveQueueScope] = useState<"active" | "selected">("active");
   const [laundryMachineFilter, setLaundryMachineFilter] = useState<string>("all");
   const [isAddLaundryModalOpen, setIsAddLaundryModalOpen] = useState(false);
   const [newLaundry, setNewLaundry] = useState({
     ogrenciAd: "",
     odaNo: "101",
     makineNo: "Makine 1 (A-1)",
-    tarih: "2026-10-19",
+    tarih: "",
     saatAraligi: "09:00 - 10:30",
     program: "Renkli & Karışık" as "Renkli & Karışık" | "Beyazlar & Pamuklu" | "Hızlı Yıkama (30 dk)" | "Kurutma & Havalandırma",
     durum: "Sırada" as "Yıkanıyor" | "Sırada" | "Tamamlandı",
@@ -154,6 +209,60 @@ export default function Home() {
   });
 
   const [isManageMachinesModalOpen, setIsManageMachinesModalOpen] = useState(false);
+  const [dailyLaundryLimit, setDailyLaundryLimit] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("yurtify_laundry_daily_limit");
+      if (saved !== null) {
+        return Number(saved);
+      }
+    }
+    return 2;
+  });
+
+  const handleSetDailyLaundryLimit = (limit: number) => {
+    const newLimit = Math.max(0, limit);
+    setDailyLaundryLimit(newLimit);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("yurtify_laundry_daily_limit", String(newLimit));
+    }
+    setYurtSettings((prev) => ({
+      ...prev,
+      camasirhaneGunlukLimit: newLimit,
+    }));
+    showToast(
+      newLimit === 0
+        ? "Günlük çamaşır atma kotası kaldırıldı (Sınırsız)."
+        : `Günlük maksimum çamaşır hakkı ${newLimit} yıkama olarak belirlendi.`
+    );
+  };
+
+  const [dailyDormLaundryLimit, setDailyDormLaundryLimit] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("yurtify_laundry_dorm_daily_limit");
+      if (saved !== null) {
+        return Number(saved);
+      }
+    }
+    return 25;
+  });
+
+  const handleSetDailyDormLaundryLimit = (limit: number) => {
+    const newLimit = Math.max(0, limit);
+    setDailyDormLaundryLimit(newLimit);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("yurtify_laundry_dorm_daily_limit", String(newLimit));
+    }
+    setYurtSettings((prev) => ({
+      ...prev,
+      camasirhaneYurtGunlukLimit: newLimit,
+    }));
+    showToast(
+      newLimit === 0
+        ? "Yurt geneli günlük çamaşır kapasitesi sınırı kaldırıldı (Sınırsız)."
+        : `Yurt geneli günlük toplam kapasite ${newLimit} randevu olarak belirlendi.`
+    );
+  };
+  const [settingsLaundryScope, setSettingsLaundryScope] = useState<"kisi" | "yurt">("kisi");
   const [laundryMachines, setLaundryMachines] = useState<LaundryMachine[]>([
     { id: "Makine 1 (A-1)", name: "Makine 1 (A Blok)", tip: "Yıkama • 9 kg", tur: "yikama", kapasiteKg: 9 },
     { id: "Makine 2 (A-2)", name: "Makine 2 (A Blok)", tip: "Yıkama • 9 kg", tur: "yikama", kapasiteKg: 9 },
@@ -162,25 +271,28 @@ export default function Home() {
     { id: "Kurutma 1 (K-1)", name: "Kurutma 1 (Merkez)", tip: "Kurutma • 10 kg", tur: "kurutma", kapasiteKg: 10 },
     { id: "Kurutma 2 (K-2)", name: "Kurutma 2 (Merkez)", tip: "Kurutma • 10 kg", tur: "kurutma", kapasiteKg: 10 },
   ]);
-  const [newCustomMachine, setNewCustomMachine] = useState({
+  const [newCustomMachine, setNewCustomMachine] = useState<{
+    name: string;
+    tur: "yikama" | "kurutma";
+    kapasiteKg: string | number;
+    blok: string;
+  }>({
     name: "",
-    tur: "yikama" as "yikama" | "kurutma",
-    kapasiteKg: 9,
-    blok: "A Blok",
+    tur: "yikama",
+    kapasiteKg: "",
+    blok: "",
   });
 
   const [isAddMaintenanceModalOpen, setIsAddMaintenanceModalOpen] = useState(false);
   const [isAddAnnouncementModalOpen, setIsAddAnnouncementModalOpen] = useState(false);
 
   // Form State'leri
-  const [newStudent, setNewStudent] = useState({
+  const [newStudent, setNewStudent] = useState<NewStudentData>({
     adSoyad: "",
-    telefon: "",
     eposta: "",
+    sifre: "",
     odaNo: "101",
     yatakNo: "1",
-    veliAd: "",
-    veliTel: "",
   });
 
   const [newMaintenance, setNewMaintenance] = useState({
@@ -198,24 +310,8 @@ export default function Home() {
   });
 
   // Yemekhane Menüsü (Yönetici öğünler, saat tarifeleri ve kalori gösterimini seçebilir)
-  const [dailyMenu, setDailyMenu] = useState<{
-    gorunumModu: "tek" | "birlikte";
-    aktifOgun: "kahvalti" | "aksam";
-    kaloriGoster: boolean;
-    gunTipi: "haftaici" | "haftasonu" | "ozelgun";
-    saatler: {
-      haftaici: { kahvalti: string; aksam: string };
-      haftasonu: { kahvalti: string; aksam: string };
-      ozelgun: { kahvalti: string; aksam: string };
-    };
-    kahvalti: string;
-    kahvaltiSaat: string;
-    kahvaltiKalori: string;
-    aksam: string;
-    aksamSaat: string;
-    aksamKalori: string;
-  }>({
-    gorunumModu: "tek",
+  const [dailyMenu, setDailyMenu] = useState<DailyMenuType>({
+    gorunumModu: "birlikte",
     aktifOgun: "kahvalti",
     kaloriGoster: true,
     gunTipi: "haftaici",
@@ -230,6 +326,7 @@ export default function Home() {
     aksam: "Mercimek Çorbası, Orman Kebabı, Şehriyeli Pirinç Pilavı, Mevsim Salatası, Fırın Sütlaç",
     aksamSaat: "18:00 - 20:30",
     aksamKalori: "1.200 kcal",
+    tarih: "",
   });
   const [isEditingMenu, setIsEditingMenu] = useState(false);
 
@@ -267,8 +364,91 @@ export default function Home() {
     }
   }, [timePickerModal.isOpen]);
 
+  // Yurda Giriş ve Çıkış Saatleri Çark Modalı State'i (Entry / Exit Time Wheel Picker)
+  const [entryTimeModal, setEntryTimeModal] = useState<{
+    isOpen: boolean;
+    field: "haftaici" | "haftasonu" | "cikisHaftaIci" | "cikisHaftaSonu";
+    title: string;
+    hour: number;
+    minute: number;
+  }>({
+    isOpen: false,
+    field: "haftaici",
+    title: "",
+    hour: 23,
+    minute: 0,
+  });
+
+  // Giriş/Çıkış Saati Seçici açıldığında seçili saat ve dakikayı merkeze kaydır
+  useEffect(() => {
+    if (entryTimeModal.isOpen) {
+      const timer = setTimeout(() => {
+        document.getElementById(`wheel-entry-h-${entryTimeModal.hour}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+        document.getElementById(`wheel-entry-m-${entryTimeModal.minute}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [entryTimeModal.isOpen]);
+
+  // Metin alanlarının (textarea) içeriğe göre dinamik ve otomatik büyümesi
+  useEffect(() => {
+    const supportsFieldSizing =
+      typeof CSS !== "undefined" &&
+      typeof CSS.supports === "function" &&
+      CSS.supports("field-sizing", "content");
+
+    if (supportsFieldSizing) return;
+
+    const autoResize = (el: HTMLTextAreaElement) => {
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, 480)}px`;
+    };
+
+    const handleInput = (e: Event) => {
+      const target = e.target;
+      if (target instanceof HTMLTextAreaElement) {
+        autoResize(target);
+      }
+    };
+
+    document.addEventListener("input", handleInput);
+
+    const resizeAll = () => {
+      document.querySelectorAll("textarea").forEach((ta) => autoResize(ta));
+    };
+
+    resizeAll();
+    const timer = setTimeout(resizeAll, 100);
+
+    return () => {
+      document.removeEventListener("input", handleInput);
+      clearTimeout(timer);
+    };
+  }, [dailyMenu, isAddAnnouncementModalOpen, isAddMaintenanceModalOpen]);
+
   // Yurt Bilgileri ve Ayarları (Yönetici doğrudan değiştirebilir)
-  const [yurtSettings, setYurtSettings] = useState({
+  const [yurtSettings, setYurtSettings] = useState<{
+    ad: string;
+    sehir: string;
+    ilce: string;
+    adres: string;
+    yetkiliAd: string;
+    yetkiliTel: string;
+    kapasite: number | string;
+    sonGirisHaftaIci: string;
+    sonGirisHaftaSonu: string;
+    ilkCikisHaftaIci: string;
+    ilkCikisHaftaSonu: string;
+    adminKullaniciAdi?: string;
+    adminEposta?: string;
+    adminSifre?: string;
+    superadminKullaniciAdi?: string;
+    superadminEposta?: string;
+    superadminSifre?: string;
+    adminGirisAktif?: boolean;
+    hizliGirisIzin?: boolean;
+    guvenliOturum?: boolean;
+  }>({
     ad: "Güneş Yükseköğrenim Kız Öğrenci Yurdu",
     sehir: "İstanbul",
     ilce: "Kadıköy",
@@ -278,7 +458,28 @@ export default function Home() {
     kapasite: 150,
     sonGirisHaftaIci: "23:00",
     sonGirisHaftaSonu: "23:45",
+    ilkCikisHaftaIci: "06:00",
+    ilkCikisHaftaSonu: "06:30",
+    adminKullaniciAdi: "mudur",
+    adminEposta: "mudur@gunesyurdu.com",
+    adminSifre: "mudur123456",
+    superadminKullaniciAdi: "superadmin",
+    superadminEposta: "superadmin@yurtify.com",
+    superadminSifre: "Admin*2026!",
+    adminGirisAktif: true,
+    hizliGirisIzin: false,
+    guvenliOturum: true,
   });
+
+  const [adminPasswordForm, setAdminPasswordForm] = useState({
+    mevcutSifre: "",
+    yeniSifre: "",
+    yeniSifreTekrar: "",
+  });
+
+  const [failedLoginAttempts, setFailedLoginAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+
 
   const [searchTerm, setSearchTerm] = useState("");
   const [cityFilter, setCityFilter] = useState("all");
@@ -338,6 +539,21 @@ export default function Home() {
         if (typeof window !== "undefined") {
           localStorage.setItem("yurtify_yurtlar", JSON.stringify(mappedYurtlar));
         }
+
+        // Eğer yerel olarak henüz kaydedilmiş özel ayar yoksa, Supabase'deki yurdun bilgilerini yurtSettings ile senkronize et
+        const hasSavedSettings = typeof window !== "undefined" && localStorage.getItem("yurtify_settings");
+        if (!hasSavedSettings && mappedYurtlar.length > 0) {
+          const first = mappedYurtlar[0];
+          setYurtSettings((prev) => ({
+            ...prev,
+            ad: first.ad || prev.ad,
+            yetkiliAd: first.yetkiliAd || prev.yetkiliAd,
+            kapasite: first.kapasite || prev.kapasite,
+            sehir: first.sehir || prev.sehir,
+            ilce: first.ilce || prev.ilce,
+            adres: first.adres || prev.adres,
+          }));
+        }
       } else if (yurtError) {
         console.warn("Supabase yurtlar çekme uyarısı:", yurtError.message);
         setIsDbConnected(false);
@@ -351,12 +567,29 @@ export default function Home() {
     // A. Sayfa yenilendiğinde kullanıcıyı atmaması için (Persistent Session)
     if (typeof window !== "undefined") {
       try {
-        const savedSession = localStorage.getItem("yurtify_session");
+        // Her sekmenin kendi bağımsız oturumunu koruması için (Tab-Isolated Session)
+        let savedSession = sessionStorage.getItem("yurtify_session");
+        if (!savedSession) {
+          savedSession = localStorage.getItem("yurtify_session");
+        }
         if (savedSession) {
           const parsedUser = JSON.parse(savedSession);
-          if (parsedUser && parsedUser.role) {
+          // 8 saatlik güvenli oturum zaman aşımı kontrolü
+          const maxSessionDuration = 8 * 60 * 60 * 1000;
+          const isExpired = parsedUser?.loginAt && Date.now() - parsedUser.loginAt > maxSessionDuration;
+          if (parsedUser && parsedUser.role && !isExpired) {
             setCurrentUser(parsedUser);
+            sessionStorage.setItem("yurtify_session", JSON.stringify(parsedUser));
+            document.documentElement.classList.add("has-session");
+          } else {
+            sessionStorage.removeItem("yurtify_session");
+            localStorage.removeItem("yurtify_session");
+            document.documentElement.classList.remove("has-session");
+            setCurrentUser(null);
           }
+        } else {
+          document.documentElement.classList.remove("has-session");
+          setCurrentUser(null);
         }
 
         // Eski dummy/mock cache'i temizle
@@ -372,70 +605,78 @@ export default function Home() {
           }
         }
         // Yönetici Verilerini Yükle / Başlat
+        const defaultStudentsList: Student[] = [
+          {
+            id: "std-1",
+            adSoyad: "Zeynep Lermi",
+            eposta: "zeynep.lermi@gmail.com",
+            sifre: "ogrenci123",
+            odaNo: "305",
+            yatakNo: "1",
+          },
+          {
+            id: "std-2",
+            adSoyad: "Elif Yıldız",
+            eposta: "elif.yildiz@hotmail.com",
+            sifre: "ogrenci123",
+            odaNo: "305",
+            yatakNo: "2",
+          },
+          {
+            id: "std-3",
+            adSoyad: "Ayşe Demir",
+            eposta: "ayse.demir@gmail.com",
+            sifre: "ogrenci123",
+            odaNo: "201",
+            yatakNo: "1",
+          },
+          {
+            id: "std-4",
+            adSoyad: "Merve Kaya",
+            eposta: "merve.kaya@gmail.com",
+            sifre: "ogrenci123",
+            odaNo: "104",
+            yatakNo: "1",
+          },
+          {
+            id: "std-5",
+            adSoyad: "Selin Çelik",
+            eposta: "selin.celik@outlook.com",
+            sifre: "ogrenci123",
+            odaNo: "202",
+            yatakNo: "2",
+          },
+          {
+            id: "std-6",
+            adSoyad: "Anna Demkiv",
+            eposta: "demkivanna22@gmail.com",
+            kullaniciAdi: "demkivanna22",
+            sifre: "ogrenci123",
+            odaNo: "101",
+            yatakNo: "1",
+          },
+        ];
+
         const savedStudents = localStorage.getItem("yurtify_students");
+        let finalStudentList: Student[] = defaultStudentsList;
         if (savedStudents) {
-          setStudents(JSON.parse(savedStudents));
-        } else {
-          const defaultStudents: Student[] = [
-            {
-              id: "std-1",
-              adSoyad: "Zeynep Lermi",
-              telefon: "0532 555 1020",
-              eposta: "zeynep.lermi@gmail.com",
-              odaNo: "305",
-              yatakNo: "1",
-              veliAd: "Kemal Lermi (Baba)",
-              veliTel: "0532 444 3322",
-              kayitTarihi: "15.09.2026",
-            },
-            {
-              id: "std-2",
-              adSoyad: "Elif Yıldız",
-              telefon: "0541 333 4455",
-              eposta: "elif.yildiz@hotmail.com",
-              odaNo: "305",
-              yatakNo: "2",
-              veliAd: "Ayten Yıldız (Anne)",
-              veliTel: "0541 999 8877",
-              kayitTarihi: "16.09.2026",
-            },
-            {
-              id: "std-3",
-              adSoyad: "Ayşe Demir",
-              telefon: "0555 222 1100",
-              eposta: "ayse.demir@gmail.com",
-              odaNo: "201",
-              yatakNo: "1",
-              veliAd: "Mehmet Demir (Baba)",
-              veliTel: "0555 111 2233",
-              kayitTarihi: "10.09.2026",
-            },
-            {
-              id: "std-4",
-              adSoyad: "Merve Kaya",
-              telefon: "0505 777 8899",
-              eposta: "merve.kaya@gmail.com",
-              odaNo: "104",
-              yatakNo: "1",
-              veliAd: "Fatma Kaya (Anne)",
-              veliTel: "0505 666 5544",
-              kayitTarihi: "18.09.2026",
-            },
-            {
-              id: "std-5",
-              adSoyad: "Selin Çelik",
-              telefon: "0533 888 9900",
-              eposta: "selin.celik@outlook.com",
-              odaNo: "202",
-              yatakNo: "2",
-              veliAd: "Hülya Çelik (Anne)",
-              veliTel: "0533 777 6655",
-              kayitTarihi: "20.09.2026",
-            },
-          ];
-          setStudents(defaultStudents);
-          localStorage.setItem("yurtify_students", JSON.stringify(defaultStudents));
+          try {
+            const parsed = JSON.parse(savedStudents);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const knownEmails = new Set(
+                parsed.map((s: any) => (s.eposta || "").toLowerCase().trim())
+              );
+              const missingDefaults = defaultStudentsList.filter(
+                (ds) => !knownEmails.has(ds.eposta.toLowerCase().trim())
+              );
+              finalStudentList = [...parsed, ...missingDefaults];
+            }
+          } catch (e) {
+            console.error("Öğrenci yükleme hatası:", e);
+          }
         }
+        setStudents(finalStudentList);
+        localStorage.setItem("yurtify_students", JSON.stringify(finalStudentList));
 
         const savedRooms = localStorage.getItem("yurtify_rooms");
         if (savedRooms) {
@@ -453,9 +694,52 @@ export default function Home() {
           localStorage.setItem("yurtify_rooms", JSON.stringify(defaultRooms));
         }
 
+        const todayStr = getTodayDateKey();
+        const tomorrowObj = new Date();
+        tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+        const tomorrowStr = `${tomorrowObj.getFullYear()}-${String(tomorrowObj.getMonth() + 1).padStart(2, "0")}-${String(tomorrowObj.getDate()).padStart(2, "0")}`;
+
         const savedLaundry = localStorage.getItem("yurtify_laundry");
+        const legacyLaundrySlots = localStorage.getItem("yurtify_laundry_slots");
+        let initialSlots: LaundrySlot[] = [];
+
         if (savedLaundry) {
-          setLaundrySlots(JSON.parse(savedLaundry));
+          try {
+            const parsed = JSON.parse(savedLaundry);
+            if (Array.isArray(parsed)) initialSlots = parsed;
+          } catch (e) {
+            console.error("Laundry parse error:", e);
+          }
+        }
+
+        if (legacyLaundrySlots) {
+          try {
+            const parsedLegacy: LaundrySlot[] = JSON.parse(legacyLaundrySlots);
+            if (Array.isArray(parsedLegacy)) {
+              const existingIds = new Set(initialSlots.map((s) => s.id));
+              for (const slot of parsedLegacy) {
+                if (!existingIds.has(slot.id)) {
+                  initialSlots.push(slot);
+                }
+              }
+            }
+          } catch {}
+        }
+
+        if (initialSlots.length > 0) {
+          const migrated = initialSlots.map((slot) => {
+            if (slot.tarih === "2026-10-19") {
+              return { ...slot, tarih: todayStr };
+            }
+            if (slot.tarih === "2026-10-20") {
+              return { ...slot, tarih: tomorrowStr };
+            }
+            return slot;
+          });
+          const { updatedSlots } = syncSlotsWithCurrentTime(migrated);
+          setLaundrySlots(updatedSlots);
+          localStorage.setItem("yurtify_laundry", JSON.stringify(updatedSlots));
+          localStorage.setItem("yurtify_laundry_slots", JSON.stringify(updatedSlots));
         } else {
           const defaultLaundry: LaundrySlot[] = [
             {
@@ -463,7 +747,7 @@ export default function Home() {
               ogrenciAd: "Zeynep Lermi",
               odaNo: "305",
               makineNo: "Makine 1 (A-1)",
-              tarih: "2026-10-19",
+              tarih: todayStr,
               saatAraligi: "09:00 - 10:30",
               program: "Renkli & Karışık",
               durum: "Yıkanıyor",
@@ -474,7 +758,7 @@ export default function Home() {
               ogrenciAd: "Merve Kaya",
               odaNo: "104",
               makineNo: "Makine 2 (A-2)",
-              tarih: "2026-10-19",
+              tarih: todayStr,
               saatAraligi: "10:30 - 12:00",
               program: "Beyazlar & Pamuklu",
               durum: "Sırada",
@@ -485,7 +769,7 @@ export default function Home() {
               ogrenciAd: "Ayşe Demir",
               odaNo: "201",
               makineNo: "Kurutma 1 (K-1)",
-              tarih: "2026-10-19",
+              tarih: todayStr,
               saatAraligi: "13:00 - 14:30",
               program: "Kurutma & Havalandırma",
               durum: "Sırada",
@@ -496,7 +780,7 @@ export default function Home() {
               ogrenciAd: "Büşra Çelik",
               odaNo: "202",
               makineNo: "Makine 3 (B-1)",
-              tarih: "2026-10-19",
+              tarih: todayStr,
               saatAraligi: "15:00 - 16:30",
               program: "Hızlı Yıkama (30 dk)",
               durum: "Sırada",
@@ -506,7 +790,7 @@ export default function Home() {
               ogrenciAd: "Elif Yılmaz",
               odaNo: "101",
               makineNo: "Makine 1 (A-1)",
-              tarih: "2026-10-19",
+              tarih: todayStr,
               saatAraligi: "17:00 - 18:30",
               program: "Renkli & Karışık",
               durum: "Sırada",
@@ -516,7 +800,7 @@ export default function Home() {
               ogrenciAd: "Selin Şahin",
               odaNo: "306",
               makineNo: "Makine 2 (A-2)",
-              tarih: "2026-10-20",
+              tarih: tomorrowStr,
               saatAraligi: "11:00 - 12:30",
               program: "Renkli & Karışık",
               durum: "Sırada",
@@ -526,14 +810,16 @@ export default function Home() {
               ogrenciAd: "Zeynep Lermi",
               odaNo: "305",
               makineNo: "Kurutma 2 (K-2)",
-              tarih: "2026-10-20",
+              tarih: tomorrowStr,
               saatAraligi: "14:00 - 15:30",
               program: "Kurutma & Havalandırma",
               durum: "Sırada",
             }
           ];
-          setLaundrySlots(defaultLaundry);
-          localStorage.setItem("yurtify_laundry", JSON.stringify(defaultLaundry));
+          const { updatedSlots: syncedDefault } = syncSlotsWithCurrentTime(defaultLaundry);
+          setLaundrySlots(syncedDefault);
+          localStorage.setItem("yurtify_laundry", JSON.stringify(syncedDefault));
+          localStorage.setItem("yurtify_laundry_slots", JSON.stringify(syncedDefault));
         }
 
         const savedMachines = localStorage.getItem("yurtify_laundry_machines");
@@ -563,7 +849,7 @@ export default function Home() {
           setAnnouncements(JSON.parse(savedAnc));
         } else {
           const defaultAnc: Announcement[] = [
-            { id: "anc-1", baslik: "Giriş ve Turnike Saatleri Hatırlatması", icerik: "Hafta içi son giriş saati 23:00, hafta sonu ise 23:45'tir. Tüm öğrencilerin yoklama saatinde odalarında bulunması zorunludur.", oncelik: "Önemli", tarih: "18.10.2026" },
+            { id: "anc-1", baslik: "Giriş ve Çıkış Saatleri Hatırlatması", icerik: "Hafta içi son giriş saati 23:00, hafta sonu ise 23:45'tir. Tüm öğrencilerin yoklama saatinde odalarında bulunması zorunludur.", oncelik: "Önemli", tarih: "18.10.2026" },
             { id: "anc-2", baslik: "Haftalık Çamaşırhane & Ütü Odası Programı", icerik: "B Blok kat sakinleri için çamaşırhane Salı ve Cuma günleri 09:00 - 21:00 arası rezerve edilmiştir.", oncelik: "Normal", tarih: "17.10.2026" },
             { id: "anc-3", baslik: "Merkezi Isıtma & Sıcak Su Saatleri", icerik: "Kış tarifesi gereği kaloriferler sabah 06:00-09:00 ve akşam 17:00-24:00 saatleri arasında kesintisiz devrededir.", oncelik: "Normal", tarih: "15.10.2026" }
           ];
@@ -571,18 +857,56 @@ export default function Home() {
           localStorage.setItem("yurtify_announcements", JSON.stringify(defaultAnc));
         }
 
+        const todayKey = getTodayDateKey();
         const savedMenu = localStorage.getItem("yurtify_menu");
         if (savedMenu) {
           try {
             const parsedMenu = JSON.parse(savedMenu);
-            setDailyMenu((prev) => ({ ...prev, ...parsedMenu }));
+            // Eger kaydedilmis menunun tarihi bugunden farkliysa yeni gun basladigi (00:00 gecildigi) icin sifirla
+            if (parsedMenu.tarih && parsedMenu.tarih !== todayKey) {
+              const resetMenu = getResetDailyMenu(parsedMenu);
+              setDailyMenu(resetMenu);
+              localStorage.setItem("yurtify_menu", JSON.stringify(resetMenu));
+            } else {
+              const current = {
+                ...parsedMenu,
+                tarih: parsedMenu.tarih || todayKey,
+              };
+              setDailyMenu((prev) => ({ ...prev, ...current }));
+              if (!parsedMenu.tarih) {
+                localStorage.setItem("yurtify_menu", JSON.stringify(current));
+              }
+            }
           } catch (e) {
             console.error("Menu parse error:", e);
+          }
+        } else {
+          const initialMenu = {
+            ...defaultDailyMenu,
+            tarih: todayKey,
+          };
+          setDailyMenu(initialMenu);
+          localStorage.setItem("yurtify_menu", JSON.stringify(initialMenu));
+        }
+
+        const savedSettings = localStorage.getItem("yurtify_settings");
+        if (savedSettings) {
+          try {
+            const parsedSettings = JSON.parse(savedSettings);
+            if (parsedSettings && parsedSettings.ad) {
+              setYurtSettings((prev) => ({ ...prev, ...parsedSettings }));
+            }
+          } catch (e) {
+            console.error("Settings parse error:", e);
           }
         }
       } catch (e) {
         console.error("Local storage error:", e);
+      } finally {
+        setIsAuthChecking(false);
       }
+    } else {
+      setIsAuthChecking(false);
     }
 
     // B. Veritabanından en güncel verileri hemen çek
@@ -613,14 +937,166 @@ export default function Home() {
   }, []);
 
   // ========================================================
+  // GÜNLÜK MENÜ 00:00 OTOMATİK SIFIRLAMA SİSTEMİ
+  // ========================================================
+  useEffect(() => {
+    let midnightTimer: ReturnType<typeof setTimeout>;
+
+    // 00:00 Gece Yarısı Zamanlayıcısı
+    const scheduleMidnightTimer = () => {
+      const msUntilMidnight = getMsUntilMidnight() + 500; // 00:00:00'dan 500ms sonra tetiklenir
+      midnightTimer = setTimeout(() => {
+        setDailyMenu((prev) => {
+          const resetMenu = getResetDailyMenu(prev);
+          try {
+            localStorage.setItem("yurtify_menu", JSON.stringify(resetMenu));
+          } catch (e) {
+            console.error("Local storage kaydetme hatasi:", e);
+          }
+          return resetMenu;
+        });
+        showToast("Yeni gün başladı (00:00). Günlük yemek menüsü sıfırlandı.");
+        scheduleMidnightTimer();
+      }, msUntilMidnight);
+    };
+
+    scheduleMidnightTimer();
+
+    // Sekme görünür olduğunda veya odaklandığında yeni gün kontrolü
+    const checkAndResetIfNewDay = () => {
+      const todayKey = getTodayDateKey();
+      setDailyMenu((prev) => {
+        if (prev.tarih && prev.tarih !== todayKey) {
+          const resetMenu = getResetDailyMenu(prev);
+          try {
+            localStorage.setItem("yurtify_menu", JSON.stringify(resetMenu));
+          } catch (e) {
+            console.error("Local storage hatasi:", e);
+          }
+          showToast("Yeni gün başladı. Yemek menüsü sıfırlandı.");
+          return resetMenu;
+        }
+        return prev;
+      });
+    };
+
+    // 30 saniyede bir periyodik kontrol (günün değişmesi ve saat ilerledikçe randevu durumlarının otomatik güncellenmesi)
+    const periodicCheck = setInterval(() => {
+      checkAndResetIfNewDay();
+      setLaundrySlots((prev) => {
+        const { updatedSlots, hasChanges } = syncSlotsWithCurrentTime(prev);
+        if (hasChanges && typeof window !== "undefined") {
+          localStorage.setItem("yurtify_laundry", JSON.stringify(updatedSlots));
+          localStorage.setItem("yurtify_laundry_slots", JSON.stringify(updatedSlots));
+          return updatedSlots;
+        }
+        return prev;
+      });
+    }, 30000);
+
+    const syncAllFromStorage = () => {
+      try {
+        const freshStudents = localStorage.getItem("yurtify_students");
+        if (freshStudents) {
+          const parsed = JSON.parse(freshStudents);
+          if (Array.isArray(parsed) && parsed.length > 0) setStudents(parsed);
+        }
+      } catch {}
+
+      try {
+        const freshLaundry = localStorage.getItem("yurtify_laundry") || localStorage.getItem("yurtify_laundry_slots");
+        if (freshLaundry) {
+          const parsed = JSON.parse(freshLaundry);
+          if (Array.isArray(parsed)) {
+            const { updatedSlots, hasChanges } = syncSlotsWithCurrentTime(parsed);
+            setLaundrySlots(updatedSlots);
+            if (hasChanges) {
+              localStorage.setItem("yurtify_laundry", JSON.stringify(updatedSlots));
+              localStorage.setItem("yurtify_laundry_slots", JSON.stringify(updatedSlots));
+            }
+          }
+        }
+      } catch {}
+
+      try {
+        const freshMnt = localStorage.getItem("yurtify_maintenance");
+        if (freshMnt) {
+          const parsed = JSON.parse(freshMnt);
+          if (Array.isArray(parsed)) setMaintenanceTickets(parsed);
+        }
+      } catch {}
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        checkAndResetIfNewDay();
+        syncAllFromStorage();
+      }
+    };
+
+    const handleFocusSync = () => {
+      checkAndResetIfNewDay();
+      syncAllFromStorage();
+    };
+
+    // Farklı sekmeler arasında menüyü, öğrencileri ve çamaşırhane randevularını anında senkronize et
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "yurtify_menu" && e.newValue) {
+        try {
+          const updated = JSON.parse(e.newValue);
+          setDailyMenu(updated);
+        } catch {}
+      }
+      if (e.key === "yurtify_students" && e.newValue) {
+        try {
+          const updated = JSON.parse(e.newValue);
+          if (Array.isArray(updated) && updated.length > 0) {
+            setStudents(updated);
+          }
+        } catch {}
+      }
+      if ((e.key === "yurtify_laundry" || e.key === "yurtify_laundry_slots") && e.newValue) {
+        try {
+          const updated = JSON.parse(e.newValue);
+          if (Array.isArray(updated)) {
+            setLaundrySlots(updated);
+          }
+        } catch {}
+      }
+      if (e.key === "yurtify_maintenance" && e.newValue) {
+        try {
+          const updated = JSON.parse(e.newValue);
+          if (Array.isArray(updated)) {
+            setMaintenanceTickets(updated);
+          }
+        } catch {}
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleFocusSync);
+    window.addEventListener("storage", handleStorageChange);
+
+    return () => {
+      clearTimeout(midnightTimer);
+      clearInterval(periodicCheck);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleFocusSync);
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, []);
+
+  // ========================================================
   // 2. GİRİŞ & OTURUM İŞLEMİ (SUPABASE AUTH & KALICI OTURUM)
   // ========================================================
   const loginUserDirect = (role: Role, customName?: string, customDetails?: string) => {
+    const activeYurtName = yurtSettings.ad || yurtlar[0]?.ad || "Güneş Yükseköğrenim Kız Öğrenci Yurdu";
     const selectedYurt = yurtlar[0] || {
       id: "1",
-      ad: "Güneş Yükseköğrenim Kız Öğrenci Yurdu",
+      ad: activeYurtName,
     };
 
+    const sessionToken = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `sess_${Date.now()}`;
     let userObj: any = null;
     if (role === "superadmin") {
       userObj = {
@@ -628,34 +1104,50 @@ export default function Home() {
         name: customName || "Süper Admin (Sistem Yöneticisi)",
         details: customDetails || "superadmin@yurtify.com",
         selectedYurtId: selectedYurt.id,
-        selectedYurtName: selectedYurt.ad,
+        selectedYurtName: activeYurtName,
+        sessionToken,
+        loginAt: Date.now(),
       };
     } else if (role === "yonetici") {
       userObj = {
         role: "yonetici",
-        name: customName || "Fatma Güneş (Yurt Müdürü)",
-        details: customDetails || "mudur@gunesyurdu.com",
+        name: customName || yurtSettings.yetkiliAd || "Fatma Güneş (Yurt Müdürü)",
+        details: customDetails || (yurtSettings.adminEposta || "mudur@gunesyurdu.com"),
         selectedYurtId: selectedYurt.id,
-        selectedYurtName: selectedYurt.ad,
+        selectedYurtName: activeYurtName,
+        sessionToken,
+        loginAt: Date.now(),
       };
     } else {
       userObj = {
         role: "ogrenci",
-        name: customName || "Zeynep Lermi",
-        details: customDetails || "Öğrenci No: 2026105 • B Blok - Oda 305",
+        name: customName || "Öğrenci",
+        details: customDetails || "Öğrenci Portalı",
         selectedYurtId: selectedYurt.id,
-        selectedYurtName: selectedYurt.ad,
+        selectedYurtName: activeYurtName,
+        sessionToken,
+        loginAt: Date.now(),
       };
     }
 
     setCurrentUser(userObj);
+    setIsAuthChecking(false);
     if (typeof window !== "undefined") {
-      localStorage.setItem("yurtify_session", JSON.stringify(userObj));
+      sessionStorage.setItem("yurtify_session", JSON.stringify(userObj));
+      document.documentElement.classList.add("has-session");
     }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Brute-force ve Geçici Kilitlenme Kontrolü
+    if (lockoutUntil && Date.now() < lockoutUntil) {
+      const remainingSec = Math.ceil((lockoutUntil - Date.now()) / 1000);
+      setErrorMessage(`Çok sayıda hatalı giriş yapıldı. Güvenlik nedeniyle lütfen ${remainingSec} saniye bekleyiniz.`);
+      return;
+    }
+
     if (!username.trim() || !password.trim()) {
       setErrorMessage("Lütfen tüm alanları doldurunuz.");
       return;
@@ -664,67 +1156,238 @@ export default function Home() {
     setErrorMessage("");
     setIsLoading(true);
 
-    try {
-      if (activeRole === "superadmin" || activeRole === "yonetici") {
-        try {
-          const { data, error } = await supabase.auth.signInWithPassword({
-            email: username.trim(),
-            password: password.trim(),
-          });
+    const recordFailedAttempt = (customMsg?: string) => {
+      const nextCount = failedLoginAttempts + 1;
+      setFailedLoginAttempts(nextCount);
+      if (nextCount >= 5) {
+        const lockoutTime = Date.now() + 60000;
+        setLockoutUntil(lockoutTime);
+        setErrorMessage("5 kez art arda hatalı giriş denemesi yapıldı. Sistem güvenliği için giriş 60 saniye süreyle kilitlendi.");
+      } else {
+        setErrorMessage(customMsg || `Hatalı kullanıcı adı veya şifre. (${5 - nextCount} deneme hakkı kaldı)`);
+      }
+    };
 
-          if (!error && data?.user) {
-            const fullName =
-              data.user.user_metadata?.full_name ||
-              (activeRole === "superadmin" ? "Sistem Sahibi (Süper Admin)" : "Yurt Müdürü (Fatma Güneş)");
-            loginUserDirect(activeRole, fullName, `Supabase Doğrulandı (${data.user.email})`);
-            return;
-          }
-        } catch (authErr) {
-          console.warn("Supabase auth uyarısı (Demo moduna geçiliyor):", authErr);
+    try {
+      const enteredIdentifier = username.trim().toLowerCase();
+      const enteredPassword = password.trim();
+
+      // ==========================================
+      // A. SÜPER ADMİN GİRİŞİ
+      // ==========================================
+      if (activeRole === "superadmin") {
+        const configuredSuperUser = (yurtSettings.superadminKullaniciAdi || "superadmin").trim().toLowerCase();
+        const configuredSuperEmail = (yurtSettings.superadminEposta || "superadmin@yurtify.com").trim().toLowerCase();
+        const configuredSuperPass = yurtSettings.superadminSifre || "Admin*2026!";
+
+        const isSuperIdentifierValid = enteredIdentifier === configuredSuperUser || enteredIdentifier === configuredSuperEmail;
+        const isSuperPassValid = enteredPassword === configuredSuperPass;
+
+        if (!isSuperIdentifierValid || !isSuperPassValid) {
+          recordFailedAttempt("Hatalı Süper Admin kullanıcı adı veya şifresi.");
+          setIsLoading(false);
+          return;
         }
 
-        // Demo veya veritabanı dışı girişler için her durumda girişi sağla
-        loginUserDirect(activeRole, activeRole === "superadmin" ? "Süper Admin" : "Yurt Müdürü (Fatma Güneş)", username.trim());
-      } else {
-        loginUserDirect("ogrenci", "Zeynep Lermi", `Öğrenci No: 2026105 • ${username.trim()}`);
+        setFailedLoginAttempts(0);
+        setLockoutUntil(null);
+        loginUserDirect("superadmin", "Süper Admin (Sistem Yöneticisi)", configuredSuperEmail);
+        return;
+      }
+
+      // ==========================================
+      // B. YURT MÜDÜRÜ / YÖNETİCİ GİRİŞİ
+      // ==========================================
+      if (activeRole === "yonetici") {
+        if (yurtSettings.adminGirisAktif === false) {
+          setErrorMessage("Yönetici girişi yurt ayarlarından geçici olarak durdurulmuştur.");
+          setIsLoading(false);
+          return;
+        }
+
+        const configuredUsername = (yurtSettings.adminKullaniciAdi || "mudur").trim().toLowerCase();
+        const configuredEmail = (yurtSettings.adminEposta || "mudur@gunesyurdu.com").trim().toLowerCase();
+        const configuredAdminPassword = yurtSettings.adminSifre || "mudur123456";
+
+        const isIdentifierMatch = enteredIdentifier === configuredUsername || enteredIdentifier === configuredEmail;
+        const isPasswordMatch = enteredPassword === configuredAdminPassword;
+
+        if (!isIdentifierMatch || !isPasswordMatch) {
+          recordFailedAttempt("Hatalı yönetici kullanıcı adı veya şifresi.");
+          setIsLoading(false);
+          return;
+        }
+
+        // Supabase Auth kontrolü (eğer veritabanı aktifse)
+        try {
+          const authEmail = enteredIdentifier.includes("@") ? enteredIdentifier : configuredEmail;
+          await supabase.auth.signInWithPassword({
+            email: authEmail,
+            password: enteredPassword,
+          });
+        } catch {
+          // Supabase bağlantısı olmasa bile doğrulanan ayar şifresi ile güvenli giriş yapılır
+        }
+
+        setFailedLoginAttempts(0);
+        setLockoutUntil(null);
+        loginUserDirect("yonetici", yurtSettings.yetkiliAd || "Fatma Güneş (Yurt Müdürü)", configuredEmail);
+        return;
+      }
+
+      // ==========================================
+      // C. ÖĞRENCİ GİRİŞİ
+      // ==========================================
+      if (activeRole === "ogrenci") {
+        // Her giriş denemesinde en güncel LocalStorage verisini doğrudan çek
+        let currentStudents = students;
+        if (typeof window !== "undefined") {
+          try {
+            const raw = localStorage.getItem("yurtify_students");
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                currentStudents = parsed;
+                setStudents(parsed);
+              }
+            }
+          } catch (e) {
+            console.error("Öğrenci okuma hatası:", e);
+          }
+        }
+
+        const cleanIdentifier = enteredIdentifier.trim().toLowerCase();
+        const identifierPrefix = cleanIdentifier.includes("@")
+          ? cleanIdentifier.split("@")[0].trim()
+          : cleanIdentifier;
+
+        const normalize = (str: string) =>
+          str
+            .toLowerCase()
+            .trim()
+            .replace(/ğ/g, "g")
+            .replace(/ü/g, "u")
+            .replace(/ş/g, "s")
+            .replace(/ı/g, "i")
+            .replace(/ö/g, "o")
+            .replace(/ç/g, "c")
+            .replace(/[^a-z0-9]/g, "");
+
+        const normalizedIdentifier = normalize(cleanIdentifier);
+        const normalizedPrefix = normalize(identifierPrefix);
+
+        const matchedStudent = currentStudents.find((s) => {
+          const sName = (s.adSoyad || "").trim().toLowerCase();
+          const sEmail = (s.eposta || "").trim().toLowerCase();
+          const sUsername = ((s.kullaniciAdi || "") || sName.replace(/\s+/g, ".")).trim().toLowerCase();
+          const sEmailPrefix = sEmail.includes("@") ? sEmail.split("@")[0].trim() : sEmail;
+
+          // 1. Doğrudan tam eşleşme (E-posta, Ad Soyad, Kullanıcı Adı)
+          if (
+            sEmail === cleanIdentifier ||
+            sName === cleanIdentifier ||
+            sUsername === cleanIdentifier
+          ) {
+            return true;
+          }
+
+          // 2. E-posta ön eki eşleşmesi (örn: demkivanna22@gmail.com <-> demkivanna22)
+          if (
+            sEmailPrefix === identifierPrefix ||
+            sEmailPrefix === cleanIdentifier ||
+            sEmail === identifierPrefix ||
+            sUsername === identifierPrefix
+          ) {
+            return true;
+          }
+
+          // 3. Normalize edilmiş eşleşme (Türkçe karakter ve noktalama bağımsız)
+          const normName = normalize(sName);
+          const normEmail = normalize(sEmail);
+          const normUsername = normalize(sUsername);
+          const normEmailPrefix = normalize(sEmailPrefix);
+
+          if (
+            normEmail === normalizedIdentifier ||
+            normName === normalizedIdentifier ||
+            normUsername === normalizedIdentifier ||
+            normEmailPrefix === normalizedPrefix ||
+            normEmailPrefix === normalizedIdentifier ||
+            normName === normalizedPrefix
+          ) {
+            return true;
+          }
+
+          // 4. İçerme eşleşmesi (örn: demkivanna22)
+          if (
+            cleanIdentifier.length >= 4 &&
+            (sEmail.includes(cleanIdentifier) ||
+              sName.includes(cleanIdentifier) ||
+              cleanIdentifier.includes(normEmailPrefix) ||
+              cleanIdentifier.includes(normName))
+          ) {
+            return true;
+          }
+
+          return false;
+        });
+
+        if (!matchedStudent) {
+          recordFailedAttempt("Bu kullanıcı adı veya e-posta ile kayıtlı öğrenci bulunamadı.");
+          setIsLoading(false);
+          return;
+        }
+
+        const studentPassword = matchedStudent.sifre || "ogrenci123";
+        if (enteredPassword !== studentPassword) {
+          recordFailedAttempt("Hatalı öğrenci şifresi.");
+          setIsLoading(false);
+          return;
+        }
+
+        setFailedLoginAttempts(0);
+        setLockoutUntil(null);
+        loginUserDirect("ogrenci", matchedStudent.adSoyad, `Oda ${matchedStudent.odaNo} • ${matchedStudent.eposta}`);
+        return;
       }
     } catch (err: any) {
-      console.error("Giriş hatası:", err);
-      // Hata durumunda bile demo girişi tamamla
-      loginUserDirect(activeRole);
+      console.error("Giriş işlemi hatası:", err);
+      setErrorMessage("Giriş işlemi gerçekleştirilemedi. Lütfen bilgilerinizi kontrol ederek tekrar deneyiniz.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fillDemoCredentials = (role: Role) => {
+  const handleRoleChange = (role: Role) => {
     setActiveRole(role);
     setErrorMessage("");
-    if (role === "superadmin") {
-      setUsername("superadmin@yurtify.com");
-      setPassword("admin123456");
-    } else if (role === "yonetici") {
-      setUsername("mudur@gunesyurdu.com");
-      setPassword("mudur123456");
-    } else {
-      setUsername("zeynep.lermi@gmail.com");
-      setPassword("ogrenci123");
-    }
+    setUsername("");
+    setPassword("");
   };
 
   const handleQuickLogin = (role: Role) => {
-    fillDemoCredentials(role);
+    if (yurtSettings.hizliGirisIzin !== true) {
+      setErrorMessage("Güvenli Giriş Protokolü: Tek tıkla hızlı giriş seçeneği ayarlardan devre dışı bırakılmıştır.");
+      return;
+    }
+    if (role === "yonetici" && yurtSettings.adminGirisAktif === false) {
+      setErrorMessage("Yönetici girişi yurt ayarlarından geçici olarak durdurulmuştur.");
+      return;
+    }
     loginUserDirect(role);
   };
 
   // Çıkış Yap: Hem React state'i hem LocalStorage'ı hem Supabase oturumunu temizler
   const handleLogout = async () => {
     setCurrentUser(null);
+    setIsAuthChecking(false);
     setUsername("");
     setPassword("");
     setErrorMessage("");
     if (typeof window !== "undefined") {
+      sessionStorage.removeItem("yurtify_session");
       localStorage.removeItem("yurtify_session");
+      document.documentElement.classList.remove("has-session");
     }
     try {
       await supabase.auth.signOut();
@@ -763,7 +1426,7 @@ export default function Home() {
     if (uniqueId) payload.id = uniqueId;
 
     setIsAddModalOpen(false);
-    showToast(`⏳ "${newYurt.ad}" veritabanına ekleniyor...`);
+    showToast(`"${newYurt.ad}" veritabanına ekleniyor...`);
 
     try {
       const { data, error } = await supabase.from("yurtlar").insert([payload]).select();
@@ -854,22 +1517,68 @@ export default function Home() {
       showToast("Uyarı: Bu makine seçilen saatte zaten dolu görünüyor!");
     }
 
+    if (dailyLaundryLimit > 0) {
+      const studentDayCount = laundrySlots.filter(
+        (s) =>
+          s.tarih === newLaundry.tarih &&
+          s.ogrenciAd.toLowerCase() === newLaundry.ogrenciAd.trim().toLowerCase() &&
+          s.durum !== "İptal"
+      ).length;
+
+      if (studentDayCount >= dailyLaundryLimit) {
+        showToast(
+          `Bilgi: ${newLaundry.ogrenciAd.trim()} için belirlenen günlük maksimum çamaşır sınırına (${dailyLaundryLimit} yıkama) ulaşıldı.`
+        );
+      }
+    }
+
+    if (dailyDormLaundryLimit > 0) {
+      const dormDayCount = laundrySlots.filter(
+        (s) => s.tarih === newLaundry.tarih && s.durum !== "İptal"
+      ).length;
+
+      if (dormDayCount >= dailyDormLaundryLimit) {
+        showToast(
+          `Bilgi: ${newLaundry.tarih} tarihi için yurt geneli günlük maksimum çamaşır kapasitesine (${dailyDormLaundryLimit} randevu) ulaşıldı.`
+        );
+      }
+    }
+
+    const { formattedRange } = parseSlotMinutes(newLaundry.saatAraligi);
+    const dynamicStatus = getDynamicSlotStatus({
+      tarih: newLaundry.tarih,
+      saatAraligi: formattedRange,
+      durum: newLaundry.durum,
+    });
+
     const createdSlot: LaundrySlot = {
       id: `lnd-${Date.now()}`,
       ogrenciAd: newLaundry.ogrenciAd.trim(),
       odaNo: newLaundry.odaNo.trim(),
       makineNo: newLaundry.makineNo,
       tarih: newLaundry.tarih,
-      saatAraligi: newLaundry.saatAraligi,
+      saatAraligi: formattedRange,
       program: newLaundry.program,
-      durum: newLaundry.durum,
+      durum: dynamicStatus,
       not: newLaundry.not?.trim() || undefined,
     };
 
-    const updated = [createdSlot, ...laundrySlots];
+    let currentSlots = laundrySlots;
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("yurtify_laundry") || localStorage.getItem("yurtify_laundry_slots");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) currentSlots = parsed;
+        }
+      } catch {}
+    }
+
+    const updated = [createdSlot, ...currentSlots.filter((s) => s.id !== createdSlot.id)];
     setLaundrySlots(updated);
     if (typeof window !== "undefined") {
       localStorage.setItem("yurtify_laundry", JSON.stringify(updated));
+      localStorage.setItem("yurtify_laundry_slots", JSON.stringify(updated));
     }
     setIsAddLaundryModalOpen(false);
     showToast(`${createdSlot.ogrenciAd} için çamaşırhane sırası oluşturuldu!`);
@@ -886,19 +1595,41 @@ export default function Home() {
   };
 
   const handleUpdateLaundryStatus = (id: string, newStatus: "Yıkanıyor" | "Sırada" | "Tamamlandı" | "İptal") => {
-    const updated = laundrySlots.map((s) => (s.id === id ? { ...s, durum: newStatus } : s));
+    let currentSlots = laundrySlots;
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("yurtify_laundry") || localStorage.getItem("yurtify_laundry_slots");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) currentSlots = parsed;
+        }
+      } catch {}
+    }
+    const updated = currentSlots.map((s) => (s.id === id ? { ...s, durum: newStatus } : s));
     setLaundrySlots(updated);
     if (typeof window !== "undefined") {
       localStorage.setItem("yurtify_laundry", JSON.stringify(updated));
+      localStorage.setItem("yurtify_laundry_slots", JSON.stringify(updated));
     }
     showToast(`Çamaşır durumu güncellendi: ${newStatus}`);
   };
 
   const handleDeleteLaundry = (id: string) => {
-    const updated = laundrySlots.filter((s) => s.id !== id);
+    let currentSlots = laundrySlots;
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("yurtify_laundry") || localStorage.getItem("yurtify_laundry_slots");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) currentSlots = parsed;
+        }
+      } catch {}
+    }
+    const updated = currentSlots.filter((s) => s.id !== id);
     setLaundrySlots(updated);
     if (typeof window !== "undefined") {
       localStorage.setItem("yurtify_laundry", JSON.stringify(updated));
+      localStorage.setItem("yurtify_laundry_slots", JSON.stringify(updated));
     }
     showToast("Çamaşır sırası silindi.");
   };
@@ -994,13 +1725,26 @@ export default function Home() {
       return;
     }
 
-    const id = `${newCustomMachine.name.trim()} (${newCustomMachine.blok})`;
+    const cleanName = newCustomMachine.name.trim();
+    const cleanBlok = newCustomMachine.blok.trim();
+    const displayName = cleanBlok ? `${cleanName} (${cleanBlok})` : cleanName;
+
+    const parsedKapasite = typeof newCustomMachine.kapasiteKg === "string"
+      ? parseFloat(newCustomMachine.kapasiteKg.trim())
+      : Number(newCustomMachine.kapasiteKg);
+    const hasKapasite = !isNaN(parsedKapasite) && parsedKapasite > 0;
+
+    const typeLabel = newCustomMachine.tur === "kurutma" ? "Kurutma" : "Yıkama";
+    const tipText = hasKapasite
+      ? `${typeLabel} • ${parsedKapasite} kg`
+      : typeLabel;
+
     const createdMachine: LaundryMachine = {
-      id,
-      name: `${newCustomMachine.name.trim()} (${newCustomMachine.blok})`,
-      tip: `${newCustomMachine.tur === "kurutma" ? "Kurutma" : "Yıkama"} • ${newCustomMachine.kapasiteKg} kg`,
+      id: `${displayName}-${Date.now()}`,
+      name: displayName,
+      tip: tipText,
       tur: newCustomMachine.tur,
-      kapasiteKg: newCustomMachine.kapasiteKg,
+      kapasiteKg: hasKapasite ? parsedKapasite : (newCustomMachine.tur === "kurutma" ? 10 : 9),
     };
 
     const updated = [...laundryMachines, createdMachine];
@@ -1008,8 +1752,8 @@ export default function Home() {
     if (typeof window !== "undefined") {
       localStorage.setItem("yurtify_laundry_machines", JSON.stringify(updated));
     }
-    setNewCustomMachine({ name: "", tur: "yikama", kapasiteKg: 9, blok: "A Blok" });
-    showToast(`"${createdMachine.name}" çamaşırhaneye eklendi!`);
+    setNewCustomMachine({ name: "", tur: "yikama", kapasiteKg: "", blok: "" });
+    showToast(`"${createdMachine.name}" çamaşırhaneye eklendi.`);
   };
 
   const handleDeleteMachine = (id: string) => {
@@ -1030,24 +1774,52 @@ export default function Home() {
   // 1. Yeni Öğrenci Kaydet
   const handleAddStudent = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStudent.adSoyad.trim() || !newStudent.telefon.trim()) {
-      showToast("Lütfen öğrenci adı ve telefon bilgilerini eksiksiz giriniz.");
+    if (!newStudent.adSoyad.trim() || !newStudent.odaNo.trim()) {
+      showToast("Lütfen öğrenci adı ve oda numarasını eksiksiz giriniz.");
       return;
     }
 
+    const rawName = newStudent.adSoyad.trim();
+    let rawEmail = (newStudent.eposta || "").trim();
+
+    // Eğer Ad Soyad alanına doğrudan e-posta yazıldıysa
+    if (!rawEmail && rawName.includes("@")) {
+      rawEmail = rawName;
+    } else if (!rawEmail) {
+      rawEmail = `${rawName.toLowerCase().replace(/[^a-z0-9]/g, ".")}@gmail.com`;
+    }
+
+    const cleanUsername = rawEmail.includes("@")
+      ? rawEmail.split("@")[0].toLowerCase()
+      : rawName.toLowerCase().replace(/\s+/g, ".");
+
     const createdStudent: Student = {
       id: "std-" + Date.now(),
-      adSoyad: newStudent.adSoyad.trim(),
-      telefon: newStudent.telefon.trim(),
-      eposta: newStudent.eposta.trim() || `${newStudent.adSoyad.toLowerCase().replace(/\s+/g, ".")}@gmail.com`,
+      adSoyad: rawName,
+      eposta: rawEmail,
+      kullaniciAdi: cleanUsername,
+      sifre: newStudent.sifre?.trim() || "ogrenci123",
       odaNo: newStudent.odaNo,
       yatakNo: newStudent.yatakNo,
-      veliAd: newStudent.veliAd.trim() || "Veli",
-      veliTel: newStudent.veliTel.trim() || newStudent.telefon.trim(),
-      kayitTarihi: new Date().toLocaleDateString("tr-TR"),
     };
 
-    const updatedStudents = [createdStudent, ...students];
+    let currentList = students;
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("yurtify_students");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            currentList = parsed;
+          }
+        }
+      } catch (err) {}
+    }
+
+    const updatedStudents = [
+      createdStudent,
+      ...currentList.filter((s) => s.id !== createdStudent.id && s.eposta.toLowerCase() !== rawEmail.toLowerCase()),
+    ];
     setStudents(updatedStudents);
     if (typeof window !== "undefined") {
       localStorage.setItem("yurtify_students", JSON.stringify(updatedStudents));
@@ -1061,12 +1833,10 @@ export default function Home() {
     setIsAddStudentModalOpen(false);
     setNewStudent({
       adSoyad: "",
-      telefon: "",
       eposta: "",
+      sifre: "",
       odaNo: "101",
       yatakNo: "1",
-      veliAd: "",
-      veliTel: "",
     });
     showToast(`"${createdStudent.adSoyad}" başarıyla kaydedildi ve Oda ${createdStudent.odaNo}'e yerleştirildi!`);
   };
@@ -1192,10 +1962,26 @@ export default function Home() {
   const handleSaveMenu = (e: React.FormEvent) => {
     e.preventDefault();
     setIsEditingMenu(false);
+    const updated = {
+      ...dailyMenu,
+      tarih: getTodayDateKey(),
+    };
+    setDailyMenu(updated);
     if (typeof window !== "undefined") {
-      localStorage.setItem("yurtify_menu", JSON.stringify(dailyMenu));
+      localStorage.setItem("yurtify_menu", JSON.stringify(updated));
     }
-    showToast(" Günün yemek menüsü güncellendi ve öğrencilere yayınlandı!");
+    showToast("Günün yemek menüsü güncellendi ve öğrencilere yayınlandı!");
+  };
+
+  const handleManualResetMenu = () => {
+    if (confirm("Bugünün yemek menüsü sıfırlansın mı? Sabah ve akşam menü içerikleri temizlenecektir.")) {
+      const reset = getResetDailyMenu(dailyMenu);
+      setDailyMenu(reset);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("yurtify_menu", JSON.stringify(reset));
+      }
+      showToast("Günün yemek menüsü sıfırlandı.");
+    }
   };
 
   const handleToggleViewMode = (mode: "tek" | "birlikte") => {
@@ -1211,15 +1997,6 @@ export default function Home() {
     );
   };
 
-  const handleToggleCalories = () => {
-    const nextVal = !dailyMenu.kaloriGoster;
-    const updated = { ...dailyMenu, kaloriGoster: nextVal };
-    setDailyMenu(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("yurtify_menu", JSON.stringify(updated));
-    }
-    showToast(nextVal ? "Kalori gösterimi açıldı." : "Kalori gösterimi kapatıldı.");
-  };
 
   const handleToggleActiveMeal = (meal: "kahvalti" | "aksam") => {
     const updated = { ...dailyMenu, aktifOgun: meal };
@@ -1227,7 +2004,22 @@ export default function Home() {
     if (typeof window !== "undefined") {
       localStorage.setItem("yurtify_menu", JSON.stringify(updated));
     }
-    showToast(` Tek öğün modunda "${meal === "kahvalti" ? "Sabah Kahvaltısı" : "Akşam Yemeği"}" seçildi!`);
+    showToast(`Tek öğün modunda "${meal === "kahvalti" ? "Sabah Kahvaltısı" : "Akşam Yemeği"}" seçildi.`);
+  };
+
+  const handleSelectMealMode = (mode: "kahvalti" | "aksam" | "birlikte") => {
+    let updated;
+    if (mode === "birlikte") {
+      updated = { ...dailyMenu, gorunumModu: "birlikte" as const };
+      showToast("Görünüm modu: Her iki öğün de aktif.");
+    } else {
+      updated = { ...dailyMenu, gorunumModu: "tek" as const, aktifOgun: mode };
+      showToast(`Tek öğün modu: ${mode === "kahvalti" ? "Sabah Kahvaltısı" : "Akşam Yemeği"} seçildi.`);
+    }
+    setDailyMenu(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("yurtify_menu", JSON.stringify(updated));
+    }
   };
 
   const handleToggleGunTipi = (tip: "haftaici" | "haftasonu" | "ozelgun") => {
@@ -1318,12 +2110,12 @@ export default function Home() {
     if (parts.length >= 1 && parts[0].includes(":")) {
       const [h, m] = parts[0].split(":").map((v) => parseInt(v, 10));
       if (!isNaN(h)) sH = Math.min(23, Math.max(0, h));
-      if (!isNaN(m)) sM = Math.min(59, Math.max(0, m));
+      if (!isNaN(m)) sM = Math.min(55, Math.max(0, Math.round(m / 5) * 5));
     }
     if (parts.length >= 2 && parts[1].includes(":")) {
       const [h, m] = parts[1].split(":").map((v) => parseInt(v, 10));
       if (!isNaN(h)) eH = Math.min(23, Math.max(0, h));
-      if (!isNaN(m)) eM = Math.min(59, Math.max(0, m));
+      if (!isNaN(m)) eM = Math.min(55, Math.max(0, Math.round(m / 5) * 5));
     }
 
     setTimePickerModal({
@@ -1350,12 +2142,220 @@ export default function Home() {
     showToast(`Servis saati güncellendi: ${formatted}`);
   };
 
-  const handleSaveYurtSettings = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (typeof window !== "undefined") {
-      localStorage.setItem("yurtify_settings", JSON.stringify(yurtSettings));
+  const openEntryTimePicker = (
+    field: "haftaici" | "haftasonu" | "cikisHaftaIci" | "cikisHaftaSonu",
+    title: string
+  ) => {
+    let currentVal = "23:00";
+    let defaultH = 23;
+    let defaultM = 0;
+
+    if (field === "haftaici") {
+      currentVal = yurtSettings.sonGirisHaftaIci || "23:00";
+      defaultH = 23;
+      defaultM = 0;
+    } else if (field === "haftasonu") {
+      currentVal = yurtSettings.sonGirisHaftaSonu || "23:45";
+      defaultH = 23;
+      defaultM = 45;
+    } else if (field === "cikisHaftaIci") {
+      currentVal = yurtSettings.ilkCikisHaftaIci || "06:00";
+      defaultH = 6;
+      defaultM = 0;
+    } else if (field === "cikisHaftaSonu") {
+      currentVal = yurtSettings.ilkCikisHaftaSonu || "06:30";
+      defaultH = 6;
+      defaultM = 30;
     }
-    showToast("Yurt kurumsal ve operasyonel ayarları kaydedildi!");
+
+    let h = defaultH;
+    let m = defaultM;
+    if (currentVal && currentVal.includes(":")) {
+      const [hStr, mStr] = currentVal.split(":").map((v) => parseInt(v, 10));
+      if (!isNaN(hStr)) h = Math.min(23, Math.max(0, hStr));
+      if (!isNaN(mStr)) m = Math.min(55, Math.max(0, Math.round(mStr / 5) * 5));
+    }
+    setEntryTimeModal({
+      isOpen: true,
+      field,
+      title,
+      hour: h,
+      minute: m,
+    });
+  };
+
+  const handleApplyEntryTime = () => {
+    const h = String(entryTimeModal.hour).padStart(2, "0");
+    const m = String(entryTimeModal.minute).padStart(2, "0");
+    const formatted = `${h}:${m}`;
+
+    let settingKey: "sonGirisHaftaIci" | "sonGirisHaftaSonu" | "ilkCikisHaftaIci" | "ilkCikisHaftaSonu" = "sonGirisHaftaIci";
+    let label = "Son giriş saati";
+
+    if (entryTimeModal.field === "haftaici") {
+      settingKey = "sonGirisHaftaIci";
+      label = "Hafta içi son giriş saati";
+    } else if (entryTimeModal.field === "haftasonu") {
+      settingKey = "sonGirisHaftaSonu";
+      label = "Hafta sonu son giriş saati";
+    } else if (entryTimeModal.field === "cikisHaftaIci") {
+      settingKey = "ilkCikisHaftaIci";
+      label = "Hafta içi ilk çıkış saati";
+    } else if (entryTimeModal.field === "cikisHaftaSonu") {
+      settingKey = "ilkCikisHaftaSonu";
+      label = "Hafta sonu ilk çıkış saati";
+    }
+
+    const updatedSettings = {
+      ...yurtSettings,
+      [settingKey]: formatted,
+    };
+    setYurtSettings(updatedSettings);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("yurtify_settings", JSON.stringify(updatedSettings));
+    }
+    setEntryTimeModal((prev) => ({ ...prev, isOpen: false }));
+    showToast(`${label} güncellendi: ${formatted}`);
+  };
+
+  const handleSaveYurtSettings = async (e: React.FormEvent, customToast?: string) => {
+    e.preventDefault();
+    const finalKapasite = typeof yurtSettings.kapasite === "string"
+      ? (parseInt(yurtSettings.kapasite, 10) || 0)
+      : (yurtSettings.kapasite || 0);
+    const settingsToSave = {
+      ...yurtSettings,
+      kapasite: finalKapasite,
+    };
+
+    // 1. Local state güncelle
+    setYurtSettings(settingsToSave);
+
+    // 2. LocalStorage'a kaydet
+    if (typeof window !== "undefined") {
+      localStorage.setItem("yurtify_settings", JSON.stringify(settingsToSave));
+    }
+
+    // 3. Aktif kullanıcıyı (currentUser) hemen güncelle
+    setCurrentUser((prev: any) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        selectedYurtName: settingsToSave.ad,
+        name: prev.role === "yonetici" ? (settingsToSave.yetkiliAd || prev.name) : prev.name,
+      };
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("yurtify_session", JSON.stringify(updated));
+      }
+      return updated;
+    });
+
+    // 4. Hedef yurt ID'sini belirle ve yurtlar state'ini güncelle
+    const targetYurtId = currentUser?.selectedYurtId || yurtlar[0]?.id || "af81f031-1988-401e-84af-42ac75b4d409";
+    
+    if (yurtlar.length > 0) {
+      const updatedYurtlar = yurtlar.map((y) =>
+        y.id === targetYurtId || yurtlar.length === 1
+          ? {
+              ...y,
+              ad: settingsToSave.ad,
+              yetkiliAd: settingsToSave.yetkiliAd,
+              kapasite: finalKapasite,
+            }
+          : y
+      );
+      setYurtlar(updatedYurtlar);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("yurtify_yurtlar", JSON.stringify(updatedYurtlar));
+      }
+    } else {
+      const newYurtObj: Yurt = {
+        id: targetYurtId,
+        ad: settingsToSave.ad,
+        sehir: settingsToSave.sehir || "İstanbul",
+        ilce: settingsToSave.ilce || "Kadıköy",
+        adres: settingsToSave.adres || "",
+        kapasite: finalKapasite,
+        mevcutOgrenci: 0,
+        yetkiliAd: settingsToSave.yetkiliAd,
+        yetkiliTel: settingsToSave.yetkiliTel || "",
+        yetkiliEposta: "mudur@gunesyurdu.com",
+        durum: "aktif",
+        yurtTuru: "Kız Öğrenci Yurdu",
+        kayitTarihi: new Date().toLocaleDateString("tr-TR"),
+      };
+      setYurtlar([newYurtObj]);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("yurtify_yurtlar", JSON.stringify([newYurtObj]));
+      }
+    }
+
+    // 5. Supabase veritabanında da güncelle
+    try {
+      if (targetYurtId) {
+        const { error } = await supabase
+          .from("yurtlar")
+          .update({
+            ad: settingsToSave.ad,
+            yetkili_ad: settingsToSave.yetkiliAd,
+            kapasite: finalKapasite,
+          })
+          .eq("id", targetYurtId);
+
+        if (error) {
+          console.warn("Supabase yurt güncelleme uyarısı:", error.message);
+        }
+      }
+    } catch (err) {
+      console.warn("Supabase veritabanı bağlantı hatası:", err);
+    }
+
+    showToast(customToast || "Yurt kurumsal ve operasyonel ayarları kaydedildi.");
+  };
+
+  const handleSaveAdminSecuritySettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    let updatedPassword = yurtSettings.adminSifre || "mudur123456";
+
+    // Şifre değiştirilmek isteniyorsa
+    if (adminPasswordForm.yeniSifre.trim() || adminPasswordForm.yeniSifreTekrar.trim() || adminPasswordForm.mevcutSifre.trim()) {
+      const currentConfigured = yurtSettings.adminSifre || "mudur123456";
+      if (!adminPasswordForm.mevcutSifre.trim()) {
+        showToast("Şifre güncellemek için mevcut şifrenizi girmeniz zorunludur!");
+        return;
+      }
+      if (adminPasswordForm.mevcutSifre.trim() !== currentConfigured) {
+        showToast("Mevcut şifrenizi hatalı girdiniz! Güvenlik nedeniyle şifre güncellenemedi.");
+        return;
+      }
+      if (adminPasswordForm.yeniSifre !== adminPasswordForm.yeniSifreTekrar) {
+        showToast("Yeni şifreler birbiriyle uyuşmuyor!");
+        return;
+      }
+      if (adminPasswordForm.yeniSifre.length < 6) {
+        showToast("Yeni şifre en az 6 karakter olmalıdır!");
+        return;
+      }
+      const hasLetter = /[a-zA-Z]/.test(adminPasswordForm.yeniSifre);
+      const hasNumber = /[0-9]/.test(adminPasswordForm.yeniSifre);
+      if (!hasLetter || !hasNumber) {
+        showToast("Yeni şifre güvenliğiniz için en az bir harf ve bir rakam içermelidir!");
+        return;
+      }
+      updatedPassword = adminPasswordForm.yeniSifre.trim();
+    }
+
+    const settingsToSave = {
+      ...yurtSettings,
+      adminSifre: updatedPassword,
+    };
+
+    setYurtSettings(settingsToSave);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("yurtify_settings", JSON.stringify(settingsToSave));
+    }
+    setAdminPasswordForm({ mevcutSifre: "", yeniSifre: "", yeniSifreTekrar: "" });
+    showToast("Yönetici güvenlik ayarları başarıyla kaydedildi.");
   };
 
 
@@ -1458,126 +2458,158 @@ export default function Home() {
   const activeYurtlar = yurtlar.filter((y) => y.durum === "aktif").length;
 
   // ==========================================
+  // OTURUM KONTROLÜ (GİRİŞ EKRANI PARLAMASINI ÖNLER)
+  // ==========================================
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0F172A] flex flex-col justify-center items-center p-4 relative font-sans">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-[#0284C7] border border-[#0369A1] flex items-center justify-center text-white font-black text-2xl shadow-xs animate-pulse">
+            Y
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#0284C7] animate-ping"></span>
+            <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">
+              Yurtify hazırlanıyor...
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
   // GİRİŞ KAPISI
   // ==========================================
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-[#FAF7F2] text-[#3D110B] flex flex-col justify-center items-center p-4 relative overflow-hidden font-sans">
+      <div className="login-screen-container min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col justify-center items-center p-3 sm:p-6 relative overflow-hidden font-sans">
         
-        {/* Canlı Realtime & DB Durum Rozeti */}
-        <div className="absolute top-4 right-4 flex items-center gap-2 bg-white border border-[#E8DCCF] px-3.5 py-1.5 rounded-full text-[11px]">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              realtimeActive ? "bg-[#D1841A] animate-pulse" : "bg-[#99501B]"
-            }`}
-          ></span>
-          <span className="text-[#662B16] font-medium">
-            {realtimeActive ? "Supabase Realtime: Aktif" : "Sistem Hazır & Eşzamanlı"}
-          </span>
+        {/* Canlı Realtime & DB Durum Rozeti ve Tema Değiştirici */}
+        <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex items-center gap-2 z-20">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Aydınlık moda geç" : "Karanlık moda geç"}
+            title={theme === "dark" ? "Aydınlık Moda Geç" : "Karanlık Moda Geç"}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all cursor-pointer bg-white text-[#0F172A] border-[#E2E8F0] shadow-xs active:scale-95 hover:border-[#0284C7]"
+          >
+            {theme === "dark" ? (
+              <>
+                <svg className="w-3.5 h-3.5 text-sky-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5" />
+                  <line x1="12" y1="1" x2="12" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="23" />
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                  <line x1="1" y1="12" x2="3" y2="12" />
+                  <line x1="21" y1="12" x2="23" y2="12" />
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+                <span>Aydınlık Mod</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5 text-[#0284C7] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+                <span>Karanlık Mod</span>
+              </>
+            )}
+          </button>
+
+          <div className="hidden xs:flex items-center gap-1.5 sm:gap-2 bg-white border border-[#E2E8F0] px-2.5 py-1 sm:px-3.5 sm:py-1.5 rounded-full text-[10px] sm:text-[11px] shadow-xs">
+            <span
+              className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${
+                realtimeActive ? "bg-[#0284C7] animate-pulse" : "bg-[#0284C7]"
+              }`}
+            ></span>
+            <span className="text-[#64748B] font-medium">
+              {realtimeActive ? "Realtime Aktif" : "Sistem Hazır"}
+            </span>
+          </div>
         </div>
 
-        <div className="w-full max-w-md relative z-10">
-          <div className="text-center mb-6">
-            <div className="inline-flex w-14 h-14 rounded-2xl bg-[#3D110B] border border-[#662B16] items-center justify-center text-[#FFC90C] font-black text-2xl mb-3">
+        <div className="w-full max-w-sm sm:max-w-md relative z-10">
+          <div className="text-center mb-4 sm:mb-6">
+            <div className="inline-flex w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-[#0284C7] border border-[#0369A1] items-center justify-center text-white font-black text-xl sm:text-2xl mb-2 sm:mb-3">
               Y
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-[#3D110B]">Yurtify • Çoklu Yurt Portalı</h1>
-            <p className="text-xs text-[#855342] mt-1 font-medium">
-              Güvenli kimlik doğrulama ve modern yurt yönetim altyapısı
-            </p>
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#0F172A]">Yurtify</h1>
           </div>
 
-          <div className="bg-white border border-[#E8DCCF] rounded-3xl p-6 sm:p-7">
-            <div className="flex bg-[#F4ECE1] p-1.5 rounded-2xl mb-6 border border-[#E8DCCF] text-xs font-bold">
+          <div className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl p-4 sm:p-7 shadow-xs">
+            <div className="flex bg-[#F1F5F9] p-1 sm:p-1.5 rounded-xl sm:rounded-2xl mb-4 sm:mb-6 border border-[#E2E8F0] text-[11px] sm:text-xs font-bold">
               <button
                 type="button"
-                onClick={() => {
-                  setActiveRole("superadmin");
-                  setErrorMessage("");
-                  fillDemoCredentials("superadmin");
-                }}
-                className={`flex-1 py-2 rounded-xl transition-all cursor-pointer ${
+                onClick={() => handleRoleChange("superadmin")}
+                className={`flex-1 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-all cursor-pointer ${
                   activeRole === "superadmin"
-                    ? "bg-[#3D110B] text-[#FFC90C]"
-                    : "text-[#662B16] hover:text-[#3D110B]"
+                    ? "bg-[#0284C7] text-white"
+                    : "text-[#64748B] hover:text-[#0F172A]"
                 }`}
               >
                 Süper Admin
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setActiveRole("yonetici");
-                  setErrorMessage("");
-                  fillDemoCredentials("yonetici");
-                }}
-                className={`flex-1 py-2 rounded-xl transition-all cursor-pointer ${
+                onClick={() => handleRoleChange("yonetici")}
+                className={`flex-1 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-all cursor-pointer ${
                   activeRole === "yonetici"
-                    ? "bg-[#3D110B] text-[#FFC90C]"
-                    : "text-[#662B16] hover:text-[#3D110B]"
+                    ? "bg-[#0284C7] text-white"
+                    : "text-[#64748B] hover:text-[#0F172A]"
                 }`}
               >
                 Yurt Müdürü
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setActiveRole("ogrenci");
-                  setErrorMessage("");
-                  fillDemoCredentials("ogrenci");
-                }}
-                className={`flex-1 py-2 rounded-xl transition-all cursor-pointer ${
+                onClick={() => handleRoleChange("ogrenci")}
+                className={`flex-1 py-1.5 sm:py-2 rounded-lg sm:rounded-xl transition-all cursor-pointer ${
                   activeRole === "ogrenci"
-                    ? "bg-[#3D110B] text-[#FFC90C]"
-                    : "text-[#662B16] hover:text-[#3D110B]"
+                    ? "bg-[#0284C7] text-white"
+                    : "text-[#64748B] hover:text-[#0F172A]"
                 }`}
               >
                 Öğrenci
               </button>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-3.5 sm:space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[#662B16] mb-1.5">
+                <label className="block text-[11px] sm:text-xs font-semibold text-[#64748B] mb-1 sm:mb-1.5">
                   {activeRole === "superadmin"
-                    ? "Süper Admin E-posta"
+                    ? "Süper Admin E-posta veya Kullanıcı Adı"
                     : activeRole === "yonetici"
-                    ? "Yurt Yöneticisi E-posta"
-                    : "Öğrenci E-posta / No"}
+                    ? "Yönetici E-posta veya Kullanıcı Adı"
+                    : "Öğrenci E-posta veya Kullanıcı Adı"}
                 </label>
                 <input
                   type="text"
-                  placeholder={
-                    activeRole === "superadmin"
-                      ? "superadmin@yurtify.com"
-                      : activeRole === "yonetici"
-                      ? "mudur@gunesyurdu.com"
-                      : "zeynep.lermi@gmail.com"
-                  }
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full bg-[#FAF7F2] border border-[#E8DCCF] rounded-xl px-4 py-3 text-sm text-[#3D110B] placeholder-[#B8998C] focus:outline-none focus:border-[#D1841A] focus:ring-2 focus:ring-[#FFC90C]/25 transition-all font-mono font-medium"
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 sm:py-3 text-xs sm:text-sm text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/25 transition-all font-mono font-medium"
                 />
               </div>
 
               <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <label className="text-xs font-semibold text-[#662B16]">Şifre</label>
-                  <span className="text-[11px] text-[#99501B] hover:text-[#3D110B] hover:underline cursor-pointer font-medium">
+                <div className="flex justify-between items-center mb-1 sm:mb-1.5">
+                  <label className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Şifre</label>
+                  <span className="text-[10px] sm:text-[11px] text-[#64748B] hover:text-[#0F172A] hover:underline cursor-pointer font-medium">
                     Şifremi Unuttum
                   </span>
                 </div>
                 <input
                   type="password"
-                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-[#FAF7F2] border border-[#E8DCCF] rounded-xl px-4 py-3 text-sm text-[#3D110B] placeholder-[#B8998C] focus:outline-none focus:border-[#D1841A] focus:ring-2 focus:ring-[#FFC90C]/25 transition-all font-mono font-medium"
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-3.5 py-2.5 sm:py-3 text-xs sm:text-sm text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/25 transition-all font-mono font-medium"
                 />
               </div>
 
               {errorMessage && (
-                <div className="p-3 rounded-xl text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200">
+                <div className="p-2.5 sm:p-3 rounded-xl text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200">
                   {errorMessage}
                 </div>
               )}
@@ -1585,44 +2617,41 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3.5 bg-[#FFC90C] hover:bg-[#D1841A] text-[#3D110B] hover:text-white font-black rounded-xl transition-colors cursor-pointer text-sm disabled:opacity-60 disabled:cursor-not-allowed border border-[#E5B409] hover:border-[#BA7313]"
+                className="w-full py-2.5 sm:py-3.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-black rounded-xl transition-colors cursor-pointer text-xs sm:text-sm disabled:opacity-60 disabled:cursor-not-allowed border border-[#0369A1] hover:border-[#0284C7]"
               >
-                {isLoading
-                  ? "Giriş Yapılıyor..."
-                  : activeRole === "superadmin"
-                  ? "Süper Admin Paneline Giriş Yap"
-                  : activeRole === "yonetici"
-                  ? "Yurt Yönetim Paneline Giriş Yap"
-                  : "Öğrenci Portalı Girişi Yap"}
+                {isLoading ? "Giriş Yapılıyor..." : "Giriş Yap"}
               </button>
             </form>
 
-            <div className="mt-6 pt-5 border-t border-[#E8DCCF] text-center space-y-2">
-              <p className="text-[11px] text-[#855342] font-semibold">Hızlı Test İçin Tek Tıkla Giriş Yap:</p>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleQuickLogin("superadmin")}
-                  className="py-2.5 px-2 rounded-xl bg-[#F4ECE1] hover:bg-[#3D110B] text-xs font-bold text-[#3D110B] hover:text-[#FFC90C] border border-[#E8DCCF] cursor-pointer transition-colors"
-                >
-                  Süper Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickLogin("yonetici")}
-                  className="py-2.5 px-2 rounded-xl bg-[#F4ECE1] hover:bg-[#3D110B] text-xs font-bold text-[#3D110B] hover:text-[#FFC90C] border border-[#E8DCCF] cursor-pointer transition-colors"
-                >
-                  Yurt Müdürü
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickLogin("ogrenci")}
-                  className="py-2.5 px-2 rounded-xl bg-[#F4ECE1] hover:bg-[#3D110B] text-xs font-bold text-[#3D110B] hover:text-[#FFC90C] border border-[#E8DCCF] cursor-pointer transition-colors"
-                >
-                  Öğrenci
-                </button>
+            {yurtSettings.hizliGirisIzin === true && (
+              <div className="mt-4 sm:mt-6 pt-3.5 sm:pt-5 border-t border-[#E2E8F0] text-center space-y-2">
+                <p className="text-[10px] sm:text-[11px] text-[#64748B] font-semibold">Test / Hızlı Giriş:</p>
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin("superadmin")}
+                    className="py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl bg-[#F1F5F9] hover:bg-[#0284C7] text-[11px] sm:text-xs font-bold text-[#0F172A] hover:text-white border border-[#E2E8F0] cursor-pointer transition-colors"
+                  >
+                    Süper Admin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin("yonetici")}
+                    disabled={yurtSettings.adminGirisAktif === false}
+                    className="py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-[11px] sm:text-xs font-bold border transition-colors bg-[#F1F5F9] hover:bg-[#0284C7] text-[#0F172A] hover:text-white border-[#E2E8F0] cursor-pointer"
+                  >
+                    Yurt Müdürü
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin("ogrenci")}
+                    className="py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl bg-[#F1F5F9] hover:bg-[#0284C7] text-[11px] sm:text-xs font-bold text-[#0F172A] hover:text-white border border-[#E2E8F0] cursor-pointer transition-colors"
+                  >
+                    Öğrenci
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -1632,128 +2661,200 @@ export default function Home() {
   // ==========================================
   // PANELLER (DASHBOARD)
   // ==========================================
+  const openTickets = maintenanceTickets.filter((t) => t.durum !== "Çözüldü").length;
+
+  const managerTabItems = [
+    {
+      id: "anasayfa",
+      label: "Ana Sayfa",
+      name: "Ana Sayfa",
+      shortName: "Ana Sayfa",
+      badge: "Genel Bakış",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+      ),
+    },
+    {
+      id: "yemekhane",
+      label: "Yemekhane",
+      name: "Yemekhane",
+      shortName: "Yemekhane",
+      badge: "Menü & Saat",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        </svg>
+      ),
+    },
+    {
+      id: "camasirhane",
+      label: `Çamaşırhane (${laundrySlots.filter(s => s.tarih === selectedLaundryDate && s.durum !== "Tamamlandı" && s.durum !== "İptal").length})`,
+      name: "Çamaşırhane",
+      shortName: "Çamaşır",
+      badge: `${laundrySlots.filter(s => s.tarih === selectedLaundryDate && s.durum !== "Tamamlandı" && s.durum !== "İptal").length} Aktif`,
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4V4zm8 12a4 4 0 100-8 4 4 0 000 8zm-5-9h.01M10 7h.01" />
+        </svg>
+      ),
+    },
+    {
+      id: "arizalar",
+      label: `Arızalar (${openTickets})`,
+      name: "Arızalar",
+      shortName: "Arızalar",
+      badge: `${openTickets} Açık`,
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+        </svg>
+      ),
+    },
+    {
+      id: "ayarlar",
+      label: "Yurt Ayarları",
+      name: "Yurt Ayarları",
+      shortName: "Ayarlar",
+      badge: `${students.length} Öğrenci & Sistem`,
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+    },
+  ];
+
+  const currentTabInfo = managerTabItems.find((t) => t.id === managerTab) || managerTabItems[0];
+
   return (
-    <div className="min-h-screen bg-[#FAF7F2] text-[#3D110B] flex flex-col font-sans">
+    <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex flex-col font-sans">
       {/* Toast Bildirimi */}
       {notification && (
-        <div className="fixed top-5 right-5 z-50 bg-[#3D110B] text-[#FFC90C] text-xs font-bold px-4 py-2.5 rounded-xl border border-[#662B16] shadow-none animate-bounce">
+        <div className="fixed top-5 right-5 z-50 bg-[#0284C7] text-white text-xs font-bold px-4 py-2.5 rounded-xl border border-[#0369A1] shadow-none animate-bounce">
           {notification}
         </div>
       )}
 
-      {/* Üst Bar */}
-      <header className="sticky top-0 z-40 bg-white border-b border-[#E8DCCF] px-4 sm:px-8 py-3.5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#3D110B] text-[#FFC90C] font-black text-lg border border-[#662B16]">
+      {/* Üst Bar (Sayfa kaydırıldığında her zaman sabit kalır) */}
+      <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-md border-b border-[#E2E8F0] dark:border-[#1E293B] px-3.5 sm:px-8 py-3 sm:py-3.5 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1 pr-2">
+          {/* Logo İkonu */}
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-[#0284C7] to-[#0284C7] text-white flex items-center justify-center font-black text-base sm:text-lg border border-[#0369A1]/40 shadow-xs shrink-0">
             Y
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-black text-sm text-[#3D110B]">Yurtify Platformu</span>
-              <span
-                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                  currentUser.role === "superadmin"
-                    ? "bg-[#3D110B] text-[#FFC90C] border border-[#662B16]"
-                    : currentUser.role === "yonetici"
-                    ? "bg-[#F4ECE1] text-[#3D110B] border border-[#D1841A]/50"
-                    : "bg-[#99501B]/15 text-[#99501B] border border-[#99501B]/30"
-                }`}
-              >
-                {currentUser.role === "superadmin"
-                  ? "Süper Admin"
-                  : currentUser.role === "yonetici"
-                  ? "Yurt Müdürü"
-                  : "Öğrenci Portalı"}
-              </span>
 
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] bg-[#F4ECE1] text-[#662B16] border border-[#E8DCCF]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#D1841A] animate-pulse"></span>
-                Senkronize
-              </span>
-            </div>
-            <p className="text-xs text-[#855342] font-medium">{currentUser.details}</p>
+          {/* Marka & Yurt Bilgisi */}
+          <div className="min-w-0 flex-1 flex flex-col justify-center">
+            {/* EN ÖNEMLİ PARÇA: YURDUN İSMİ (ANA BAŞLIK) */}
+            {(currentUser.role !== "superadmin" || currentUser.selectedYurtName) ? (
+              <>
+                <h1 className="font-bold text-[13px] sm:text-sm md:text-base text-[#0F172A] dark:text-[#F8FAFC] tracking-tight leading-snug line-clamp-2">
+                  {yurtSettings.ad || currentUser.selectedYurtName || yurtlar[0]?.ad || "Karahan Yükseköğrenim Kız Öğrenci Yurdu"}
+                </h1>
+
+                {/* ALT SATIR: ZARİF, İNCE YURTIFY VE ROL BİLGİSİ */}
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="font-light text-[11px] text-[#64748B] dark:text-[#94A3B8] tracking-normal shrink-0 leading-none">
+                    Yurtify
+                  </span>
+                  <span className="text-[#94A3B8] text-[9px] shrink-0 leading-none">•</span>
+                  <span className="text-[10px] sm:text-[11px] font-medium text-[#0284C7] shrink-0 leading-none">
+                    {currentUser.role === "yonetici" ? "Yurt Müdürü" : currentUser.role === "superadmin" ? "Süper Admin" : "Öğrenci"}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="font-light text-xs sm:text-sm text-[#64748B] dark:text-[#94A3B8] tracking-wide shrink-0">Yurtify</span>
+                <span className="text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-[#0284C7] text-white border border-[#0369A1]">
+                  Süper Admin
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+
           {currentUser.name.includes("Süper Admin") && currentUser.role === "yonetici" && (
             <button
-              onClick={() =>
-                setCurrentUser({
-                  role: "superadmin",
+              onClick={() => {
+                const superUser = {
+                  role: "superadmin" as const,
                   name: "Sistem Sahibi (Süper Admin)",
                   details: "Platform Yöneticisi • Tüm Yurtlar & Lisans Yönetimi",
-                })
-              }
-              className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#3D110B] hover:bg-[#662B16] text-[#FFC90C] border border-[#662B16] transition-colors cursor-pointer"
+                };
+                setCurrentUser(superUser);
+                if (typeof window !== "undefined") {
+                  sessionStorage.setItem("yurtify_session", JSON.stringify(superUser));
+                }
+              }}
+              className="px-2.5 py-1.5 sm:px-3.5 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold bg-[#0284C7] hover:bg-[#0369A1] text-white border border-[#0369A1] transition-colors cursor-pointer"
             >
-              ← Süper Admin Paneline Dön
+              ← <span className="hidden sm:inline">Süper Admin </span>Dön
             </button>
           )}
 
-          <button
-            onClick={handleLogout}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
-          >
-            Çıkış Yap
-          </button>
+          {currentUser.role === "superadmin" && (
+            <button
+              onClick={handleLogout}
+              className="px-2.5 py-1.5 sm:px-3.5 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
+            >
+              Çıkış Yap
+            </button>
+          )}
         </div>
       </header>
 
       {/* Ana Gövde */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 md:py-8 pb-24 md:pb-8 space-y-4 sm:space-y-6 md:space-y-8">
         {/* ========================================================= */}
         {/* A. SÜPER ADMİN PANELİ */}
         {/* ========================================================= */}
         {currentUser.role === "superadmin" && (
-          <div className="space-y-8">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white border border-[#E8DCCF] p-6 sm:p-8 rounded-3xl">
-              <div>
-                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#3D110B] text-[#FFC90C] border border-[#662B16]">
-                  Platform Yönetim Merkezi
-                </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-[#3D110B] mt-2">
-                  Yurtlar ve Şubeler Yönetim Merkezi
-                </h2>
-                <p className="text-[#855342] text-sm mt-1">
-                  Eklediğiniz veya güncellediğiniz tüm yurtlar anında sisteme kaydedilir ve listede yerini alır.
-                </p>
-              </div>
+          <div className="space-y-4 sm:space-y-6 md:space-y-8">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 bg-white border border-[#E2E8F0] p-4 sm:p-6 rounded-2xl sm:rounded-3xl">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-black text-[#0F172A]">
+                Yurtlar ve Şubeler
+              </h2>
 
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="px-5 py-3 rounded-2xl bg-[#FFC90C] hover:bg-[#D1841A] text-[#3D110B] hover:text-white font-black text-sm flex items-center gap-2 cursor-pointer transition-colors border border-[#E5B409]"
+                className="w-full sm:w-auto justify-center px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl sm:rounded-2xl bg-[#0284C7] hover:bg-[#0369A1] text-white font-black text-xs sm:text-sm flex items-center gap-2 cursor-pointer transition-colors border border-[#0369A1]"
               >
                 + Yeni Yurt Ekle
               </button>
             </div>
 
             {/* İstatistikler (Flat 5-Color Tones) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-5 rounded-2xl border border-[#E8DCCF] border-t-4 border-t-[#3D110B]">
-                <div className="text-xs font-semibold text-[#855342]">Kayıtlı Yurt Sayısı</div>
-                <div className="text-3xl font-black text-[#3D110B] mt-1">{yurtlar.length}</div>
-                <div className="text-[11px] font-bold text-[#99501B] mt-1">{activeYurtlar} Yurt Aktif Hizmette</div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+              <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0F172A]">
+                <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Kayıtlı Yurt</div>
+                <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0F172A] mt-0.5 sm:mt-1">{yurtlar.length}</div>
+                <div className="text-[10px] sm:text-[11px] font-bold text-[#64748B] mt-0.5 sm:mt-1">{activeYurtlar} Yurt Aktif</div>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-[#E8DCCF] border-t-4 border-t-[#662B16]">
-                <div className="text-xs font-semibold text-[#855342]">Toplam Yatak Kapasitesi</div>
-                <div className="text-3xl font-black text-[#662B16] mt-1">{totalKapasite}</div>
-                <div className="text-[11px] text-[#855342] mt-1">Tüm yurtlar toplamı</div>
+              <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0284C7]">
+                <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Yatak Kapasitesi</div>
+                <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0F172A] mt-0.5 sm:mt-1">{totalKapasite}</div>
+                <div className="text-[10px] sm:text-[11px] text-[#64748B] mt-0.5 sm:mt-1">Toplam kontenjan</div>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-[#E8DCCF] border-t-4 border-t-[#99501B]">
-                <div className="text-xs font-semibold text-[#855342]">Barınan Toplam Öğrenci</div>
-                <div className="text-3xl font-black text-[#99501B] mt-1">{totalOgrenci}</div>
-                <div className="text-[11px] font-bold text-[#D1841A] mt-1">
-                  Ortalama Doluluk: %{totalKapasite > 0 ? Math.round((totalOgrenci / totalKapasite) * 100) : 0}
+              <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0284C7]">
+                <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Toplam Öğrenci</div>
+                <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0F172A] mt-0.5 sm:mt-1">{totalOgrenci}</div>
+                <div className="text-[10px] sm:text-[11px] font-bold text-[#0284C7] mt-0.5 sm:mt-1">
+                  Doluluk: %{totalKapasite > 0 ? Math.round((totalOgrenci / totalKapasite) * 100) : 0}
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-[#E8DCCF] border-t-4 border-t-[#D1841A]">
-                <div className="text-xs font-semibold text-[#855342]">Toplam Boş Yatak</div>
-                <div className="text-3xl font-black text-[#D1841A] mt-1">{Math.max(0, totalKapasite - totalOgrenci)}</div>
-                <div className="text-[11px] font-bold text-[#662B16] mt-1">Kayıt Alınabilir Kontenjan</div>
+              <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0284C7]">
+                <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Boş Yatak</div>
+                <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0284C7] mt-0.5 sm:mt-1">{Math.max(0, totalKapasite - totalOgrenci)}</div>
+                <div className="text-[10px] sm:text-[11px] font-bold text-[#64748B] mt-0.5 sm:mt-1">Açık Kontenjan</div>
               </div>
             </div>
 
@@ -1765,7 +2866,7 @@ export default function Home() {
                   placeholder="Yurt adı, şehir veya yetkili ara..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-yellow-50 border border-yellow-300 rounded-xl px-4 py-2.5 text-xs text-white placeholder-stone-400 focus:outline-none focus:border-yellow-300 focus:ring-2 focus:ring-amber-300/20"
+                  className="w-full bg-yellow-50 border border-yellow-300 rounded-xl px-4 py-2.5 text-xs text-white placeholder-stone-400 focus:outline-none focus:border-yellow-300 focus:ring-2 focus:ring-sky-500/20"
                 />
               </div>
 
@@ -1773,7 +2874,7 @@ export default function Home() {
                 <select
                   value={cityFilter}
                   onChange={(e) => setCityFilter(e.target.value)}
-                  className="bg-yellow-50 border border-yellow-300 rounded-xl px-3 py-2 text-xs text-stone-600 focus:outline-none focus:border-yellow-300 focus:ring-2 focus:ring-amber-300/20"
+                  className="bg-yellow-50 border border-yellow-300 rounded-xl px-3 py-2 text-xs text-stone-600 focus:outline-none focus:border-yellow-300 focus:ring-2 focus:ring-sky-500/20"
                 >
                   <option value="all">Tüm Şehirler</option>
                   <option value="İstanbul">İstanbul</option>
@@ -1787,10 +2888,113 @@ export default function Home() {
             </div>
 
             {/* Yurtlar Tablosu */}
-            <div className="bg-white rounded-3xl border border-yellow-200 overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-yellow-50 text-stone-500 uppercase tracking-wider text-[10px]">
+            {/* Yurtlar Listesi (Mobil Kartlar & Masaüstü Tablo) */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-[#E2E8F0] p-3 sm:p-4 shadow-xs">
+              {/* 1. MOBİL KART GÖRÜNÜMÜ */}
+              <div className="sm:hidden space-y-3">
+                {filteredYurtlar.length === 0 ? (
+                  <div className="p-8 text-center text-[#64748B] bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0]">
+                    <p className="font-bold text-sm text-[#0F172A]">Henüz Kayıtlı Yurt Bulunmuyor</p>
+                    <p className="text-xs text-[#64748B] mt-1">
+                      İlk yurdunuzu tanımlamak için yukarıdaki <strong>&ldquo;Yeni Yurt Ekle&rdquo;</strong> butonunu kullanabilirsiniz.
+                    </p>
+                  </div>
+                ) : (
+                  filteredYurtlar.map((yurt) => {
+                    const fillRate = yurt.kapasite > 0 ? Math.round((yurt.mevcutOgrenci / yurt.kapasite) * 100) : 0;
+                    return (
+                      <div
+                        key={yurt.id}
+                        className="bg-[#F8FAFC] border border-[#E2E8F0] p-3.5 rounded-2xl space-y-3 shadow-xs"
+                      >
+                        {/* Başlık & Durum */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h4 className="font-bold text-[#0F172A] text-sm">{yurt.ad}</h4>
+                            <p className="text-[11px] text-[#64748B]">{yurt.sehir} / {yurt.ilce}</p>
+                          </div>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                              yurt.durum === "aktif"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : yurt.durum === "deneme"
+                                ? "bg-sky-50 text-sky-700 border border-sky-200"
+                                : "bg-rose-50 text-rose-700 border border-rose-200"
+                            }`}
+                          >
+                            {yurt.durum === "aktif"
+                              ? "● Aktif"
+                              : yurt.durum === "deneme"
+                              ? "● Deneme"
+                              : "● Askıda"}
+                          </span>
+                        </div>
+
+                        {/* Doluluk ve Kapasite */}
+                        <div className="space-y-1 bg-white p-2.5 rounded-xl border border-[#E2E8F0]">
+                          <div className="flex justify-between text-[11px] font-medium">
+                            <span className="text-[#64748B]">Kapasite & Doluluk</span>
+                            <span className="font-bold text-[#0F172A]">
+                              {yurt.mevcutOgrenci} / {yurt.kapasite} (%{fillRate})
+                            </span>
+                          </div>
+                          <div className="w-full bg-[#F8FAFC] h-2 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-[#0284C7]"
+                              style={{ width: `${Math.min(100, fillRate)}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Yetkili & İletişim */}
+                        <div className="text-[11px] space-y-0.5">
+                          <div className="text-[#0F172A]">Yetkili: <strong>{yurt.yetkiliAd}</strong> ({yurt.yetkiliTel})</div>
+                          <div className="text-[#64748B] text-[10px] truncate">{yurt.yetkiliEposta}</div>
+                        </div>
+
+                        {/* Aksiyon Butonları */}
+                        <div className="flex items-center gap-1.5 pt-2 border-t border-[#E2E8F0]">
+                          <button
+                            onClick={() => {
+                              const managerUser = {
+                                role: "yonetici" as const,
+                                name: `${yurt.yetkiliAd} (Süper Admin)`,
+                                details: `Yurt Müdürü • ${yurt.ad}`,
+                                selectedYurtId: yurt.id,
+                                selectedYurtName: yurt.ad,
+                              };
+                              setCurrentUser(managerUser);
+                              if (typeof window !== "undefined") {
+                                sessionStorage.setItem("yurtify_session", JSON.stringify(managerUser));
+                              }
+                            }}
+                            className="flex-1 py-1.5 px-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-lg text-xs transition-colors cursor-pointer text-center border border-[#0369A1]"
+                          >
+                            Paneline Geç
+                          </button>
+                          <button
+                            onClick={() => toggleYurtStatus(yurt.id, yurt.durum)}
+                            className="py-1.5 px-2.5 bg-white hover:bg-[#F8FAFC] text-[#0F172A] font-semibold rounded-lg text-xs transition-colors cursor-pointer border border-[#E2E8F0]"
+                          >
+                            {yurt.durum === "aktif" ? "Askıya Al" : "Aktifleştir"}
+                          </button>
+                          <button
+                            onClick={() => deleteYurt(yurt.id, yurt.ad)}
+                            className="py-1.5 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-xs transition-colors cursor-pointer border border-rose-200"
+                          >
+                            Sil
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* 2. MASAÜSTÜ TABLO GÖRÜNÜMÜ */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[700px]">
+                  <thead className="bg-[#F8FAFC] text-[#64748B] uppercase tracking-wider text-[10px]">
                     <tr>
                       <th className="p-4">Yurt Adı & Lokasyon</th>
                       <th className="p-4">Yetkili / İletişim</th>
@@ -1799,285 +3003,126 @@ export default function Home() {
                       <th className="p-4 text-right">İşlemler</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-amber-200/60">
+                  <tbody className="divide-y divide-[#E2E8F0]">
                     {filteredYurtlar.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="p-12 text-center text-stone-500">
-                          <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-purple-950/40 border border-purple-800/50 flex items-center justify-center text-2xl shadow-inner">
-                            
-                          </div>
-                          <p className="font-bold text-sm text-stone-900">Henüz Kayıtlı Yurt Bulunmuyor</p>
-                          <p className="text-xs text-stone-500 mt-1 max-w-sm mx-auto">
+                        <td colSpan={5} className="p-12 text-center text-[#64748B]">
+                          <p className="font-bold text-sm text-[#0F172A]">Henüz Kayıtlı Yurt Bulunmuyor</p>
+                          <p className="text-xs text-[#64748B] mt-1 max-w-sm mx-auto">
                             Veritabanınız tamamen temiz. İlk yurdunuzu tanımlamak için yukarıdaki <strong>&ldquo;Yeni Yurt Ekle&rdquo;</strong> butonunu kullanabilirsiniz.
                           </p>
                         </td>
                       </tr>
                     ) : (
                       filteredYurtlar.map((yurt) => {
-                      const fillRate = yurt.kapasite > 0 ? Math.round((yurt.mevcutOgrenci / yurt.kapasite) * 100) : 0;
-                      return (
-                        <tr key={yurt.id} className="hover:bg-yellow-100/40 transition-colors">
-                          <td className="p-4">
-                            <div className="font-bold text-stone-800 text-sm">{yurt.ad}</div>
-                            <div className="text-stone-500 text-[11px] flex items-center gap-1 mt-0.5">
-                              {yurt.sehir} / {yurt.ilce}
-                            </div>
-                            <div className="text-[10px] text-slate-500">Kayıt: {yurt.kayitTarihi}</div>
-                          </td>
+                        const fillRate = yurt.kapasite > 0 ? Math.round((yurt.mevcutOgrenci / yurt.kapasite) * 100) : 0;
+                        return (
+                          <tr key={yurt.id} className="hover:bg-[#F8FAFC] transition-colors">
+                            <td className="p-4">
+                              <div className="font-bold text-[#0F172A] text-sm">{yurt.ad}</div>
+                              <div className="text-[#64748B] text-[11px] flex items-center gap-1 mt-0.5">
+                                {yurt.sehir} / {yurt.ilce}
+                              </div>
+                              <div className="text-[10px] text-[#64748B]">Kayıt: {yurt.kayitTarihi}</div>
+                            </td>
 
-                          <td className="p-4">
-                            <div className="font-medium text-stone-700">{yurt.yetkiliAd}</div>
-                            <div className="text-stone-500 text-[11px] font-mono">{yurt.yetkiliTel}</div>
-                            <div className="text-purple-400 text-[11px]">{yurt.yetkiliEposta}</div>
-                          </td>
+                            <td className="p-4">
+                              <div className="font-medium text-[#0F172A]">{yurt.yetkiliAd}</div>
+                              <div className="text-[#64748B] text-[11px] font-mono">{yurt.yetkiliTel}</div>
+                              <div className="text-[#64748B] text-[11px]">{yurt.yetkiliEposta}</div>
+                            </td>
 
-                          <td className="p-4">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-stone-800">
-                                {yurt.mevcutOgrenci} / {yurt.kapasite}
+                            <td className="p-4">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-[#0F172A]">
+                                  {yurt.mevcutOgrenci} / {yurt.kapasite}
+                                </span>
+                                <span className="text-[10px] text-emerald-600 font-semibold">
+                                  (%{fillRate})
+                                </span>
+                              </div>
+                              <div className="w-32 bg-[#F8FAFC] h-1.5 rounded-full mt-1.5 overflow-hidden">
+                                <div
+                                  className="h-full bg-[#0284C7]"
+                                  style={{ width: `${fillRate}%` }}
+                                ></div>
+                              </div>
+                            </td>
+
+                            <td className="p-4">
+                              <span className="inline-block text-[11px] font-semibold text-[#64748B] bg-[#F1F5F9] border border-[#E2E8F0] px-2.5 py-0.5 rounded-md mb-1">
+                                {yurt.yurtTuru}
                               </span>
-                              <span className="text-[10px] text-emerald-400 font-semibold">
-                                (%{fillRate})
-                              </span>
-                            </div>
-                            <div className="w-32 bg-yellow-50 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                              <div
-                                className={`h-full ${
-                                  fillRate > 80
-                                    ? "bg-emerald-500"
-                                    : fillRate > 50
-                                    ? "bg-sky-500"
-                                    : "bg-yellow-500"
-                                }`}
-                                style={{ width: `${fillRate}%` }}
-                              ></div>
-                            </div>
-                          </td>
-
-                          <td className="p-4">
-                            <span className="inline-block text-[11px] font-semibold text-purple-300 bg-purple-500/15 border border-purple-500/30 px-2.5 py-0.5 rounded-md mb-1">
-                              {yurt.yurtTuru}
-                            </span>
-                            <div>
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  yurt.durum === "aktif"
-                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                              <div>
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    yurt.durum === "aktif"
+                                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                      : yurt.durum === "deneme"
+                                      ? "bg-sky-50 text-sky-700 border border-sky-200"
+                                      : "bg-rose-50 text-rose-700 border border-rose-200"
+                                  }`}
+                                >
+                                  {yurt.durum === "aktif"
+                                    ? "● Aktif"
                                     : yurt.durum === "deneme"
-                                    ? "bg-sky-500/20 text-sky-400 border border-sky-500/30"
-                                    : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-                                }`}
+                                    ? "● Deneme"
+                                    : "● Askıda"}
+                                </span>
+                              </div>
+                            </td>
+
+                            <td className="p-4 text-right space-x-2 whitespace-nowrap">
+                              <button
+                                onClick={() => {
+                                  const managerUser = {
+                                    role: "yonetici" as const,
+                                    name: `${yurt.yetkiliAd} (Süper Admin)`,
+                                    details: `Yurt Müdürü • ${yurt.ad}`,
+                                    selectedYurtId: yurt.id,
+                                    selectedYurtName: yurt.ad,
+                                  };
+                                  setCurrentUser(managerUser);
+                                  if (typeof window !== "undefined") {
+                                    sessionStorage.setItem("yurtify_session", JSON.stringify(managerUser));
+                                  }
+                                }}
+                                className="px-2.5 py-1.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-lg text-[11px] transition-colors cursor-pointer border border-[#0369A1]"
                               >
-                                {yurt.durum === "aktif"
-                                  ? "● Aktif"
-                                  : yurt.durum === "deneme"
-                                  ? "● Deneme"
-                                  : "● Askıda"}
-                              </span>
-                            </div>
-                          </td>
+                                Paneline Geç
+                              </button>
 
-                          <td className="p-4 text-right space-x-2">
-                            <button
-                              onClick={() =>
-                                setCurrentUser({
-                                  role: "yonetici",
-                                  name: `${yurt.yetkiliAd} (Süper Admin)`,
-                                  details: `Yurt Müdürü • ${yurt.ad}`,
-                                  selectedYurtId: yurt.id,
-                                  selectedYurtName: yurt.ad,
-                                  })
-                              }
-                              className="px-2.5 py-1.5 bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold font-bold rounded-lg text-[11px] transition-colors cursor-pointer"
-                            >
-                              Paneline Geç
-                            </button>
+                              <button
+                                onClick={() => toggleYurtStatus(yurt.id, yurt.durum)}
+                                className="px-2 py-1.5 bg-[#F8FAFC] hover:bg-[#E2E8F0] text-[#0F172A] rounded-lg text-[11px] transition-colors cursor-pointer border border-[#E2E8F0]"
+                              >
+                                {yurt.durum === "aktif" ? "Askıya Al" : "Aktifleştir"}
+                              </button>
 
-                            <button
-                              onClick={() => toggleYurtStatus(yurt.id, yurt.durum)}
-                              className="px-2 py-1.5 bg-yellow-100/70 hover:bg-yellow-100 text-stone-600 rounded-lg text-[11px] transition-colors cursor-pointer border border-yellow-300"
-                            >
-                              {yurt.durum === "aktif" ? "Askıya Al" : "Aktifleştir"}
-                            </button>
-
-                            <button
-                              onClick={() => deleteYurt(yurt.id, yurt.ad)}
-                              className="px-2 py-1.5 bg-rose-950/60 hover:bg-rose-900 text-rose-300 rounded-lg text-[11px] transition-colors cursor-pointer border border-rose-800/40"
-                            >
-                              Sil
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
+                              <button
+                                onClick={() => deleteYurt(yurt.id, yurt.ad)}
+                                className="px-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-[11px] transition-colors cursor-pointer border border-rose-200"
+                              >
+                                Sil
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
 
             {/* YURT EKLEME MODALI */}
-            {isAddModalOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40 ">
-                <div className="bg-white border border-yellow-200 rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-sm space-y-6 max-h-[90vh] overflow-y-auto">
-                  <div className="flex justify-between items-center pb-4 border-b border-yellow-200">
-                    <div>
-                      <h3 className="text-xl font-bold text-stone-900">Yeni Yurt Kaydı Ekle</h3>
-                      <p className="text-xs text-stone-500 mt-0.5">
-                        Yurt işletmesini sisteme tanımlayın
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setIsAddModalOpen(false)}
-                      className="text-stone-600 hover:text-stone-950 text-xl p-1 cursor-pointer"
-                    >
-                      
-                    </button>
-                  </div>
-
-                  <form onSubmit={handleCreateYurt} className="space-y-4 text-xs">
-                    <div>
-                      <label className="block font-semibold text-stone-600 mb-1">
-                        Yurt Tam Adı <span className="text-rose-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Örn: Kadıköy Yükseköğrenim Kız Yurdu"
-                        value={newYurt.ad}
-                        onChange={(e) => setNewYurt({ ...newYurt, ad: e.target.value })}
-                        className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-stone-900 bg-white placeholder-stone-400 focus:outline-none focus:border-yellow-300 focus:ring-2 focus:ring-amber-300/20"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block font-semibold text-stone-600 mb-1">Şehir</label>
-                        <select
-                          value={newYurt.sehir}
-                          onChange={(e) => setNewYurt({ ...newYurt, sehir: e.target.value })}
-                          className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-stone-900 bg-white focus:outline-none focus:border-yellow-300 focus:ring-2 focus:ring-amber-300/20"
-                        >
-                          <option value="İstanbul">İstanbul</option>
-                          <option value="Ankara">Ankara</option>
-                          <option value="İzmir">İzmir</option>
-                          <option value="Eskişehir">Eskişehir</option>
-                          <option value="Bursa">Bursa</option>
-                          <option value="Antalya">Antalya</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block font-semibold text-stone-600 mb-1">İlçe</label>
-                        <input
-                          type="text"
-                          placeholder="Örn: Kadıköy"
-                          value={newYurt.ilce}
-                          onChange={(e) => setNewYurt({ ...newYurt, ilce: e.target.value })}
-                          className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-stone-900 bg-white placeholder-stone-400 focus:outline-none focus:border-yellow-300 focus:ring-2 focus:ring-amber-300/20"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block font-semibold text-stone-600 mb-1">
-                          Yatak Kapasitesi <span className="text-rose-400">*</span>
-                        </label>
-                        <input
-                          type="number"
-                          required
-                          min={10}
-                          max={5000}
-                          value={newYurt.kapasite}
-                          onChange={(e) =>
-                            setNewYurt({ ...newYurt, kapasite: Number(e.target.value) })
-                          }
-                          className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-stone-900 bg-white focus:outline-none focus:border-yellow-300 focus:ring-2 focus:ring-amber-300/20"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-semibold text-stone-600 mb-1">Yurt Türü</label>
-                        <select
-                          value={newYurt.yurtTuru}
-                          onChange={(e) => setNewYurt({ ...newYurt, yurtTuru: e.target.value })}
-                          className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-stone-900 bg-white focus:outline-none focus:border-yellow-300 focus:ring-2 focus:ring-amber-300/20"
-                        >
-                          <option value="Kız Öğrenci Yurdu">Kız Öğrenci Yurdu</option>
-                          <option value="Erkek Öğrenci Yurdu">Erkek Öğrenci Yurdu</option>
-                          <option value="Karma Öğrenci Rezidansı">Karma Öğrenci Rezidansı</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-yellow-200">
-                      <p className="font-bold text-purple-400 mb-2">Yurt Yöneticisi / İletişim Bilgileri</p>
-                      <div className="space-y-3">
-                        <div>
-                          <label className="block font-semibold text-stone-600 mb-1">
-                            Yetkili Adı Soyadı <span className="text-rose-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="Örn: Ayşe Demir"
-                            value={newYurt.yetkiliAd}
-                            onChange={(e) => setNewYurt({ ...newYurt, yetkiliAd: e.target.value })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-stone-900 bg-white placeholder-stone-400 focus:outline-none focus:border-yellow-300 focus:ring-2 focus:ring-amber-300/20"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block font-semibold text-stone-600 mb-1">Telefon</label>
-                            <input
-                              type="tel"
-                              placeholder="05XX XXX XX XX"
-                              value={newYurt.yetkiliTel}
-                              onChange={(e) => setNewYurt({ ...newYurt, yetkiliTel: e.target.value })}
-                              className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-stone-900 bg-white placeholder-stone-400 focus:outline-none focus:border-yellow-300 focus:ring-2 focus:ring-amber-300/20 font-mono"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block font-semibold text-stone-600 mb-1">
-                              Yönetici E-posta <span className="text-rose-400">*</span>
-                            </label>
-                            <input
-                              type="email"
-                              required
-                              placeholder="mudur@yurt.com"
-                              value={newYurt.yetkiliEposta}
-                              onChange={(e) =>
-                                setNewYurt({ ...newYurt, yetkiliEposta: e.target.value })
-                              }
-                              className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-stone-900 bg-white placeholder-stone-400 focus:outline-none focus:border-yellow-300 focus:ring-2 focus:ring-amber-300/20"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-3 pt-4 border-t border-yellow-200">
-                      <button
-                        type="button"
-                        onClick={() => setIsAddModalOpen(false)}
-                        className="px-4 py-2.5 rounded-xl bg-yellow-100/70 hover:bg-yellow-100 text-stone-600 cursor-pointer"
-                      >
-                        İptal
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-6 py-2.5 rounded-xl bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold font-bold shadow-sm  cursor-pointer"
-                      >
-                        Yurdu Kaydet
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
+            <AddYurtModal
+              isOpen={isAddModalOpen}
+              newYurt={newYurt}
+              setNewYurt={setNewYurt}
+              onClose={() => setIsAddModalOpen(false)}
+              onSubmit={handleCreateYurt}
+            />
           </div>
         )}
 
@@ -2090,57 +3135,26 @@ export default function Home() {
 
           // Filtrelenmiş Öğrenciler
           const filteredStudents = students.filter((s) => {
+            const query = studentSearch.toLowerCase();
             return (
-              s.adSoyad.toLowerCase().includes(studentSearch.toLowerCase()) ||
-              s.odaNo.toLowerCase().includes(studentSearch.toLowerCase()) ||
-              s.telefon.includes(studentSearch)
+              s.adSoyad.toLowerCase().includes(query) ||
+              s.odaNo.toLowerCase().includes(query) ||
+              (s.eposta && s.eposta.toLowerCase().includes(query))
             );
           });
 
           return (
-            <div className="space-y-6">
-              {/* 1. ÜST BAŞLIK VE HIZLI YÖNETİCİ AKSİYONLARI */}
-              <div className="bg-white border border-[#E8DCCF] p-6 rounded-3xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#3D110B] text-[#FFC90C] border border-[#662B16]">
-                      Yönetici & İdare Kontrol Merkezi
-                    </span>
-                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#F4ECE1] text-[#662B16] border border-[#E8DCCF] flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#D1841A] animate-pulse" /> Canlı Sistem
-                    </span>
-                  </div>
-                  <h2 className="text-2xl font-black text-[#3D110B] mt-2">
-                    {yurtSettings.ad}
-                  </h2>
-                  <p className="text-xs text-[#855342] mt-1 flex flex-wrap items-center gap-3">
-                    <span>Müdür: <strong className="text-[#3D110B]">{yurtSettings.yetkiliAd}</strong></span>
-                    <span>•</span>
-                    <span>İletişim: <strong className="text-[#3D110B]">{yurtSettings.yetkiliTel}</strong></span>
-                    <span>•</span>
-                    <span>Adres: <strong className="text-[#3D110B]">{yurtSettings.adres}</strong></span>
-                  </p>
-                </div>
-              </div>
-
-              {/* 2. YÖNETİCİ MODÜL SEKMELERİ (Modern Flat Nav) */}
-              <div className="flex items-center justify-start md:justify-center gap-1.5 p-1.5 bg-[#F4ECE1] border border-[#E8DCCF] rounded-2xl overflow-x-auto">
-                {[
-                  { id: "odalar", label: `Odalar & Yataklar (${rooms.length})` },
-                  { id: "ogrenciler", label: `Öğrenci Kütüğü (${students.length})` },
-                  { id: "yemekhane", label: "Yemekhane Menüsü" },
-                  { id: "camasirhane", label: `Çamaşırhane Sırası (${laundrySlots.filter(s => s.tarih === selectedLaundryDate && s.durum !== "Tamamlandı" && s.durum !== "İptal").length})` },
-                  { id: "arizalar", label: `Arıza & Bakım (${openTickets})` },
-                  { id: "duyurular", label: `Duyurular (${announcements.length})` },
-                  { id: "ayarlar", label: "Yurt Ayarları" },
-                ].map((tab) => (
+            <div className="space-y-4 sm:space-y-6">
+              {/* YÖNETİCİ MODÜL SEKMELERİ (Masaüstü: Üst Yatay Sekmeler / Mobilde: Ortadan Kaldırıldı) */}
+              <div className="hidden md:flex items-center justify-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-[#F1F5F9] dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] rounded-xl sm:rounded-2xl overflow-x-auto no-scrollbar">
+                {managerTabItems.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setManagerTab(tab.id as any)}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                    className={`px-3 sm:px-4 py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
                       managerTab === tab.id
-                        ? "bg-[#3D110B] text-[#FFC90C] border border-[#662B16]"
-                        : "text-[#662B16] hover:text-[#3D110B] hover:bg-white"
+                        ? "bg-[#0284C7] text-white border border-[#0369A1]"
+                        : "text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-[#F1F5F9] hover:bg-white dark:hover:bg-[#0F172A]"
                     }`}
                   >
                     {tab.label}
@@ -2148,26 +3162,364 @@ export default function Home() {
                 ))}
               </div>
 
-              {/* Sekme İçerikleri Konteyneri - Sekmeler arası geçişte ekran kaymasını önlemek için sabit taban yükseklik */}
-              <div className="min-h-[600px] w-full space-y-6">
+
+              {/* Sekme İçerikleri Konteyneri */}
+              <div className="min-h-[500px] w-full space-y-4 sm:space-y-6">
+                {/* ======================================================== */}
+                {/* MODÜL 0: ANA SAYFA (GENEL BAKIŞ & DUYURULAR & KPI) */}
+                {/* ======================================================== */}
+                {managerTab === "anasayfa" && (
+                  <div className="w-full space-y-4 sm:space-y-6">
+                    {/* 1. Üst Özet & Hızlı Aksiyon Kartı */}
+                    <div className="bg-white border border-[#E2E8F0] p-3.5 sm:p-4 rounded-2xl shadow-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-[#0284C7] bg-[#F1F5F9] px-2 py-0.5 rounded-md border border-[#E2E8F0]">
+                          Yurt Müdürü Paneli
+                        </span>
+                      </div>
+                      <h2 className="text-lg sm:text-xl font-black text-[#0F172A] mt-1.5">
+                        Merhaba, {(yurtSettings.yetkiliAd || currentUser.name || "Fatma Güneş").replace(/Yurt Müdürü/gi, "").replace(/[()]/g, "").trim() || "Fatma Güneş"}!
+                      </h2>
+                    </div>
+
+                    {/* 2. KPI İstatistik Sayaçları */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
+                      {/* Öğrenci Kapasitesi */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManagerTab("ayarlar");
+                          setOpenSettingsSections((prev) => ({ ...prev, ogrenciler: true }));
+                        }}
+                        className="bg-white border border-[#E2E8F0] hover:border-[#0284C7] p-3 sm:p-4.5 rounded-2xl text-left transition-all cursor-pointer group shadow-xs flex flex-col justify-between"
+                      >
+                        <div className="flex items-center justify-between gap-1 w-full">
+                          <span className="text-[11px] sm:text-xs font-bold text-[#64748B] truncate">Kayıtlı Öğrenci</span>
+                          <svg className="w-3.5 h-3.5 text-[#94A3B8] group-hover:text-[#0284C7] transition-transform group-hover:translate-x-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                        <div className="mt-2 sm:mt-2.5">
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-lg sm:text-2xl font-black text-[#0F172A]">{students.length}</span>
+                            <span className="text-[11px] sm:text-xs text-[#64748B]">/ {yurtSettings.kapasite} Kapasite</span>
+                          </div>
+                          <div className="w-full bg-[#F1F5F9] h-1.5 rounded-full mt-2 overflow-hidden">
+                            <div
+                              className="bg-[#0284C7] h-full rounded-full transition-all"
+                              style={{
+                                width: `${Math.min(100, (students.length / (Number(yurtSettings.kapasite) || 1)) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* Çamaşırhane Aktif */}
+                      <button
+                        type="button"
+                        onClick={() => setManagerTab("camasirhane")}
+                        className="bg-white border border-[#E2E8F0] hover:border-[#0284C7] p-3 sm:p-4.5 rounded-2xl text-left transition-all cursor-pointer group shadow-xs flex flex-col justify-between"
+                      >
+                        <div className="flex items-center justify-between gap-1 w-full">
+                          <span className="text-[11px] sm:text-xs font-bold text-[#64748B] truncate">Çamaşırhane</span>
+                          <svg className="w-3.5 h-3.5 text-[#94A3B8] group-hover:text-[#0284C7] transition-transform group-hover:translate-x-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                        <div className="mt-2 sm:mt-2.5">
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-lg sm:text-2xl font-black text-[#0F172A]">
+                              {laundrySlots.filter((s) => s.tarih === selectedLaundryDate && s.durum === "Yıkanıyor").length}
+                            </span>
+                            <span className="text-[11px] sm:text-xs text-[#64748B]">
+                              Çalışıyor • {laundrySlots.filter((s) => s.tarih === selectedLaundryDate && s.durum === "Sırada").length} Sırada
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* Açık Arızalar */}
+                      <button
+                        type="button"
+                        onClick={() => setManagerTab("arizalar")}
+                        className="bg-white border border-[#E2E8F0] hover:border-[#0284C7] p-3 sm:p-4.5 rounded-2xl text-left transition-all cursor-pointer group shadow-xs flex flex-col justify-between"
+                      >
+                        <div className="flex items-center justify-between gap-1 w-full">
+                          <span className="text-[11px] sm:text-xs font-bold text-[#64748B] truncate">Arıza Talepleri</span>
+                          <svg className="w-3.5 h-3.5 text-[#94A3B8] group-hover:text-[#0284C7] transition-transform group-hover:translate-x-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                        <div className="mt-2 sm:mt-2.5">
+                          <div className="flex items-baseline gap-1">
+                            <span className={`text-lg sm:text-2xl font-black ${openTickets > 0 ? "text-rose-600" : "text-[#0F172A]"}`}>
+                              {openTickets}
+                            </span>
+                            <span className="text-[11px] sm:text-xs text-[#64748B]">Açık Talep</span>
+                          </div>
+                          <p className={`text-[10px] sm:text-[11px] mt-1 truncate ${openTickets > 0 ? "text-rose-600 font-medium" : "text-[#64748B]"}`}>
+                            {openTickets > 0 ? "Müdahale bekliyor" : "Bekleyen arıza yok"}
+                          </p>
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* 3. Günün Yemek Menüsü Kartı (Öğrenciye Yansıyan Canlı Görünüm) */}
+                    <div className="bg-white border border-[#E2E8F0] p-3.5 sm:p-6 rounded-2xl sm:rounded-3xl space-y-3.5 sm:space-y-4 transition-colors shadow-xs">
+                      {/* Üst Başlık ve Bilgi Etiketleri */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
+                          <h3 className="text-sm sm:text-base font-bold text-[#0F172A]">
+                            Günün Yemek Menüsü
+                          </h3>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 border border-emerald-500/30 shrink-0">
+                            Öğrenci Görünümü
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setManagerTab("yemekhane")}
+                          className="shrink-0 inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#F1F5F9] hover:bg-[#E2E8F0] border border-[#E2E8F0] text-[11px] sm:text-xs font-bold text-[#0284C7] hover:underline cursor-pointer transition-colors"
+                        >
+                          <span>Menüyü Düzenle</span>
+                          <span>→</span>
+                        </button>
+                      </div>
+
+                      {/* Menü Kartları (Öğrencilerin Gördüğü Canlı Format) */}
+                      {dailyMenu.gorunumModu === "birlikte" ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
+                          {/* Sabah Kahvaltısı */}
+                          <div
+                            onClick={() => setManagerTab("yemekhane")}
+                            className="p-4 sm:p-4.5 bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#0284C7]/60 dark:hover:border-[#38BDF8]/60 rounded-2xl space-y-2.5 shadow-2xs cursor-pointer transition-all group"
+                          >
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="text-xs font-bold text-[#0284C7] dark:text-[#38BDF8] px-3 py-1 rounded-full bg-[#F1F5F9] dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] group-hover:border-[#0284C7]/40 transition-colors">
+                                Sabah Kahvaltısı
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                {dailyMenu.kaloriGoster && dailyMenu.kahvaltiKalori && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                    {dailyMenu.kahvaltiKalori}
+                                  </span>
+                                )}
+                                <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8] bg-white dark:bg-[#1E293B] px-2.5 py-0.5 rounded-lg border border-[#E2E8F0] dark:border-[#334155]">
+                                  {dailyMenu.kahvaltiSaat}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-xs sm:text-[13px] text-stone-700 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-line min-h-[38px]">
+                              {dailyMenu.kahvalti || (
+                                <span className="text-stone-400 dark:text-slate-500 italic">Menü girilmedi.</span>
+                              )}
+                            </p>
+                            <div className="text-[11px] text-stone-500 dark:text-slate-400 pt-2 border-t border-[#E2E8F0] dark:border-[#334155] flex justify-between items-center">
+                              <span>Günün Servisi</span>
+                              {dailyMenu.kahvalti ? (
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 text-[11px]">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Servis Hazır
+                                </span>
+                              ) : (
+                                <span className="text-stone-400 dark:text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
+                                  <span className="w-2 h-2 rounded-full bg-stone-300 dark:bg-slate-600" /> Menü Bekleniyor
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Akşam Yemeği */}
+                          <div
+                            onClick={() => setManagerTab("yemekhane")}
+                            className="p-4 sm:p-4.5 bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#0284C7]/60 dark:hover:border-[#38BDF8]/60 rounded-2xl space-y-2.5 shadow-2xs cursor-pointer transition-all group"
+                          >
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="text-xs font-bold text-[#0284C7] dark:text-[#38BDF8] px-3 py-1 rounded-full bg-[#F1F5F9] dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] group-hover:border-[#0284C7]/40 transition-colors">
+                                Akşam Yemeği
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                {dailyMenu.kaloriGoster && dailyMenu.aksamKalori && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                    {dailyMenu.aksamKalori}
+                                  </span>
+                                )}
+                                <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8] bg-white dark:bg-[#1E293B] px-2.5 py-0.5 rounded-lg border border-[#E2E8F0] dark:border-[#334155]">
+                                  {dailyMenu.aksamSaat}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-xs sm:text-[13px] text-stone-700 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-line min-h-[38px]">
+                              {dailyMenu.aksam || (
+                                <span className="text-stone-400 dark:text-slate-500 italic">Menü girilmedi.</span>
+                              )}
+                            </p>
+                            <div className="text-[11px] text-stone-500 dark:text-slate-400 pt-2 border-t border-[#E2E8F0] dark:border-[#334155] flex justify-between items-center">
+                              <span>Günün Servisi</span>
+                              {dailyMenu.aksam ? (
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 text-[11px]">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Sıcak Servis
+                                </span>
+                              ) : (
+                                <span className="text-stone-400 dark:text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
+                                  <span className="w-2 h-2 rounded-full bg-stone-300 dark:bg-slate-600" /> Menü Bekleniyor
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Tek Öğün Görünümü */
+                        dailyMenu.aktifOgun === "kahvalti" ? (
+                          <div
+                            onClick={() => setManagerTab("yemekhane")}
+                            className="p-4 sm:p-5 bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#0284C7]/60 dark:hover:border-[#38BDF8]/60 rounded-2xl space-y-2.5 shadow-2xs cursor-pointer transition-all group"
+                          >
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="text-xs font-bold text-[#0284C7] dark:text-[#38BDF8] px-3 py-1 rounded-full bg-[#F1F5F9] dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155]">
+                                Sabah Kahvaltısı Servisi
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                {dailyMenu.kaloriGoster && dailyMenu.kahvaltiKalori && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                    {dailyMenu.kahvaltiKalori}
+                                  </span>
+                                )}
+                                <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8] bg-white dark:bg-[#1E293B] px-2.5 py-0.5 rounded-lg border border-[#E2E8F0] dark:border-[#334155]">
+                                  {dailyMenu.kahvaltiSaat}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-xs sm:text-sm text-stone-700 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-line min-h-[38px]">
+                              {dailyMenu.kahvalti || (
+                                <span className="text-stone-400 dark:text-slate-500 italic">Menü girilmedi.</span>
+                              )}
+                            </p>
+                            <div className="text-[11px] text-stone-500 dark:text-slate-400 pt-2 border-t border-[#E2E8F0] dark:border-[#334155] flex justify-between items-center">
+                              <span>Günün Servisi</span>
+                              {dailyMenu.kahvalti ? (
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 text-[11px]">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Servis Hazır
+                                </span>
+                              ) : (
+                                <span className="text-stone-400 dark:text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
+                                  <span className="w-2 h-2 rounded-full bg-stone-300 dark:bg-slate-600" /> Menü Bekleniyor
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => setManagerTab("yemekhane")}
+                            className="p-4 sm:p-5 bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#0284C7]/60 dark:hover:border-[#38BDF8]/60 rounded-2xl space-y-2.5 shadow-2xs cursor-pointer transition-all group"
+                          >
+                            <div className="flex justify-between items-center gap-2">
+                              <span className="text-xs font-bold text-[#0284C7] dark:text-[#38BDF8] px-3 py-1 rounded-full bg-[#F1F5F9] dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155]">
+                                Akşam Yemeği Servisi
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                {dailyMenu.kaloriGoster && dailyMenu.aksamKalori && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                    {dailyMenu.aksamKalori}
+                                  </span>
+                                )}
+                                <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8] bg-white dark:bg-[#1E293B] px-2.5 py-0.5 rounded-lg border border-[#E2E8F0] dark:border-[#334155]">
+                                  {dailyMenu.aksamSaat}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-xs sm:text-sm text-stone-700 dark:text-slate-200 leading-relaxed font-medium whitespace-pre-line min-h-[38px]">
+                              {dailyMenu.aksam || (
+                                <span className="text-stone-400 dark:text-slate-500 italic">Menü girilmedi.</span>
+                              )}
+                            </p>
+                            <div className="text-[11px] text-stone-500 dark:text-slate-400 pt-2 border-t border-[#E2E8F0] dark:border-[#334155] flex justify-between items-center">
+                              <span>Günün Servisi</span>
+                              {dailyMenu.aksam ? (
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5 text-[11px]">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Sıcak Servis
+                                </span>
+                              ) : (
+                                <span className="text-stone-400 dark:text-slate-400 font-medium flex items-center gap-1.5 text-[11px]">
+                                  <span className="w-2 h-2 rounded-full bg-stone-300 dark:bg-slate-600" /> Menü Bekleniyor
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      )}
+                    </div>
+
+                    {/* 4. YURT DUYURULARI VE PANO BÖLÜMÜ */}
+                    <div className="bg-white border border-[#E2E8F0] p-4 sm:p-6 rounded-2xl sm:rounded-3xl space-y-4">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <h3 className="text-base sm:text-lg font-bold text-[#0F172A]">Duyurular</h3>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddAnnouncementModalOpen(true)}
+                          className="px-3.5 py-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold text-xs rounded-xl cursor-pointer transition-colors border border-[#0369A1]"
+                        >
+                          + Yeni Duyuru Ekle
+                        </button>
+                      </div>
+
+                      {announcements.length === 0 ? (
+                        <div className="p-8 text-center bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] text-xs text-[#64748B]">
+                          Henüz yayınlanmış bir duyuru bulunmuyor. Yeni duyuru eklemek için yukarıdaki butonu kullanabilirsiniz.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                          {announcements.map((a) => (
+                            <div
+                              key={a.id}
+                              className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-2 hover:border-[#0284C7] transition-all"
+                            >
+                              <div className="flex justify-between items-start">
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                    a.oncelik === "Acil"
+                                      ? "bg-rose-50 text-rose-700 border-rose-200"
+                                      : a.oncelik === "Önemli"
+                                      ? "bg-[#F1F5F9] text-[#0284C7] border-[#E2E8F0]"
+                                      : "bg-white text-[#64748B] border-[#E2E8F0]"
+                                  }`}
+                                >
+                                  {a.oncelik}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] text-[#64748B]">{a.tarih}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteAnnouncement(a.id)}
+                                    className="text-[#64748B] hover:text-rose-600 text-xs cursor-pointer font-bold"
+                                  >
+                                    Sil
+                                  </button>
+                                </div>
+                              </div>
+                              <h4 className="text-sm font-bold text-[#0F172A]">{a.baslik}</h4>
+                              <p className="text-xs text-[#64748B] leading-relaxed">{a.icerik}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* ======================================================== */}
                 {/* MODÜL 2: ODA & YATAK YÖNETİMİ (TAM YETKİLİ) */}
                 {/* ======================================================== */}
                 {managerTab === "odalar" && (
                 <div className="bg-white border border-yellow-200 p-6 rounded-3xl space-y-6">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                      <h3 className="text-lg font-bold text-stone-900">Oda ve Yatak Yönetim Merkezi</h3>
-                      <p className="text-xs text-stone-500">
-                        Yeni oda ekleyin, odaların yatak kapasitesini ve tiplerini düzenleyin, öğrencileri taşıyın.
-                      </p>
-                    </div>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <h3 className="text-base sm:text-lg font-bold text-stone-900">Odalar</h3>
 
                     <button
                       onClick={() => setIsAddRoomModalOpen(true)}
-                      className="px-4 py-2 bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold font-bold text-xs rounded-xl shadow cursor-pointer transition-all"
+                      className="px-4 py-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold text-xs rounded-xl shadow cursor-pointer transition-all"
                     >
-                      + Yeni Oda Oluştur
+                      + Yeni Oda
                     </button>
                   </div>
 
@@ -2218,7 +3570,7 @@ export default function Home() {
                             <div className="w-full bg-yellow-100/70 h-2 rounded-full overflow-hidden">
                               <div
                                 className={`h-full rounded-full transition-all ${
-                                  isFull ? "bg-rose-500" : "bg-indigo-500"
+                                  isFull ? "bg-rose-500" : "bg-[#0284C7]"
                                 }`}
                                 style={{ width: `${Math.min(100, (room.doluYatak / (room.kapasite || 1)) * 100)}%` }}
                               />
@@ -2226,7 +3578,7 @@ export default function Home() {
                           </div>
 
                           {/* YATAK VE ÖĞRENCİ DETAYI */}
-                          <div className="pt-2 border-t border-yellow-200 space-y-2">
+                          <div className="pt-2 border-t border-[#E2E8F0] dark:border-[#334155] space-y-2">
                             <span className="text-[11px] font-semibold text-stone-500 block">
                               Yatak Durumu ({room.kapasite} Yataklı):
                             </span>
@@ -2248,7 +3600,7 @@ export default function Home() {
                                       {studentInBed ? (
                                         <div>
                                           <span className="font-bold text-stone-800 block">{studentInBed.adSoyad}</span>
-                                          <span className="text-[10px] text-stone-500">{studentInBed.telefon}</span>
+                                          <span className="text-[10px] text-stone-500">{studentInBed.eposta}</span>
                                         </div>
                                       ) : (
                                         <span className="text-slate-500 italic">Boş Yatak</span>
@@ -2287,106 +3639,24 @@ export default function Home() {
               )}
 
               {/* ======================================================== */}
-              {/* MODÜL 3: ÖĞRENCİ KÜTÜĞÜ (TAM YETKİLİ) */}
+              {/* MODÜL 3: ÖĞRENCİ KÜTÜĞÜ (YURT AYARLARINA ENTEGRE EDİLDİ) */}
               {/* ======================================================== */}
               {managerTab === "ogrenciler" && (
-                <div className="bg-white border border-yellow-200 p-6 rounded-3xl space-y-4">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                      <h3 className="text-lg font-bold text-stone-900">Öğrenci Kütüğü & Bilgi Yönetimi</h3>
-                      <p className="text-xs text-stone-500">
-                        Öğrencilerin oda, veli ve iletişim bilgilerini istediğiniz zaman düzenleyin veya yeni öğrenci kaydedin.
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-                      <input
-                        type="text"
-                        placeholder="Öğrenci, Oda ara..."
-                        value={studentSearch}
-                        onChange={(e) => setStudentSearch(e.target.value)}
-                        className="bg-yellow-50 border border-yellow-300 text-xs text-white rounded-xl px-3 py-2 w-full sm:w-48 focus:outline-none focus:border-yellow-300"
-                      />
-
-                      <button
-                        onClick={() => setIsAddStudentModalOpen(true)}
-                        className="px-4 py-2 bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold font-bold text-xs rounded-xl cursor-pointer transition-all"
-                      >
-                        + Yeni Öğrenci
-                      </button>
-                    </div>
+                <div className="bg-white border border-[#E2E8F0] p-5 sm:p-6 rounded-2xl sm:rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-sm text-[#0F172A]">Öğrenci Yönetimi Yurt Ayarlarına Taşındı</h4>
+                    <p className="text-xs text-[#64748B]">Tüm öğrenci arama, listeleme, kayıt ekleme ve düzenleme işlemleri Yurt Ayarları sekmesi altında toplanmıştır.</p>
                   </div>
-
-                  {/* Öğrenci Tablosu */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-yellow-50 text-stone-500 uppercase tracking-wider text-[10px]">
-                        <tr>
-                          <th className="p-3 rounded-l-xl">Öğrenci</th>
-                          <th className="p-3">Oda / Yatak</th>
-                          <th className="p-3">İletişim</th>
-                          <th className="p-3">Veli Bilgisi</th>
-                          <th className="p-3">Kayıt Tarihi</th>
-                          <th className="p-3 rounded-r-xl text-right">İşlemler</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-amber-200/60">
-                        {filteredStudents.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="p-8 text-center text-stone-500">
-                              Kayıtlı öğrenci bulunamadı.
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredStudents.map((std) => (
-                            <tr key={std.id} className="hover:bg-yellow-100/40 transition-colors">
-                              <td className="p-3">
-                                <div className="font-bold text-stone-800 text-sm">{std.adSoyad}</div>
-                              </td>
-                              <td className="p-3">
-                                <span className="px-2.5 py-1 rounded-lg bg-indigo-900/40 text-stone-800 font-medium font-bold border border-indigo-700/50">
-                                  Oda {std.odaNo}
-                                </span>
-                                <span className="ml-1.5 text-stone-500">Yatak {std.yatakNo}</span>
-                              </td>
-                              <td className="p-3">
-                                <div className="text-stone-700">{std.telefon}</div>
-                                <div className="text-[11px] text-stone-500">{std.eposta}</div>
-                              </td>
-                              <td className="p-3">
-                                <div className="text-stone-700 font-semibold">{std.veliAd}</div>
-                                <div className="text-[11px] text-stone-800 font-medium">{std.veliTel}</div>
-                              </td>
-                              <td className="p-3 text-stone-600 font-medium">
-                                {std.kayitTarihi}
-                              </td>
-                              <td className="p-3 text-right space-x-1.5">
-                                <button
-                                  onClick={() => setEditingStudent(std)}
-                                  className="px-2.5 py-1 bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold font-bold rounded-lg text-[11px] cursor-pointer"
-                                  title="Tüm bilgilerini ve oda/yatağını düzenle"
-                                >
-                                  Düzenle
-                                </button>
-                                <button
-                                  onClick={() => setSelectedStudentForDetail(std)}
-                                  className="px-2 py-1 bg-yellow-100/70 hover:bg-yellow-100 text-stone-600 rounded-lg text-[11px] cursor-pointer"
-                                >
-                                  Kart
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteStudent(std.id, std.adSoyad)}
-                                  className="px-2 py-1 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg text-[11px] cursor-pointer transition-all"
-                                >
-                                  Sil
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManagerTab("ayarlar");
+                      setOpenSettingsSections((prev) => ({ ...prev, ogrenciler: true }));
+                    }}
+                    className="px-4 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold rounded-xl cursor-pointer transition-colors shrink-0"
+                  >
+                    Yurt Ayarlarına Git
+                  </button>
                 </div>
               )}
 
@@ -2394,625 +3664,147 @@ export default function Home() {
               {/* MODÜL 5: YEMEKHANE MENÜSÜ & KALORİ YÖNETİMİ */}
               {/* ======================================================== */}
               {managerTab === "yemekhane" && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Sol Kolon: Menü Ayar, Zaman ve Kalori Tercihleri Formu */}
-                  <div className="bg-white border border-yellow-200 p-6 rounded-3xl space-y-5">
-                    <div>
-                      <h3 className="text-lg font-bold text-stone-900 flex items-center gap-2">
-                         Yemekhane Menüsü & Ayarları
-                      </h3>
-                      <p className="text-xs text-stone-500 mt-1">
-                        Günün kahvaltı ve akşam yemeklerini girin, servis saatleri ve gösterim tercihlerini belirleyin.
-                      </p>
+                <div className="w-full space-y-4">
+                  {/* Menü Girişi Formu */}
+                  <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-5 sm:p-7 rounded-2xl sm:rounded-3xl space-y-5 shadow-xs transition-colors">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E8F0] dark:border-[#334155]">
+                      <div>
+                        <h3 className="text-base sm:text-lg font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                          Menü Girişi
+                        </h3>
+                        <p className="text-xs text-[#64748B] dark:text-[#94A3B8] mt-0.5">
+                          Tarih: {formatTurkishDate(dailyMenu.tarih || getTodayDateKey())}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                          00:00 Otomatik Sıfırlama Aktif
+                        </span>
+                      </div>
                     </div>
 
-                    <form onSubmit={handleSaveMenu} className="space-y-5 text-xs">
-                      {/* 1. BUGÜNÜN GEÇERLİ YEMEK SAATİ TARİFESİ SEÇİCİ */}
-                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-2xl space-y-2.5">
-                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1.5">
-                          <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
-                             Bugünün Yemek Saati Tarifesi
-                          </label>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-yellow-100 text-stone-800 border border-yellow-300 font-bold self-start sm:self-auto">
-                            Geçerli: {dailyMenu.gunTipi === "haftasonu" ? "Hafta Sonu" : dailyMenu.gunTipi === "ozelgun" ? "Bayram / Özel Gün" : "Hafta İçi"}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-stone-500 leading-relaxed">
-                          Yemek saatleri bugün hangi tarifeye göre uygulansın? Tıklayarak anında değiştirebilirsiniz:
-                        </p>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
-                          {/* 1. Hafta İçi Kartı */}
-                          <div
-                            onClick={() => handleToggleGunTipi("haftaici")}
-                            className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
-                              dailyMenu.gunTipi === "haftaici" || !dailyMenu.gunTipi
-                                ? "bg-yellow-100/70 border-2 border-yellow-300 shadow-sm"
-                                : "bg-white border-yellow-200 hover:border-yellow-300"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1.5">
-                                
-                                <div>
-                                  <div className="font-bold text-xs text-stone-800">Hafta İçi</div>
-                                  <div className="text-[10px] text-stone-500">Pzt - Cuma</div>
-                                </div>
-                              </div>
-                              {dailyMenu.gunTipi === "haftaici" || !dailyMenu.gunTipi ? (
-                                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-yellow-300 text-stone-900 border border-yellow-400">
-                                   Geçerli
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleGunTipi("haftaici");
-                                  }}
-                                  className="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-yellow-100 text-stone-700 hover:bg-yellow-300 hover:text-stone-900 transition-colors"
-                                >
-                                  Seç
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Saat Ayarları Butonları */}
-                            <div className="space-y-2 pt-2.5 border-t border-yellow-200" onClick={(e) => e.stopPropagation()}>
-                              <div className="space-y-1">
-                                <span className="text-[11px] font-semibold text-stone-700 block">
-                                  Kahvaltı:
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => openTimePicker("haftaici", "kahvalti", "Hafta İçi • Sabah Kahvaltısı")}
-                                  className="w-full py-1.5 px-2 bg-yellow-50 hover:bg-white border border-yellow-300 hover:border-yellow-400 rounded-xl text-xs text-stone-900 text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-sm hover:shadow"
-                                  title="Saati çark ile kaydırarak seç"
-                                >
-                                  {formatDisplayHours(dailyMenu.saatler?.haftaici?.kahvalti || "07:30 - 10:00")}
-                                </button>
-                              </div>
-                              <div className="space-y-1">
-                                <span className="text-[11px] font-semibold text-stone-700 block">
-                                  Akşam:
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => openTimePicker("haftaici", "aksam", "Hafta İçi • Akşam Yemeği")}
-                                  className="w-full py-1.5 px-2 bg-yellow-50 hover:bg-white border border-yellow-300 hover:border-yellow-400 rounded-xl text-xs text-stone-900 text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-sm hover:shadow"
-                                  title="Saati çark ile kaydırarak seç"
-                                >
-                                  {formatDisplayHours(dailyMenu.saatler?.haftaici?.aksam || "18:00 - 20:30")}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 2. Hafta Sonu Kartı */}
-                          <div
-                            onClick={() => handleToggleGunTipi("haftasonu")}
-                            className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
-                              dailyMenu.gunTipi === "haftasonu"
-                                ? "bg-yellow-100/70 border-2 border-yellow-300 shadow-sm"
-                                : "bg-white border-yellow-200 hover:border-yellow-300"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1.5">
-                                
-                                <div>
-                                  <div className="font-bold text-xs text-stone-800">Hafta Sonu</div>
-                                  <div className="text-[10px] text-stone-500">Cmt - Pazar</div>
-                                </div>
-                              </div>
-                              {dailyMenu.gunTipi === "haftasonu" ? (
-                                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-yellow-300 text-stone-900 border border-yellow-400">
-                                   Geçerli
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleGunTipi("haftasonu");
-                                  }}
-                                  className="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-yellow-100 text-stone-700 hover:bg-yellow-300 hover:text-stone-900 transition-colors"
-                                >
-                                  Seç
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Saat Ayarları Butonları */}
-                            <div className="space-y-2 pt-2.5 border-t border-yellow-200" onClick={(e) => e.stopPropagation()}>
-                              <div className="space-y-1">
-                                <span className="text-[11px] font-semibold text-stone-700 block">
-                                  Kahvaltı:
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => openTimePicker("haftasonu", "kahvalti", "Hafta Sonu • Sabah Kahvaltısı")}
-                                  className="w-full py-1.5 px-2 bg-yellow-50 hover:bg-white border border-yellow-300 hover:border-yellow-400 rounded-xl text-xs text-stone-900 text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-sm hover:shadow"
-                                  title="Saati çark ile kaydırarak seç"
-                                >
-                                  {formatDisplayHours(dailyMenu.saatler?.haftasonu?.kahvalti || "08:30 - 11:30")}
-                                </button>
-                              </div>
-                              <div className="space-y-1">
-                                <span className="text-[11px] font-semibold text-stone-700 block">
-                                  Akşam:
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => openTimePicker("haftasonu", "aksam", "Hafta Sonu • Akşam Yemeği")}
-                                  className="w-full py-1.5 px-2 bg-yellow-50 hover:bg-white border border-yellow-300 hover:border-yellow-400 rounded-xl text-xs text-stone-900 text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-sm hover:shadow"
-                                  title="Saati çark ile kaydırarak seç"
-                                >
-                                  {formatDisplayHours(dailyMenu.saatler?.haftasonu?.aksam || "18:30 - 21:00")}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 3. Bayram / Özel Gün Kartı */}
-                          <div
-                            onClick={() => handleToggleGunTipi("ozelgun")}
-                            className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
-                              dailyMenu.gunTipi === "ozelgun"
-                                ? "bg-emerald-50/90 border-emerald-500 shadow-sm shadow-emerald-200/50 border-2 border-emerald-500"
-                                : "bg-white border-yellow-200 hover:border-yellow-300"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1.5">
-                                
-                                <div>
-                                  <div className="font-bold text-xs text-stone-800">Bayram / Özel</div>
-                                  <div className="text-[10px] text-stone-500">Tatil & Özel Gün</div>
-                                </div>
-                              </div>
-                              {dailyMenu.gunTipi === "ozelgun" ? (
-                                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-yellow-300 text-stone-900 border border-yellow-400">
-                                   Geçerli
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleToggleGunTipi("ozelgun");
-                                  }}
-                                  className="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-yellow-100 text-stone-700 hover:bg-yellow-300 hover:text-stone-900 transition-colors"
-                                >
-                                  Seç
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Saat Ayarları Butonları */}
-                            <div className="space-y-2 pt-2.5 border-t border-yellow-200" onClick={(e) => e.stopPropagation()}>
-                              <div className="space-y-1">
-                                <span className="text-[11px] font-semibold text-stone-700 block">
-                                  Kahvaltı:
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => openTimePicker("ozelgun", "kahvalti", "Bayram / Özel • Sabah Kahvaltısı")}
-                                  className="w-full py-1.5 px-2 bg-yellow-50 hover:bg-white border border-yellow-300 hover:border-yellow-400 rounded-xl text-xs text-stone-900 text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-sm hover:shadow"
-                                  title="Saati çark ile kaydırarak seç"
-                                >
-                                  {formatDisplayHours(dailyMenu.saatler?.ozelgun?.kahvalti || "09:00 - 12:00")}
-                                </button>
-                              </div>
-                              <div className="space-y-1">
-                                <span className="text-[11px] font-semibold text-stone-700 block">
-                                  Akşam:
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => openTimePicker("ozelgun", "aksam", "Bayram / Özel • Akşam Yemeği")}
-                                  className="w-full py-1.5 px-2 bg-yellow-50 hover:bg-white border border-yellow-300 hover:border-yellow-400 rounded-xl text-xs text-stone-900 text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-sm hover:shadow"
-                                  title="Saati çark ile kaydırarak seç"
-                                >
-                                  {formatDisplayHours(dailyMenu.saatler?.ozelgun?.aksam || "19:00 - 21:30")}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 2. YEMEK GİRİŞ ALANLARI (ÜSTTE) */}
+                    <form onSubmit={handleSaveMenu} className="space-y-4 text-xs">
+                      {/* 1. YEMEK GİRİŞ ALANLARI */}
                       <div className="space-y-4">
-                        <div className="flex items-center justify-between pb-1 border-b border-yellow-200">
-                          <span className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
-                             Günün Yemek Girişi
-                          </span>
-                          <span className="text-[10px] text-stone-500">Kahvaltı ve akşam menü içerikleri</span>
-                        </div>
-
-                        {/* Kahvaltı Bloğu */}
-                        <div className="p-4 bg-yellow-50 rounded-2xl border border-yellow-300 space-y-3">
-                          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                            <label className="text-yellow-600 font-bold flex items-center gap-1.5">
-                               Sabah Kahvaltısı Menüsü & Saati
-                            </label>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-stone-500 font-medium">Saat:</span>
-                              <button
-                                type="button"
-                                onClick={() => openTimePicker(dailyMenu.gunTipi || "haftaici", "kahvalti", "Sabah Kahvaltısı Servis Saati")}
-                                className="bg-white hover:bg-yellow-100/70 border border-yellow-300 hover:border-yellow-400 rounded-lg px-3 py-1.5 text-xs text-stone-900 font-mono font-bold whitespace-nowrap min-w-[140px] flex items-center justify-center cursor-pointer transition-all shadow-sm"
-                                title="Saati çark ile kaydırarak ayarla"
-                              >
-                                <span className="whitespace-nowrap tracking-wide">{dailyMenu.kahvaltiSaat}</span>
-                              </button>
-                            </div>
-                          </div>
-                          <textarea
-                            rows={3}
-                            value={dailyMenu.kahvalti}
-                            onChange={(e) => setDailyMenu({ ...dailyMenu, kahvalti: e.target.value })}
-                            placeholder="Kahvaltı içeriğini girin (örn: Haşlanmış yumurta, peynir çeşitleri, zeytin, domates, salatalık, bal-tereyağı, çay)..."
-                            className="w-full bg-white border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300 focus:ring-2 focus:ring-amber-300/20 leading-relaxed"
-                          />
-                          <div className="flex items-center gap-2">
-                            <label className="text-stone-500 whitespace-nowrap text-[11px]">Kahvaltı Kalorisi:</label>
-                            <input
-                              type="text"
-                              value={dailyMenu.kahvaltiKalori}
-                              onChange={(e) => setDailyMenu({ ...dailyMenu, kahvaltiKalori: e.target.value })}
-                              placeholder="Örn: 650 kcal"
-                              className="bg-white border border-yellow-300 rounded-lg px-2.5 py-1 text-xs text-stone-900 focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-amber-300/20 w-36"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Akşam Yemeği Bloğu */}
-                        <div className="p-4 bg-yellow-50 rounded-2xl border border-yellow-300 space-y-3">
-                          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                            <label className="text-yellow-600 font-bold flex items-center gap-1.5">
-                               Akşam Yemeği Menüsü & Saati
-                            </label>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-stone-500 font-medium">Saat:</span>
-                              <button
-                                type="button"
-                                onClick={() => openTimePicker(dailyMenu.gunTipi || "haftaici", "aksam", "Akşam Yemeği Servis Saati")}
-                                className="bg-white hover:bg-yellow-100/70 border border-yellow-300 hover:border-yellow-400 rounded-lg px-3 py-1.5 text-xs text-stone-900 font-mono font-bold whitespace-nowrap min-w-[140px] flex items-center justify-center cursor-pointer transition-all shadow-sm"
-                                title="Saati çark ile kaydırarak ayarla"
-                              >
-                                <span className="whitespace-nowrap tracking-wide">{dailyMenu.aksamSaat}</span>
-                              </button>
-                            </div>
-                          </div>
-                          <textarea
-                            rows={3}
-                            value={dailyMenu.aksam}
-                            onChange={(e) => setDailyMenu({ ...dailyMenu, aksam: e.target.value })}
-                            placeholder="Akşam menüsü içeriğini girin (örn: Mercimek çorbası, Tavuk sote, Pirinç pilavı, Mevsim salata, Ayran)..."
-                            className="w-full bg-white border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300 focus:ring-2 focus:ring-amber-300/20 leading-relaxed"
-                          />
-                          <div className="flex items-center gap-2">
-                            <label className="text-stone-500 whitespace-nowrap text-[11px]">Akşam Kalorisi:</label>
-                            <input
-                              type="text"
-                              value={dailyMenu.aksamKalori}
-                              onChange={(e) => setDailyMenu({ ...dailyMenu, aksamKalori: e.target.value })}
-                              placeholder="Örn: 1.200 kcal"
-                              className="bg-white border border-yellow-300 rounded-lg px-2.5 py-1 text-xs text-stone-900 focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-amber-300/20 w-36"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 3. MENÜ VE GÖRÜNÜM AYARLARI (AŞAĞIDA) */}
-                      <div className="space-y-4 pt-2 border-t border-yellow-200">
-                        <div className="flex items-center justify-between pb-1">
-                          <span className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
-                             Menü & Kalori Gösterim Ayarları
-                          </span>
-                          <span className="text-[10px] text-stone-500">Yönetici tercihleri</span>
-                        </div>
-
-                        {/* B. Gösterim Şekli (Aynı Zamanda vs Tek Zamanlı) */}
-                        <div className="p-4 bg-yellow-50 border border-yellow-300 rounded-2xl space-y-3">
-                          <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold text-stone-800 font-medium block">
-                              Yemeklerin Gösterim Şekli
-                            </label>
-                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-yellow-100 text-stone-800 border border-yellow-300 text-stone-800 font-medium font-bold border border-yellow-300">
-                              {dailyMenu.gorunumModu === "birlikte" ? "Aynı Zamanda" : "Tek Zamanlı"}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-stone-500">
-                            Yemeklerin panoda aynı anda mı yoksa sadece ilgili servis zamanında tek tek mi görüneceğini belirleyin:
-                          </p>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="flex items-center pb-2 border-b border-[#E2E8F0] dark:border-[#334155]">
+                          <div className="inline-flex items-center gap-1 bg-[#F8FAFC] dark:bg-[#0F172A] p-1 rounded-xl border border-[#E2E8F0] dark:border-[#334155] shadow-xs">
                             <button
                               type="button"
-                              onClick={() => handleToggleViewMode("birlikte")}
-                              className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                              onClick={() => handleSelectMealMode("kahvalti")}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                dailyMenu.gorunumModu === "tek" && dailyMenu.aktifOgun === "kahvalti"
+                                  ? "bg-[#0284C7] text-white border border-[#0369A1] shadow-xs"
+                                  : "text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-[#F1F5F9] hover:bg-white dark:hover:bg-[#1E293B]"
+                              }`}
+                            >
+                              Kahvaltı
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSelectMealMode("aksam")}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                dailyMenu.gorunumModu === "tek" && dailyMenu.aktifOgun === "aksam"
+                                  ? "bg-[#0284C7] text-white border border-[#0369A1] shadow-xs"
+                                  : "text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-[#F1F5F9] hover:bg-white dark:hover:bg-[#1E293B]"
+                              }`}
+                            >
+                              Akşam Yemeği
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSelectMealMode("birlikte")}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                 dailyMenu.gorunumModu === "birlikte"
-                                  ? "bg-yellow-100/70 border-2 border-yellow-300 text-stone-800 shadow-sm"
-                                  : "bg-white border-yellow-200 text-stone-500 hover:border-yellow-300"
+                                  ? "bg-[#0284C7] text-white border border-[#0369A1] shadow-xs"
+                                  : "text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-[#F1F5F9] hover:bg-white dark:hover:bg-[#1E293B]"
                               }`}
                             >
-                              <div className="flex items-center justify-between mb-1.5">
-                                
-                                {dailyMenu.gorunumModu === "birlikte" && (
-                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-yellow-200 text-stone-800 border border-yellow-300">
-                                    AKTİF SEÇİM
-                                  </span>
-                                )}
-                              </div>
-                              <div className="font-bold text-xs text-stone-800">Aynı Zamanda Göster</div>
-                              <div className="text-[10px] text-stone-500 mt-1 leading-relaxed">
-                                Hem Kahvaltı hem Akşam Yemeği aynı anda panoda birlikte listelenir.
-                              </div>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleToggleViewMode("tek")}
-                              className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
-                                dailyMenu.gorunumModu === "tek"
-                                  ? "bg-yellow-100/70 border-2 border-yellow-300 text-stone-800 shadow-sm"
-                                  : "bg-white border-yellow-200 text-stone-500 hover:border-yellow-300"
-                              }`}
-                            >
-                              <div className="flex items-center justify-between mb-1.5">
-                                
-                                {dailyMenu.gorunumModu === "tek" && (
-                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-yellow-200 text-stone-800 border border-yellow-300">
-                                    AKTİF SEÇİM
-                                  </span>
-                                )}
-                              </div>
-                              <div className="font-bold text-xs text-stone-800">Tek Zamanda Göster</div>
-                              <div className="text-[10px] text-stone-500 mt-1 leading-relaxed">
-                                Yalnızca seçtiğiniz tek öğün görünür, diğer öğün gizlenir.
-                              </div>
+                              İkisi de
                             </button>
                           </div>
-
-                          {/* Tek Zamanlı Modunda Hangi Öğün Seçimi */}
-                          {dailyMenu.gorunumModu === "tek" && (
-                            <div className="pt-2 border-t border-yellow-200 space-y-2">
-                              <label className="text-[11px] font-semibold text-stone-600 block">
-                                Şu an hangi tek öğün gösterilsin?
-                              </label>
-                              <div className="grid grid-cols-2 gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleActiveMeal("kahvalti")}
-                                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                                    dailyMenu.aktifOgun === "kahvalti"
-                                      ? "bg-yellow-100 border-2 border-yellow-300 text-stone-800 shadow-sm"
-                                      : "bg-white border-yellow-200 text-stone-600 hover:text-stone-900 hover:border-yellow-300"
-                                  }`}
-                                >
-                                   Yalnızca Kahvaltı
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleActiveMeal("aksam")}
-                                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                                    dailyMenu.aktifOgun === "aksam"
-                                      ? "bg-yellow-100 border-2 border-yellow-300 text-stone-800 shadow-sm"
-                                      : "bg-white border-yellow-200 text-stone-600 hover:text-stone-900 hover:border-yellow-300"
-                                  }`}
-                                >
-                                   Yalnızca Akşam Yemeği
-                                </button>
-                              </div>
-                            </div>
-                          )}
                         </div>
 
-                        {/* C. Kalori Gösterim Tercihi */}
-                        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-2xl space-y-2.5">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <label className="text-xs font-bold text-yellow-600 flex items-center gap-1.5">
-                                 Kalori Gösterim Tercihi
+                        {/* Yemek Alanları */}
+                        <div className={dailyMenu.gorunumModu === "birlikte" ? "grid grid-cols-1 md:grid-cols-2 gap-4" : "space-y-4"}>
+                          {/* Kahvaltı Bloğu: Birlikte modunda veya Tekli modda Kahvaltı seçiliyse görünür */}
+                          {(dailyMenu.gorunumModu === "birlikte" || dailyMenu.aktifOgun === "kahvalti") && (
+                          <div className="p-4 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155] space-y-3">
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                              <label className="text-[#64748B] dark:text-[#94A3B8] font-bold flex items-center gap-1.5">
+                                Sabah Kahvaltısı Menüsü & Saati
                               </label>
-                              <p className="text-[11px] text-stone-500 mt-0.5">
-                                Yemeklerin tahmini kalori değerleri öğrencilere gösterilsin mi?
-                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-[#64748B] dark:text-[#94A3B8] font-medium">Saat:</span>
+                                <span className="text-xs font-mono font-semibold text-[#0F172A] dark:text-[#F1F5F9] tracking-wide">
+                                  {dailyMenu.kahvaltiSaat}
+                                </span>
+                              </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={handleToggleCalories}
-                              className={`px-3 py-1.5 rounded-xl font-bold text-xs border transition-all cursor-pointer flex items-center gap-1.5 ${
-                                dailyMenu.kaloriGoster
-                                  ? "bg-yellow-500/20 border-yellow-300/50 text-yellow-600 shadow-sm"
-                                  : "bg-white border-yellow-200 text-slate-500 hover:text-stone-600"
-                              }`}
-                            >
-                              <span>{dailyMenu.kaloriGoster ? " Kalori Açık" : " Kalori Gizli"}</span>
-                            </button>
+                            <textarea
+                              rows={4}
+                              value={dailyMenu.kahvalti}
+                              onChange={(e) => setDailyMenu({ ...dailyMenu, kahvalti: e.target.value })}
+                              placeholder="Kahvaltı içeriğini girin (Enter ile alt alta listeleyebilirsiniz)..."
+                              className="w-full bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] rounded-xl p-2.5 text-[#0F172A] dark:text-[#F1F5F9] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 leading-relaxed resize-none"
+                            />
                           </div>
-                          <div className="text-[11px] text-stone-500">
-                            Durum: <strong className={dailyMenu.kaloriGoster ? "text-yellow-600 font-semibold" : "text-stone-500 font-semibold"}>
-                              {dailyMenu.kaloriGoster ? "Kalori bilgileri panoda rozet olarak gösteriliyor." : "Kalori bilgileri gizlendi, yalnızca menü adları görünüyor."}
-                            </strong>
+                        )}
+
+                        {/* Akşam Yemeği Bloğu: Birlikte modunda veya Tekli modda Akşam Yemeği seçiliyse görünür */}
+                        {(dailyMenu.gorunumModu === "birlikte" || dailyMenu.aktifOgun === "aksam") && (
+                          <div className="p-4 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155] space-y-3">
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                              <label className="text-[#64748B] dark:text-[#94A3B8] font-bold flex items-center gap-1.5">
+                                Akşam Yemeği Menüsü & Saati
+                              </label>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-[#64748B] dark:text-[#94A3B8] font-medium">Saat:</span>
+                                <span className="text-xs font-mono font-semibold text-[#0F172A] dark:text-[#F1F5F9] tracking-wide">
+                                  {dailyMenu.aksamSaat}
+                                </span>
+                              </div>
+                            </div>
+                            <textarea
+                              rows={4}
+                              value={dailyMenu.aksam}
+                              onChange={(e) => setDailyMenu({ ...dailyMenu, aksam: e.target.value })}
+                              placeholder="Akşam menüsü içeriğini girin (Enter ile alt alta listeleyebilirsiniz)..."
+                              className="w-full bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] rounded-xl p-2.5 text-[#0F172A] dark:text-[#F1F5F9] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 leading-relaxed resize-none"
+                            />
                           </div>
+                        )}
                         </div>
                       </div>
 
-                      {/* KAYDET BUTONU */}
-                      <button
-                        type="submit"
-                        className="w-full py-3 bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold font-bold rounded-xl cursor-pointer shadow-sm  transition-all flex items-center justify-center gap-2"
-                      >
-                         Menüyü ve Tercihleri Kaydet
-                      </button>
+                      {/* BUTONLAR: KAYDET VE SIFIRLA */}
+                      <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                        <button
+                          type="submit"
+                          className="w-full sm:flex-1 py-3 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl cursor-pointer shadow-xs transition-colors flex items-center justify-center gap-2 border border-[#0369A1]"
+                        >
+                          Menüyü Kaydet ve Yayınla
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleManualResetMenu}
+                          className="w-full sm:w-auto px-4 py-3 bg-[#F8FAFC] dark:bg-[#0F172A] hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400 font-bold rounded-xl cursor-pointer transition-colors border border-[#E2E8F0] dark:border-[#334155] hover:border-rose-300 dark:hover:border-rose-800/40 text-center"
+                        >
+                          Günün Menüsünü Sıfırla
+                        </button>
+                      </div>
                     </form>
-                  </div>
 
-                  {/* Sağ Kolon: Canlı Pano Önizlemesi */}
-                  <div className="space-y-6">
-                    <div className="bg-white border border-yellow-200 p-6 rounded-3xl space-y-4">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2 mb-1">
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-700 border border-emerald-500/30">
-                            Öğrencilere Yansıyan Canlı Görünüm
-                          </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-yellow-500/20 text-yellow-700 border border-yellow-300/30">
-                            {dailyMenu.gunTipi === "haftasonu"
-                              ? "Hafta Sonu Tarifesi"
-                              : dailyMenu.gunTipi === "ozelgun"
-                              ? "Bayram / Özel Gün Tarifesi"
-                              : "Hafta İçi Tarifesi"}
-                          </span>
-                        </div>
-                        <p className="text-xs text-stone-500">
-                          {dailyMenu.gorunumModu === "birlikte"
-                            ? "Her iki öğün de aynı anda öğrencilerin ekranında görünür."
-                            : `Şu anda sadece ${dailyMenu.aktifOgun === "kahvalti" ? "Sabah Kahvaltısı" : "Akşam Yemeği"} gösteriliyor.`}
-                        </p>
-                      </div>
-
-                      {dailyMenu.gorunumModu === "birlikte" ? (
-                        <div className="space-y-4">
-                          {/* Kahvaltı Canlı Kartı */}
-                          <div className="p-5 bg-white border-2 border-yellow-300/60 rounded-3xl space-y-3 shadow-sm">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs font-bold px-3 py-1 rounded-full bg-yellow-100 text-stone-800 border border-yellow-300 flex items-center gap-1.5">
-                                 Sabah Kahvaltısı
-                              </span>
-                              <span className="text-xs font-semibold text-stone-600 bg-white px-3 py-1 rounded-xl border border-yellow-200">
-                                Servis: {dailyMenu.kahvaltiSaat}
-                              </span>
-                            </div>
-
-                            <div className="py-1">
-                              <h4 className="text-xs font-bold text-stone-700 mb-1">Kahvaltı Menüsü:</h4>
-                              <p className="text-sm text-stone-700 leading-relaxed font-medium">
-                                {dailyMenu.kahvalti}
-                              </p>
-                            </div>
-
-                            <div className="pt-2.5 border-t border-yellow-200 flex justify-between items-center text-xs">
-                              {dailyMenu.kaloriGoster ? (
-                                <span className="text-stone-500">
-                                  Kalori: <strong className="text-amber-800 font-bold">{dailyMenu.kahvaltiKalori}</strong>
-                                </span>
-                              ) : (
-                                <span className="text-stone-500 text-xs">Günün Menüsü</span>
-                              )}
-                              <span className="text-emerald-600 font-bold flex items-center gap-1.5 text-[11px]">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Servis Hazır
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Akşam Yemeği Canlı Kartı */}
-                          <div className="p-5 bg-white border-2 border-yellow-300/60 rounded-3xl space-y-3 shadow-sm">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs font-bold px-3 py-1 rounded-full bg-yellow-100 text-stone-800 border border-yellow-300 flex items-center gap-1.5">
-                                 Akşam Yemeği
-                              </span>
-                              <span className="text-xs font-semibold text-stone-600 bg-white px-3 py-1 rounded-xl border border-yellow-200">
-                                Servis: {dailyMenu.aksamSaat}
-                              </span>
-                            </div>
-
-                            <div className="py-1">
-                              <h4 className="text-xs font-bold text-stone-700 mb-1">Akşam Menüsü:</h4>
-                              <p className="text-sm text-stone-700 leading-relaxed font-medium">
-                                {dailyMenu.aksam}
-                              </p>
-                            </div>
-
-                            <div className="pt-2.5 border-t border-yellow-200 flex justify-between items-center text-xs">
-                              {dailyMenu.kaloriGoster ? (
-                                <span className="text-stone-500">
-                                  Kalori: <strong className="text-amber-800 font-bold">{dailyMenu.aksamKalori}</strong>
-                                </span>
-                              ) : (
-                                <span className="text-stone-500 text-xs">Günün Menüsü</span>
-                              )}
-                              <span className="text-emerald-600 font-bold flex items-center gap-1.5 text-[11px]">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Sıcak Servis
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        /* CANLI ÖNİZLEME: TEK ZAMANLI GÖRÜNÜM */
-                        dailyMenu.aktifOgun === "kahvalti" ? (
-                          <div className="p-5 bg-white border-2 border-yellow-300/60 rounded-3xl space-y-3 shadow-sm">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs font-bold px-3 py-1 rounded-full bg-yellow-100 text-stone-800 border border-yellow-300 flex items-center gap-1.5">
-                                 Sabah Kahvaltısı
-                              </span>
-                              <span className="text-xs font-semibold text-stone-600 bg-white px-3 py-1 rounded-xl border border-yellow-200">
-                                Servis: {dailyMenu.kahvaltiSaat}
-                              </span>
-                            </div>
-
-                            <div className="py-2">
-                              <h4 className="text-base font-bold text-stone-900 mb-1.5">Günün Kahvaltı Tabağı:</h4>
-                              <p className="text-sm text-stone-700 leading-relaxed font-medium">
-                                {dailyMenu.kahvalti}
-                              </p>
-                            </div>
-
-                            <div className="pt-3 border-t border-yellow-200 flex justify-between items-center text-xs">
-                              {dailyMenu.kaloriGoster ? (
-                                <span className="text-stone-500">
-                                  Kalori: <strong className="text-amber-800 font-bold">{dailyMenu.kahvaltiKalori}</strong>
-                                </span>
-                              ) : (
-                                <span className="text-stone-500 text-xs">Günün Menüsü</span>
-                              )}
-                              <span className="text-emerald-600 font-bold flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Servis Başladı
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="p-5 bg-white border-2 border-yellow-300/60 rounded-3xl space-y-3 shadow-sm">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs font-bold px-3 py-1 rounded-full bg-yellow-100 text-stone-800 border border-yellow-300 flex items-center gap-1.5">
-                                 Akşam Yemeği
-                              </span>
-                              <span className="text-xs font-semibold text-stone-600 bg-white px-3 py-1 rounded-xl border border-yellow-200">
-                                Servis: {dailyMenu.aksamSaat}
-                              </span>
-                            </div>
-
-                            <div className="py-2">
-                              <h4 className="text-base font-bold text-stone-900 mb-1.5">Günün Akşam Menüsü:</h4>
-                              <p className="text-sm text-stone-700 leading-relaxed font-medium">
-                                {dailyMenu.aksam}
-                              </p>
-                            </div>
-
-                            <div className="pt-3 border-t border-yellow-200 flex justify-between items-center text-xs">
-                              {dailyMenu.kaloriGoster ? (
-                                <span className="text-stone-500">
-                                  Kalori: <strong className="text-amber-800 font-bold">{dailyMenu.aksamKalori}</strong>
-                                </span>
-                              ) : (
-                                <span className="text-stone-500 text-xs">Günün Menüsü</span>
-                              )}
-                              <span className="text-emerald-600 font-bold flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Sıcak Servis
-                              </span>
-                            </div>
-                          </div>
-                        )
-                      )}
-
-                      <div className="p-3.5 bg-yellow-50 rounded-2xl border border-yellow-200 text-xs text-stone-500 flex items-start gap-2.5">
-                        <div className="leading-relaxed">
-                          Yönetici olarak sol taraftan <strong className="text-stone-600">Aynı Zamanda</strong> seçeneğini seçtiğinizde kahvaltı ve akşam menüsü aynı anda görünür; <strong className="text-stone-600">Tek Zamanda</strong> seçtiğinizde sadece aktif olan öğün yayınlanır. Kalori seçeneğini de dilediğiniz an açıp kapatabilirsiniz.
-                        </div>
-                      </div>
+                    {/* Ayarlar Hızlı Geçiş Kutusu */}
+                    <div className="p-3 bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-xl flex items-center justify-between text-xs">
+                      <span className="text-[#64748B] dark:text-[#94A3B8]">Servis saatleri ve gösterim ayarları:</span>
+                      <button
+                        type="button"
+                        onClick={() => setManagerTab("ayarlar")}
+                        className="text-[#0F172A] dark:text-[#38BDF8] font-bold hover:underline cursor-pointer"
+                      >
+                        Yurt Ayarları →
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -3026,25 +3818,127 @@ export default function Home() {
                 const dryerMachines = laundryMachines.filter((m) => m.tur === "kurutma" || m.tip.toLowerCase().includes("kurutma") || m.id.includes("Kurutma"));
 
                 const timeSlots = [
-                  "09:00 - 10:30",
-                  "10:30 - 12:00",
+                  "08:00 - 09:30",
+                  "09:30 - 11:00",
+                  "11:00 - 12:30",
                   "13:00 - 14:30",
-                  "15:00 - 16:30",
-                  "17:00 - 18:30",
+                  "14:30 - 16:00",
+                  "16:00 - 17:30",
+                  "17:30 - 19:00",
                   "19:00 - 20:30",
                   "20:30 - 22:00",
                 ];
 
-                // Takvim günleri (Bu hafta)
-                const weekDays = [
-                  { date: "2026-10-19", dayName: "Pazartesi", shortDate: "19 Eki" },
-                  { date: "2026-10-20", dayName: "Salı", shortDate: "20 Eki" },
-                  { date: "2026-10-21", dayName: "Çarşamba", shortDate: "21 Eki" },
-                  { date: "2026-10-22", dayName: "Perşembe", shortDate: "22 Eki" },
-                  { date: "2026-10-23", dayName: "Cuma", shortDate: "23 Eki" },
-                  { date: "2026-10-24", dayName: "Cumartesi", shortDate: "24 Eki" },
-                  { date: "2026-10-25", dayName: "Pazar", shortDate: "25 Eki" },
+                // Türkçe Tarih Formatlayıcı
+                const formatLaundryTurkishDate = (dateStr: string) => {
+                  if (!dateStr) return "";
+                  const parts = dateStr.split("-").map(Number);
+                  if (parts.length !== 3) return dateStr;
+                  const [y, m, d] = parts;
+                  const dateObj = new Date(y, m - 1, d);
+                  const dayNames = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
+                  const monthNames = [
+                    "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+                    "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
+                  ];
+                  const dayOfWeek = dayNames[dateObj.getDay()] || "";
+                  const monthName = monthNames[m - 1] || "";
+                  return `${d} ${monthName} ${y} – ${dayOfWeek}`;
+                };
+
+                // Aylık Takvim Hesaplamaları
+                const turkishMonthNames = [
+                  "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+                  "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
                 ];
+
+                const currentMonthLabel = `${turkishMonthNames[laundryViewMonth]} ${laundryViewYear}`;
+
+                // Ayın toplam gün sayısı
+                const daysInCurrentMonth = new Date(laundryViewYear, laundryViewMonth + 1, 0).getDate();
+                // Ayın 1. gününün haftanın hangi günü olduğu (0: Pazartesi ... 6: Pazar)
+                const firstDayWeekday = (new Date(laundryViewYear, laundryViewMonth, 1).getDay() + 6) % 7;
+                // Bir önceki ayın toplam gün sayısı
+                const daysInPreviousMonth = new Date(laundryViewYear, laundryViewMonth, 0).getDate();
+
+                const prevM = laundryViewMonth === 0 ? 11 : laundryViewMonth - 1;
+                const prevY = laundryViewMonth === 0 ? laundryViewYear - 1 : laundryViewYear;
+                const prevMonthDays = [];
+                for (let i = firstDayWeekday - 1; i >= 0; i--) {
+                  const dayNum = daysInPreviousMonth - i;
+                  const dateStr = `${prevY}-${String(prevM + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                  prevMonthDays.push({
+                    dateStr,
+                    dayNum,
+                    isCurrentMonth: false,
+                    year: prevY,
+                    month: prevM,
+                  });
+                }
+
+                const currentMonthDays = [];
+                for (let d = 1; d <= daysInCurrentMonth; d++) {
+                  const dateStr = `${laundryViewYear}-${String(laundryViewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                  currentMonthDays.push({
+                    dateStr,
+                    dayNum: d,
+                    isCurrentMonth: true,
+                    year: laundryViewYear,
+                    month: laundryViewMonth,
+                  });
+                }
+
+                const totalSoFar = prevMonthDays.length + currentMonthDays.length;
+                const trailingDaysNeeded = (7 - (totalSoFar % 7)) % 7;
+                const nextM = laundryViewMonth === 11 ? 0 : laundryViewMonth + 1;
+                const nextY = laundryViewMonth === 11 ? laundryViewYear + 1 : laundryViewYear;
+                const nextMonthDays = [];
+                for (let d = 1; d <= trailingDaysNeeded; d++) {
+                  const dateStr = `${nextY}-${String(nextM + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                  nextMonthDays.push({
+                    dateStr,
+                    dayNum: d,
+                    isCurrentMonth: false,
+                    year: nextY,
+                    month: nextM,
+                  });
+                }
+
+                const calendarCells = [...prevMonthDays, ...currentMonthDays, ...nextMonthDays];
+
+                // Bugünün tarihi
+                const todayObj = new Date();
+                const todayDateStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, "0")}-${String(todayObj.getDate()).padStart(2, "0")}`;
+
+                // Ay boyunca toplam randevu sayısı
+                const monthPrefix = `${laundryViewYear}-${String(laundryViewMonth + 1).padStart(2, "0")}`;
+                const currentMonthSlotsCount = laundrySlots.filter(s => s.tarih.startsWith(monthPrefix) && s.durum !== "İptal").length;
+
+                const goToPrevMonth = () => {
+                  if (laundryViewMonth === 0) {
+                    setLaundryViewYear((y) => y - 1);
+                    setLaundryViewMonth(11);
+                  } else {
+                    setLaundryViewMonth((m) => m - 1);
+                  }
+                };
+
+                const goToNextMonth = () => {
+                  if (laundryViewMonth === 11) {
+                    setLaundryViewYear((y) => y + 1);
+                    setLaundryViewMonth(0);
+                  } else {
+                    setLaundryViewMonth((m) => m + 1);
+                  }
+                };
+
+                const goToToday = () => {
+                  const now = new Date();
+                  setLaundryViewYear(now.getFullYear());
+                  setLaundryViewMonth(now.getMonth());
+                  const nowStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+                  setSelectedLaundryDate(nowStr);
+                };
 
                 const daySlots = laundrySlots.filter((s) => s.tarih === selectedLaundryDate);
                 const filteredSlots = daySlots.filter((s) => {
@@ -3057,474 +3951,793 @@ export default function Home() {
                 const activeWashingCount = laundrySlots.filter(s => s.tarih === selectedLaundryDate && s.durum === "Yıkanıyor").length;
                 const inQueueCount = laundrySlots.filter(s => s.tarih === selectedLaundryDate && s.durum === "Sırada").length;
 
+                // Seçili günün haftalık gün şeridi (iOS Takvim Tarzı: Pazartesi - Pazar)
+                const [selY, selM, selD] = selectedLaundryDate.split("-").map(Number);
+                const selectedDateObj = new Date(selY, selM - 1, selD);
+                const dayOfWeekIdx = (selectedDateObj.getDay() + 6) % 7; // 0: Pzt ... 6: Paz
+                const mondayDateObj = new Date(selY, selM - 1, selD - dayOfWeekIdx);
+
+                const weekStripDays = [];
+                const shortDayNames = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+                for (let i = 0; i < 7; i++) {
+                  const dObj = new Date(mondayDateObj.getFullYear(), mondayDateObj.getMonth(), mondayDateObj.getDate() + i);
+                  const dateStr = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, "0")}-${String(dObj.getDate()).padStart(2, "0")}`;
+                  const slotsCount = laundrySlots.filter(s => s.tarih === dateStr && s.durum !== "İptal").length;
+                  const activeCount = laundrySlots.filter(s => s.tarih === dateStr && s.durum === "Yıkanıyor").length;
+                  const queueCount = laundrySlots.filter(s => s.tarih === dateStr && s.durum === "Sırada").length;
+                  weekStripDays.push({
+                    dateStr,
+                    dayNum: dObj.getDate(),
+                    dayName: shortDayNames[i],
+                    isToday: dateStr === todayDateStr,
+                    isSelected: dateStr === selectedLaundryDate,
+                    slotsCount,
+                    activeCount,
+                    queueCount,
+                  });
+                }
+
+                const timelineHours = [
+                  "08:00",
+                  "09:00",
+                  "10:00",
+                  "11:00",
+                  "12:00",
+                  "13:00",
+                  "14:00",
+                  "15:00",
+                  "16:00",
+                  "17:00",
+                  "18:00",
+                  "19:00",
+                  "20:00",
+                  "21:00",
+                  "22:00",
+                ];
+
+                const currentHourNum = todayObj.getHours();
+                const currentMinNum = todayObj.getMinutes();
+                const currentTimeStr = `${String(currentHourNum).padStart(2, "0")}:${String(currentMinNum).padStart(2, "0")}`;
+
+                const getSlotsForHour = (hourStr: string) => {
+                  const hourNum = parseInt(hourStr.split(":")[0], 10);
+                  return filteredSlots.filter((slot) => {
+                    const startHour = parseInt(slot.saatAraligi.split("-")[0].trim().split(":")[0], 10);
+                    return startHour === hourNum;
+                  });
+                };
+
+                // ========================================================
+                // CANLI / ŞU ANKİ SIRA VE MAKİNE DURUMU HESAPLAMALARI
+                // ========================================================
+                const allActiveSlots = laundrySlots.filter(
+                  (s) => s.durum === "Yıkanıyor" || s.durum === "Sırada"
+                );
+
+                const currentDisplayedQueue = allActiveSlots;
+
+                const activeWashingNow = currentDisplayedQueue.filter((s) => s.durum === "Yıkanıyor");
+                const waitingQueueList = currentDisplayedQueue.filter((s) => s.durum === "Sırada");
+
+                const runningMachinesCount = laundryMachines.filter((m) =>
+                  laundrySlots.some((s) => s.makineNo === m.id && s.durum === "Yıkanıyor")
+                ).length;
+
+                const queuedSlotsCount = laundrySlots.filter((s) => s.durum === "Sırada").length;
+                const freeMachinesCount = Math.max(0, laundryMachines.length - runningMachinesCount);
+
+                const freeMachinesList = laundryMachines.filter(
+                  (m) => !laundrySlots.some((s) => s.makineNo === m.id && s.durum === "Yıkanıyor")
+                );
+
+                const machineStatusList = laundryMachines.map((m) => {
+                  const activeSlot = laundrySlots.find(
+                    (s) => s.makineNo === m.id && s.durum === "Yıkanıyor"
+                  );
+                  const nextQueueSlot = !activeSlot
+                    ? laundrySlots.find((s) => s.makineNo === m.id && s.durum === "Sırada")
+                    : null;
+                  return {
+                    machine: m,
+                    activeSlot,
+                    nextQueueSlot,
+                  };
+                });
+
                 return (
-                  <div className="bg-white border border-yellow-200 p-6 sm:p-8 rounded-3xl space-y-6 shadow-sm">
-                    {/* Üst Başlık ve Aksiyonlar */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-yellow-200 pb-5">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-yellow-100 text-stone-800 border border-yellow-300">
-                            Çamaşırhane & Kurutma Çizelgesi
-                          </span>
-                          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 border border-emerald-500/30 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Canlı Takip
-                          </span>
+                  <div className="space-y-4">
+                    {/* Üst Yönetici Bilgi ve İstatistik Çubuğu (Proje Teması) */}
+                    <div className="bg-[#F8FAFC] dark:bg-[#1E293B] p-3 sm:p-4 rounded-2xl border border-[#E2E8F0] dark:border-[#334155] shadow-xs space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between sm:gap-3">
+                      {/* Sol / Üst Bölüm: Başlık ve Bilgi Rozetleri */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="text-base sm:text-lg font-black text-[#0F172A] dark:text-[#F1F5F9] tracking-tight">
+                            Çamaşırhane
+                          </h3>
+                          {/* Mobilde sağ üstte + Sıra Ekle butonu */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewLaundry((p) => ({ ...p, tarih: selectedLaundryDate, makineNo: laundryMachines[0]?.id || "Makine 1 (A-1)" }));
+                              setIsAddLaundryModalOpen(true);
+                            }}
+                            className="sm:hidden px-3.5 py-1.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap active:scale-95 border border-[#0369A1] min-h-[36px]"
+                          >
+                            + Sıra Ekle
+                          </button>
                         </div>
-                        <h3 className="text-xl font-bold text-stone-900">Öğrenci Çamaşırhane Sırası ve Takvimi</h3>
-                        <p className="text-xs text-stone-500 mt-0.5">
-                          Öğrencilerin ne zaman çamaşır attığını, hangi makinede hangi saatte sırada olduklarını takvimden inceleyin veya yeni sıra verin.
-                        </p>
+
+                        {/* Rozetler (Mobilde ve Masaüstünde asla kırılmayan temiz rozetler) */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg sm:rounded-full bg-[#F1F5F9] dark:bg-[#0F172A] text-[#64748B] dark:text-[#94A3B8] border border-[#E2E8F0] dark:border-[#334155] whitespace-nowrap">
+                            {washingMachines.length} Yıkama • {dryerMachines.length} Kurutma
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setIsManageMachinesModalOpen(true)}
+                            className="text-[11px] font-bold px-2.5 py-1 rounded-lg sm:rounded-full bg-[#0284C7]/10 hover:bg-[#0284C7]/20 text-[#0284C7] border border-[#0284C7]/30 cursor-pointer transition-colors whitespace-nowrap"
+                            title="Kişi başı ve yurt geneli günlük çamaşır limitlerini ayarla"
+                          >
+                            Limit: {dailyLaundryLimit === 0 ? "Sınırsız" : `${dailyLaundryLimit}/Kişi`} • {dailyDormLaundryLimit === 0 ? "Sınırsız" : `${dailyDormLaundryLimit}/Yurt`}
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
+                      {/* Sağ / Alt Butonlar */}
+                      <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#E2E8F0] dark:border-[#334155]">
                         <button
                           type="button"
                           onClick={() => setIsManageMachinesModalOpen(true)}
-                          className="px-3.5 py-2.5 bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 text-stone-800 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95"
-                          title="Çamaşır ve kurutma makinelerinin sayısını artır veya azalt"
+                          className="w-full sm:w-auto px-3.5 py-1.5 bg-white dark:bg-[#0F172A] hover:bg-[#F1F5F9] dark:hover:bg-[#162032] border border-[#E2E8F0] dark:border-[#334155] text-[#0F172A] dark:text-[#F1F5F9] hover:text-[#0284C7] font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 whitespace-nowrap flex items-center justify-center gap-1.5 min-h-[36px]"
+                          title="Makine sayısını ve türlerini ayarla"
                         >
-                          Makine Sayısını Ayarla ({laundryMachines.length})
+                          Makine Sayısı & Ayarlar ({laundryMachines.length})
                         </button>
 
+                        {/* Masaüstü + Sıra Ekle butonu */}
                         <button
                           type="button"
                           onClick={() => {
                             setNewLaundry((p) => ({ ...p, tarih: selectedLaundryDate, makineNo: laundryMachines[0]?.id || "Makine 1 (A-1)" }));
                             setIsAddLaundryModalOpen(true);
                           }}
-                          className="px-4 py-2.5 bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap active:scale-95"
+                          className="hidden sm:inline-flex px-3.5 py-1.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-black text-xs rounded-xl shadow-xs transition-all items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95 border border-[#0369A1]"
                         >
-                          + Yeni Çamaşır Sırası Ekle
+                          + Sıra Ekle
                         </button>
                       </div>
                     </div>
 
-                    {/* Canlı İstatistik ve Durum Özet Kartları */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="p-3.5 bg-yellow-50/70 border border-yellow-200 rounded-2xl flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-yellow-200/80 border border-yellow-300 flex items-center justify-center font-bold text-stone-800 text-xs">
-                          KAP
-                        </div>
-                        <div>
-                          <div className="text-xs text-stone-500">Toplam Makine</div>
-                          <div className="text-base font-black text-stone-900">{washingMachines.length} Yıkama • {dryerMachines.length} Kurutma</div>
-                        </div>
-                      </div>
-
-                      <div className="p-3.5 bg-yellow-50/70 border border-yellow-200 rounded-2xl flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-700 font-bold text-xs">
-                          AKTİF
-                        </div>
-                        <div>
-                          <div className="text-xs text-stone-500">Şu An Yıkanıyor</div>
-                          <div className="text-base font-black text-emerald-700">{activeWashingCount} Makine</div>
-                        </div>
-                      </div>
-
-                      <div className="p-3.5 bg-yellow-50/70 border border-yellow-200 rounded-2xl flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold text-xs">
-                          SIRA
-                        </div>
-                        <div>
-                          <div className="text-xs text-stone-500">Sırada Bekleyen</div>
-                          <div className="text-base font-black text-amber-800">{inQueueCount} Öğrenci</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Canlı Makineler Paneli */}
-                    <div className="bg-yellow-50/50 border border-yellow-200 rounded-2xl p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
-                          Çamaşırhane Makineleri Anlık Durumu
-                        </span>
-                        <span className="text-[11px] text-stone-500 font-medium">B Blok Zemin Kat Çamaşırhane Odası</span>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-                        {laundryMachines.map((m) => {
-                          const currentActive = daySlots.find(
-                            (s) => s.makineNo === m.id && (s.durum === "Yıkanıyor" || s.durum === "Sırada")
-                          );
-                          const isWashing = currentActive?.durum === "Yıkanıyor";
-                          const isQueued = currentActive?.durum === "Sırada";
-
-                          return (
-                            <div
-                              key={m.id}
-                              className={`p-3 rounded-xl border text-center transition-all ${
-                                isWashing
-                                  ? "bg-emerald-50 border-emerald-300 text-stone-900 shadow-sm"
-                                  : isQueued
-                                  ? "bg-amber-50 border-amber-300 text-stone-900 shadow-sm"
-                                  : "bg-white border-yellow-200 text-stone-700"
-                              }`}
-                            >
-                              <div className="text-[10px] font-bold uppercase tracking-wider text-stone-500 mb-1">{m.id.includes("Kurutma") || m.tur === "kurutma" ? "Kurutma" : "Yıkama"}</div>
-                              <div className="font-bold text-xs truncate" title={m.name}>{m.name}</div>
-                              <div className="text-[10px] text-stone-500 mb-1.5">{m.tip}</div>
-                              {isWashing ? (
-                                <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                                  {currentActive?.ogrenciAd.split(" ")[0]} (Oda {currentActive?.odaNo})
-                                </span>
-                              ) : isQueued ? (
-                                <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
-                                  Sırada: {currentActive?.ogrenciAd.split(" ")[0]}
-                                </span>
-                              ) : (
-                                <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200">
-                                  Boşta (Müsait)
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* HAFTALIK TAKVİM SEÇİCİ BARI */}
-                    <div className="space-y-2">
-                      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                        <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
-                          Günlük Çamaşırhane Takvimi
-                        </span>
+                    {/* ======================================================== */}
+                    {/* ŞU ANKİ DURUM PANOSU: YIKANIYOR - SIRADA - BOŞTA         */}
+                    {/* ======================================================== */}
+                    <div className="bg-white dark:bg-[#1E293B] rounded-2xl sm:rounded-3xl border border-[#E2E8F0] dark:border-[#334155] p-4 sm:p-5 shadow-xs space-y-4 transition-all">
+                      {/* Pano Üst Başlık */}
+                      <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] dark:border-[#334155]">
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] text-stone-500">Makine Filtresi:</span>
-                          <select
-                            value={laundryMachineFilter}
-                            onChange={(e) => setLaundryMachineFilter(e.target.value)}
-                            className="bg-yellow-50 border border-yellow-300 rounded-xl px-2.5 py-1 text-xs text-stone-800 focus:outline-none"
-                          >
-                            <option value="all">Tüm Makineler</option>
-                            <option value="yikama">Sadece Çamaşır Makineleri</option>
-                            <option value="kurutma">Sadece Kurutma Makineleri</option>
-                          </select>
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <h4 className="text-sm sm:text-base font-black text-[#0F172A] dark:text-[#F1F5F9] tracking-tight">
+                            Şu Anki Durum Panosu
+                          </h4>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-[#64748B] dark:text-[#94A3B8]">
+                            {activeWashingNow.length} Yıkanıyor • {waitingQueueList.length} Sırada • {freeMachinesList.length} Boşta
+                          </span>
                         </div>
                       </div>
 
-                      {/* Gün Seçici Butonları */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
-                        {weekDays.map((wd) => {
-                          const countForDay = laundrySlots.filter(
-                            (s) => s.tarih === wd.date && s.durum !== "İptal"
-                          ).length;
-                          const isSelected = selectedLaundryDate === wd.date;
+                      {/* 3 Ana Blok: Yıkanıyor / Sırada / Boşta */}
+                      <div className="space-y-3.5">
+                        {/* 1. YIKANIYOR BLOĞU */}
+                        <div className="p-3.5 sm:p-4 rounded-2xl border border-emerald-200 dark:border-emerald-800/40 bg-emerald-50/60 dark:bg-emerald-950/25 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                              <span className="text-xs sm:text-sm font-black text-emerald-900 dark:text-emerald-300 uppercase tracking-wider">
+                                Yıkanıyor
+                              </span>
+                            </div>
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60">
+                              {activeWashingNow.length} Makine Aktif
+                            </span>
+                          </div>
 
-                          return (
+                          {activeWashingNow.length === 0 ? (
+                            <p className="text-xs text-[#64748B] dark:text-[#94A3B8] py-1 italic">
+                              Şu anda yıkamada olan makine bulunmuyor.
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                              {activeWashingNow.map((slot) => (
+                                <div
+                                  key={slot.id}
+                                  className="p-3 bg-white dark:bg-[#1E293B] rounded-xl border border-emerald-200 dark:border-emerald-800/60 shadow-2xs flex flex-col justify-between gap-2.5"
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="font-bold text-xs text-[#0F172A] dark:text-[#F1F5F9] truncate">
+                                          {slot.makineNo}
+                                        </span>
+                                      </div>
+                                      <p className="font-semibold text-xs text-[#0F172A] dark:text-[#F1F5F9] mt-0.5 truncate">
+                                        {slot.ogrenciAd}
+                                      </p>
+                                      <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">
+                                        Oda {slot.odaNo}
+                                      </p>
+                                    </div>
+                                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#F1F5F9] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] shrink-0">
+                                      {slot.saatAraligi}
+                                    </span>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateLaundryStatus(slot.id, "Tamamlandı")}
+                                    className="w-full py-1.5 px-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold text-xs rounded-lg transition-colors cursor-pointer text-center"
+                                  >
+                                    Yıkamayı Bitir
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 2. SIRADA BLOĞU */}
+                        <div className="p-3.5 sm:p-4 rounded-2xl border border-[#0284C7]/30 dark:border-sky-800/40 bg-[#F0F9FF] dark:bg-sky-950/20 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-[#0284C7] dark:bg-sky-400" />
+                              <span className="text-xs sm:text-sm font-black text-[#0369A1] dark:text-sky-300 uppercase tracking-wider">
+                                Sırada
+                              </span>
+                            </div>
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#0284C7]/15 dark:bg-sky-900/40 text-[#0369A1] dark:text-sky-300 border border-[#0284C7]/30 dark:border-sky-700/60">
+                              {waitingQueueList.length} Öğrenci
+                            </span>
+                          </div>
+
+                          {waitingQueueList.length === 0 ? (
+                            <p className="text-xs text-[#64748B] dark:text-[#94A3B8] py-1 italic">
+                              Sırada bekleyen öğrenci bulunmuyor.
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                              {waitingQueueList.map((slot, idx) => (
+                                <div
+                                  key={slot.id}
+                                  className="p-2.5 sm:p-3 bg-white dark:bg-[#1E293B] rounded-xl border border-[#0284C7]/20 dark:border-sky-800/40 shadow-2xs flex items-center justify-between gap-2"
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="w-5 h-5 rounded-md bg-[#0284C7] text-white text-[10px] font-black flex items-center justify-center shrink-0">
+                                      #{idx + 1}
+                                    </span>
+                                    <span className="font-bold text-xs text-[#0F172A] dark:text-[#F1F5F9] truncate">
+                                      {slot.ogrenciAd}
+                                    </span>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteLaundry(slot.id)}
+                                    className="w-6 h-6 flex items-center justify-center text-[#64748B] dark:text-[#94A3B8] hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer text-xs font-bold shrink-0"
+                                    title="Sirayi Sil"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 3. BOŞTA BLOĞU */}
+                        <div className="p-3.5 sm:p-4 rounded-2xl border border-[#E2E8F0] dark:border-[#334155] bg-[#F8FAFC] dark:bg-[#0F172A]/50 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-[#64748B] dark:bg-[#94A3B8]" />
+                              <span className="text-xs sm:text-sm font-black text-[#0F172A] dark:text-[#F1F5F9] uppercase tracking-wider">
+                                Boşta
+                              </span>
+                            </div>
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-white dark:bg-[#1E293B] text-[#64748B] dark:text-[#94A3B8] border border-[#E2E8F0] dark:border-[#334155]">
+                              {freeMachinesList.length} Makine Müsait
+                            </span>
+                          </div>
+
+                          {freeMachinesList.length === 0 ? (
+                            <p className="text-xs text-[#64748B] dark:text-[#94A3B8] py-1 italic">
+                              Şu anda tüm makineler kullanımda.
+                            </p>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                              {freeMachinesList.map((m) => {
+                                const nextQueueSlot = laundrySlots.find(
+                                  (s) => s.makineNo === m.id && s.durum === "Sırada"
+                                );
+
+                                return (
+                                  <div
+                                    key={m.id}
+                                    className="p-3 bg-white dark:bg-[#1E293B] rounded-xl border border-[#E2E8F0] dark:border-[#334155] shadow-2xs flex items-center justify-between gap-2"
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                      <div className="min-w-0">
+                                        <p className="font-bold text-xs text-[#0F172A] dark:text-[#F1F5F9] truncate">
+                                          {m.name}
+                                        </p>
+                                        <p className="text-[10px] text-[#64748B] dark:text-[#94A3B8] truncate">
+                                          {m.tur === "kurutma" || m.id.includes("Kurutma") ? "Kurutma" : "Yıkama"} • {m.tip}
+                                        </p>
+                                        {nextQueueSlot && (
+                                          <p className="text-[9px] font-semibold text-[#0284C7] dark:text-sky-400 truncate">
+                                            Sıradaki: {nextQueueSlot.ogrenciAd}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setNewLaundry((p) => ({ ...p, tarih: selectedLaundryDate, makineNo: m.id }));
+                                        setIsAddLaundryModalOpen(true);
+                                      }}
+                                      className="px-2.5 py-1.5 bg-[#F1F5F9] dark:bg-[#0F172A] hover:bg-[#0284C7] hover:text-white dark:hover:bg-[#0284C7] dark:hover:text-white text-[#0284C7] dark:text-sky-300 font-bold text-xs rounded-lg border border-[#E2E8F0] dark:border-[#334155] transition-colors cursor-pointer shrink-0"
+                                    >
+                                      + Sıra Ver
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ======================================================== */}
+                    {/* GÖRÜNÜM 1: AYLIK TAKVİM (iOS Month View - Doğru Proje Teması) */}
+                    {/* ======================================================== */}
+                    {laundryCalendarView === "month" && (
+                      <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-xs overflow-hidden animate-ios-month p-4 sm:p-6 transition-all duration-300">
+                        {/* iOS Takvim Üst Navigasyon Çubuğu */}
+                        <div className="flex items-center justify-between pb-4 border-b border-[#E2E8F0]">
+                          <div className="flex items-center gap-3">
+                            <h2 className="text-xl sm:text-2xl font-black text-[#0F172A] tracking-tight">
+                              {currentMonthLabel}
+                            </h2>
+                            <div className="flex items-center gap-1 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-0.5 shadow-xs">
+                              <button
+                                type="button"
+                                onClick={goToPrevMonth}
+                                className="w-7 h-7 flex items-center justify-center text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] rounded-lg transition-colors cursor-pointer text-xs font-bold active:scale-90"
+                                title="Önceki Ay"
+                              >
+                                &lt;
+                              </button>
+                              <button
+                                type="button"
+                                onClick={goToNextMonth}
+                                className="w-7 h-7 flex items-center justify-center text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] rounded-lg transition-colors cursor-pointer text-xs font-bold active:scale-90"
+                                title="Sonraki Ay"
+                              >
+                                &gt;
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
                             <button
-                              key={wd.date}
                               type="button"
-                              onClick={() => setSelectedLaundryDate(wd.date)}
-                              className={`p-3 rounded-2xl border text-center transition-all cursor-pointer ${
-                                isSelected
-                                  ? "bg-yellow-300 border-2 border-yellow-400 text-stone-900 shadow-sm"
-                                  : "bg-white hover:bg-yellow-100/60 border-yellow-200 text-stone-700"
+                              onClick={goToToday}
+                              className="px-3 py-1.5 text-xs font-bold text-[#64748B] bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] rounded-xl transition-colors cursor-pointer active:scale-95"
+                            >
+                              Bugün
+                            </button>
+
+                            <select
+                              value={laundryMachineFilter}
+                              onChange={(e) => setLaundryMachineFilter(e.target.value)}
+                              className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-2.5 py-1.5 text-xs text-[#0F172A] focus:outline-none font-bold cursor-pointer transition-colors"
+                            >
+                              <option value="all">Tüm Makineler</option>
+                              <option value="yikama">Sadece Çamaşır</option>
+                              <option value="kurutma">Sadece Kurutma</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* iOS Hafta Günleri Başlıkları (PZT SAL ÇAR PER CUM CMT PAZ) */}
+                        <div className="grid grid-cols-7 text-center pt-3 pb-2 border-b border-[#E2E8F0]/60">
+                          {["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((dName, idx) => (
+                            <div
+                              key={dName}
+                              className={`text-[11px] sm:text-xs font-bold uppercase tracking-wider ${
+                                idx >= 5 ? "text-[#64748B]" : "text-[#64748B]"
                               }`}
                             >
-                              <div className="text-[11px] font-semibold uppercase">{wd.dayName}</div>
-                              <div className="text-sm font-black mt-0.5">{wd.shortDate}</div>
-                              <div className="mt-1 text-[10px]">
-                                {countForDay > 0 ? (
-                                  <span className={`px-2 py-0.5 rounded-full font-bold ${isSelected ? "bg-stone-900 text-yellow-300" : "bg-yellow-100 text-stone-800 border border-yellow-300"}`}>
-                                    {countForDay} Yıkama
-                                  </span>
-                                ) : (
-                                  <span className="text-stone-400">Boş</span>
-                                )}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* TAKVİM ÇİZELGESİ / MATRİS (Saat x Makine) */}
-                    <div className="border border-yellow-200 rounded-2xl overflow-hidden">
-                      <div className="bg-yellow-100/70 p-3 border-b border-yellow-200 flex justify-between items-center text-xs">
-                        <span className="font-bold text-stone-800">
-                          {weekDays.find((w) => w.date === selectedLaundryDate)?.dayName} ({selectedLaundryDate}) Çizelgesi
-                        </span>
-                        <span className="text-[11px] text-stone-600">
-                          Boş saat dilimlerine tıklayarak doğrudan öğrenciye sıra tanımlayabilirsiniz.
-                        </span>
-                      </div>
-
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs border-collapse min-w-[700px]">
-                          <thead>
-                            <tr className="bg-yellow-50/70 border-b border-yellow-200 text-stone-600">
-                              <th className="p-3 font-bold w-32 border-r border-yellow-200">Saat Dilimi</th>
-                              {laundryMachines
-                                .filter((m) => {
-                                  if (laundryMachineFilter === "all") return true;
-                                  if (laundryMachineFilter === "yikama") return m.tur === "yikama" || m.id.includes("Makine");
-                                  if (laundryMachineFilter === "kurutma") return m.tur === "kurutma" || m.id.includes("Kurutma");
-                                  return m.id === laundryMachineFilter;
-                                })
-                                .map((m) => (
-                                  <th key={m.id} className="p-3 font-bold border-r border-yellow-200 last:border-r-0">
-                                    <div className="text-stone-800">{m.name}</div>
-                                    <div className="text-[10px] text-stone-500 font-normal">{m.tip}</div>
-                                  </th>
-                                ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-yellow-200">
-                            {timeSlots.map((slot) => (
-                              <tr key={slot} className="hover:bg-yellow-50/30 transition-colors">
-                                <td className="p-3 font-mono font-bold text-stone-700 bg-yellow-50/40 border-r border-yellow-200 whitespace-nowrap">
-                                  {slot}
-                                </td>
-                                {laundryMachines
-                                  .filter((m) => {
-                                    if (laundryMachineFilter === "all") return true;
-                                    if (laundryMachineFilter === "yikama") return m.tur === "yikama" || m.id.includes("Makine");
-                                    if (laundryMachineFilter === "kurutma") return m.tur === "kurutma" || m.id.includes("Kurutma");
-                                    return m.id === laundryMachineFilter;
-                                  })
-                                  .map((m) => {
-                                    const booking = daySlots.find(
-                                      (s) => s.saatAraligi === slot && s.makineNo === m.id
-                                    );
-
-                                    return (
-                                      <td key={m.id} className="p-2 border-r border-yellow-200 last:border-r-0 align-top">
-                                        {booking ? (
-                                          <div
-                                            className={`p-2.5 rounded-xl border space-y-1.5 shadow-sm transition-all ${
-                                              booking.durum === "Yıkanıyor"
-                                                ? "bg-emerald-50/90 border-emerald-300"
-                                                : booking.durum === "Sırada"
-                                                ? "bg-yellow-100/80 border-yellow-300"
-                                                : "bg-stone-50 border-stone-200"
-                                            }`}
-                                          >
-                                            <div className="flex justify-between items-start gap-1">
-                                              <span className="font-bold text-stone-900 truncate" title={booking.ogrenciAd}>
-                                                {booking.ogrenciAd}
-                                              </span>
-                                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white font-bold border border-yellow-200 text-stone-700 whitespace-nowrap">
-                                                Oda {booking.odaNo}
-                                              </span>
-                                            </div>
-
-                                            <div className="text-[10px] text-stone-600 truncate" title={booking.program}>
-                                              Program: {booking.program}
-                                            </div>
-
-                                            {booking.not && (
-                                              <div className="text-[9px] text-stone-500 italic truncate" title={booking.not}>
-                                                Not: {booking.not}
-                                              </div>
-                                            )}
-
-                                            <div className="flex items-center justify-between pt-1 border-t border-yellow-200/60 text-[10px]">
-                                              <span
-                                                className={`font-bold ${
-                                                  booking.durum === "Yıkanıyor"
-                                                    ? "text-emerald-700"
-                                                    : booking.durum === "Sırada"
-                                                    ? "text-amber-800"
-                                                    : "text-stone-500"
-                                                }`}
-                                              >
-                                                {booking.durum}
-                                              </span>
-
-                                              <div className="flex items-center gap-1">
-                                                {booking.durum === "Sırada" && (
-                                                  <button
-                                                    onClick={() => handleUpdateLaundryStatus(booking.id, "Yıkanıyor")}
-                                                    className="px-1.5 py-0.5 rounded bg-emerald-600 text-white font-bold hover:bg-emerald-700 cursor-pointer"
-                                                    title="Yıkamaya Başlat"
-                                                  >
-                                                    Başlat
-                                                  </button>
-                                                )}
-                                                {booking.durum === "Yıkanıyor" && (
-                                                  <button
-                                                    onClick={() => handleUpdateLaundryStatus(booking.id, "Tamamlandı")}
-                                                    className="px-1.5 py-0.5 rounded bg-stone-700 text-white font-bold hover:bg-stone-800 cursor-pointer"
-                                                    title="Tamamlandı Olarak İşaretle"
-                                                  >
-                                                    Bitir
-                                                  </button>
-                                                )}
-                                                <button
-                                                  onClick={() => handleDeleteLaundry(booking.id)}
-                                                  className="text-stone-400 hover:text-rose-600 px-1 py-0.5 cursor-pointer text-[10px] font-semibold"
-                                                  title="Sırayı Sil / İptal Et"
-                                                >
-                                                  Sil
-                                                </button>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <button
-                                            type="button"
-                                            onClick={() => openQuickAddLaundry(m.id, slot, selectedLaundryDate)}
-                                            className="w-full h-16 rounded-xl border border-dashed border-yellow-300 hover:border-yellow-400 hover:bg-yellow-100/50 flex flex-col items-center justify-center text-stone-400 hover:text-stone-700 transition-all cursor-pointer text-[11px] gap-0.5"
-                                          >
-                                            <span className="text-xs">+</span>
-                                            <span className="text-[10px] font-medium">Sıra Ver</span>
-                                          </button>
-                                        )}
-                                      </td>
-                                    );
-                                  })}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    {/* GÜNLÜK KAYITLAR LİSTE GÖRÜNÜMÜ */}
-                    <div className="space-y-3 pt-2">
-                      <div className="flex justify-between items-center">
-                        <h4 className="text-sm font-bold text-stone-900">
-                          Seçili Günün Kayıtlı Çamaşır Sıraları ({filteredSlots.length})
-                        </h4>
-                        <span className="text-[11px] text-stone-500">Tarih: {selectedLaundryDate}</span>
-                      </div>
-
-                      {filteredSlots.length === 0 ? (
-                        <div className="p-8 bg-yellow-50/50 border border-yellow-200 rounded-2xl text-center text-stone-500 text-xs">
-                          Bu tarihte henüz çamaşır sırası oluşturulmamış. Yukarıdaki takvimden saat seçip sıra tanımlayabilirsiniz.
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {filteredSlots.map((slot) => (
-                            <div
-                              key={slot.id}
-                              className="p-4 bg-yellow-50/70 border border-yellow-200 rounded-2xl space-y-2 hover:border-yellow-300 transition-all shadow-sm"
-                            >
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <div className="font-bold text-sm text-stone-900">{slot.ogrenciAd}</div>
-                                  <div className="text-[11px] text-stone-500">Oda No: <strong className="text-stone-700">{slot.odaNo}</strong></div>
-                                </div>
-                                <span
-                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                    slot.durum === "Yıkanıyor"
-                                      ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                                      : slot.durum === "Sırada"
-                                      ? "bg-amber-100 text-amber-800 border border-amber-300"
-                                      : "bg-stone-100 text-stone-600 border border-stone-200"
-                                  }`}
-                                >
-                                  {slot.durum}
-                                </span>
-                              </div>
-
-                              <div className="text-xs text-stone-700 space-y-1 pt-1 border-t border-yellow-200">
-                                <div className="flex items-center gap-1.5 font-medium">
-                                  <span>{slot.makineNo}</span>
-                                </div>
-                                <div className="text-[11px] text-stone-600 flex items-center gap-1">
-                                  <span>Saat:</span>
-                                  <strong className="text-stone-800 font-mono">{slot.saatAraligi}</strong>
-                                </div>
-                                <div className="text-[11px] text-stone-500">
-                                  Program: <span className="text-stone-700 font-medium">{slot.program}</span>
-                                </div>
-                                {slot.not && (
-                                  <div className="text-[11px] text-amber-800 bg-yellow-100/60 p-1.5 rounded-lg border border-yellow-200">
-                                    Not: {slot.not}
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="pt-2 border-t border-yellow-200 flex justify-between items-center text-xs">
-                                <div className="flex items-center gap-1.5">
-                                  {slot.durum === "Sırada" && (
-                                    <button
-                                      onClick={() => handleUpdateLaundryStatus(slot.id, "Yıkanıyor")}
-                                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg cursor-pointer transition-colors"
-                                    >
-                                      Yıkamayı Başlat
-                                    </button>
-                                  )}
-                                  {slot.durum === "Yıkanıyor" && (
-                                    <button
-                                      onClick={() => handleUpdateLaundryStatus(slot.id, "Tamamlandı")}
-                                      className="px-2.5 py-1 bg-stone-700 hover:bg-stone-800 text-white font-bold text-[11px] rounded-lg cursor-pointer transition-colors"
-                                    >
-                                      Bitti (Boşaltıldı)
-                                    </button>
-                                  )}
-                                </div>
-
-                                <button
-                                  onClick={() => handleDeleteLaundry(slot.id)}
-                                  className="text-xs text-stone-400 hover:text-rose-600 cursor-pointer font-medium"
-                                >
-                                  Sil / İptal
-                                </button>
-                              </div>
+                              {dName}
                             </div>
                           ))}
                         </div>
-                      )}
-                    </div>
+
+                        {/* iOS Minimalist Gün Izgarası (Akıcı Geçişli Dokunma Hedefleri) */}
+                        <div className="grid grid-cols-7 gap-y-2 pt-3">
+                          {calendarCells.map((cell) => {
+                            const slotsForDay = laundrySlots.filter(
+                              (s) => s.tarih === cell.dateStr && s.durum !== "İptal"
+                            );
+                            const isToday = cell.dateStr === todayDateStr;
+                            const isSelected = selectedLaundryDate === cell.dateStr;
+                            const activeWashingOnDay = slotsForDay.filter((s) => s.durum === "Yıkanıyor").length;
+                            const inQueueOnDay = slotsForDay.filter((s) => s.durum === "Sırada").length;
+
+                            return (
+                              <button
+                                key={cell.dateStr}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedLaundryDate(cell.dateStr);
+                                  if (!cell.isCurrentMonth) {
+                                    setLaundryViewYear(cell.year);
+                                    setLaundryViewMonth(cell.month);
+                                  }
+                                  setLaundryCalendarView("day");
+                                }}
+                                className="group flex flex-col items-center justify-center py-2 sm:py-2.5 rounded-2xl cursor-pointer transition-transform duration-150 active:scale-90"
+                              >
+                                {/* Gün Yuvarlak Rozeti */}
+                                <div
+                                  className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-sm transition-all duration-200 select-none ${
+                                    isSelected
+                                      ? "bg-[#0284C7] text-white font-black shadow-md ring-4 ring-[#0284C7]/40"
+                                      : isToday
+                                      ? "bg-sky-100 text-[#0284C7] font-black border-2 border-[#0284C7] shadow-xs"
+                                      : cell.isCurrentMonth
+                                      ? "text-[#0F172A] font-bold group-hover:bg-[#F1F5F9]"
+                                      : "text-[#94A3B8] font-normal"
+                                  }`}
+                                >
+                                  {cell.dayNum}
+                                </div>
+
+                                {/* iOS Tarzı Etkinlik Noktaları (Tema Uyumlu) */}
+                                <div className="h-2 flex items-center justify-center gap-1 mt-1">
+                                  {slotsForDay.length > 0 ? (
+                                    <>
+                                      {activeWashingOnDay > 0 && (
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                                      )}
+                                      {inQueueOnDay > 0 && (
+                                        <span className="w-1.5 h-1.5 rounded-full bg-[#0284C7]" />
+                                      )}
+                                      {activeWashingOnDay === 0 && inQueueOnDay === 0 && (
+                                        <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-[#0284C7]" : "bg-[#64748B]"}`} />
+                                      )}
+                                    </>
+                                  ) : (
+                                    <span className="w-1.5 h-1.5 opacity-0" />
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ======================================================== */}
+                    {/* GÖRÜNÜM 2: GÜNLÜK ÇİZELGE (iOS Day View - Doğru Proje Teması) */}
+                    {/* (Tarihe tıklandığında hafta şeridi üste kayar, saatler altından çıkar) */}
+                    {/* ======================================================== */}
+                    {laundryCalendarView === "day" && (
+                      <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-xs overflow-hidden transition-all duration-300">
+                        {/* iOS Üst Başlık: < [Ay] Geri Butonu + Bugün & Filtre */}
+                        <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+                          <button
+                            type="button"
+                            onClick={() => setLaundryCalendarView("month")}
+                            className="flex items-center gap-1.5 text-[#64748B] hover:text-[#0F172A] font-black text-sm sm:text-base cursor-pointer px-2.5 py-1 -ml-1 rounded-xl hover:bg-[#F1F5F9] transition-all duration-150 active:scale-95"
+                          >
+                            <span className="text-lg leading-none font-black text-[#0284C7]">&lt;</span>
+                            <span>{turkishMonthNames[laundryViewMonth]} {laundryViewYear}</span>
+                          </button>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={goToToday}
+                              className="px-3 py-1.5 text-xs font-bold text-[#64748B] bg-white hover:bg-[#F1F5F9] border border-[#E2E8F0] rounded-xl transition-colors cursor-pointer active:scale-95"
+                            >
+                              Bugün
+                            </button>
+
+                            <select
+                              value={laundryMachineFilter}
+                              onChange={(e) => setLaundryMachineFilter(e.target.value)}
+                              className="bg-white border border-[#E2E8F0] rounded-xl px-2.5 py-1.5 text-xs text-[#0F172A] focus:outline-none font-bold cursor-pointer"
+                            >
+                              <option value="all">Tüm Makineler</option>
+                              <option value="yikama">Sadece Çamaşır</option>
+                              <option value="kurutma">Sadece Kurutma</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* iOS Hafta Şeridi: Üste Kayan Hafta (animate-ios-week) */}
+                        <div className="bg-[#F8FAFC] border-b border-[#E2E8F0] px-2 sm:px-4 py-2.5 animate-ios-week">
+                          <div className="grid grid-cols-7 gap-1 text-center">
+                            {weekStripDays.map((wd) => (
+                              <button
+                                key={wd.dateStr}
+                                type="button"
+                                onClick={() => setSelectedLaundryDate(wd.dateStr)}
+                                className="group flex flex-col items-center justify-center py-1 sm:py-1.5 rounded-xl cursor-pointer transition-transform duration-150 active:scale-90"
+                              >
+                                <span
+                                  className={`text-[10px] sm:text-[11px] font-bold uppercase tracking-wider ${
+                                    wd.isSelected ? "text-[#0284C7] font-black" : "text-[#64748B]"
+                                  }`}
+                                >
+                                  {wd.dayName}
+                                </span>
+                                <span
+                                  className={`mt-1 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-xs sm:text-sm transition-all duration-200 select-none ${
+                                    wd.isSelected
+                                      ? "bg-[#0284C7] text-white font-black shadow-md ring-2 ring-[#0284C7]"
+                                      : wd.isToday
+                                      ? "text-[#0284C7] font-black border-2 border-[#0284C7] bg-sky-100"
+                                      : "text-[#0F172A] font-bold hover:bg-[#F1F5F9]"
+                                  }`}
+                                >
+                                  {wd.dayNum}
+                                </span>
+                                <div className="h-1.5 mt-1 flex items-center justify-center gap-0.5">
+                                  {wd.slotsCount > 0 && (
+                                    <span
+                                      className={`w-1.5 h-1.5 rounded-full transition-colors duration-200 ${
+                                        wd.isSelected ? "bg-[#0284C7]" : wd.activeCount > 0 ? "bg-emerald-600" : "bg-[#0284C7]"
+                                      }`}
+                                    />
+                                  )}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Hafta Şeridinin Altından Çıkan Saatlik Çizelge (animate-ios-hours + animate-ios-day-switch) */}
+                        <div className="p-4 sm:p-6 animate-ios-hours space-y-4">
+                          <div key={selectedLaundryDate} className="animate-ios-day-switch space-y-4">
+                            {/* Tarih Başlığı (Proje Teması) */}
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-3 border-b border-[#E2E8F0]">
+                              <div>
+                                <h3 className="text-lg sm:text-xl font-black text-[#0F172A] tracking-tight flex items-center gap-2">
+                                  <span>{formatLaundryTurkishDate(selectedLaundryDate)}</span>
+                                  {selectedLaundryDate === todayDateStr && (
+                                    <span className="text-[11px] font-bold text-[#0284C7] bg-sky-100 px-2.5 py-0.5 rounded-full border border-sky-300">
+                                      Bugün
+                                    </span>
+                                  )}
+                                </h3>
+                                <p className="text-xs text-[#64748B] mt-0.5">
+                                  Bu tarihte toplam {daySlots.length} çamaşır ve kurutma sırası kayıtlı.
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                                  {activeWashingCount} Yıkanıyor
+                                </span>
+                                <span className="text-xs font-bold text-[#64748B] bg-[#F1F5F9] px-2.5 py-1 rounded-lg border border-[#E2E8F0]">
+                                  {inQueueCount} Sırada
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* iOS Dikey Saatler Çizelgesi (Proje Teması) */}
+                            <div className="space-y-0 relative">
+                              {timelineHours.map((hourStr) => {
+                                const slotsInThisHour = getSlotsForHour(hourStr);
+                                const isCurrentHour =
+                                  selectedLaundryDate === todayDateStr &&
+                                  parseInt(hourStr.slice(0, 2), 10) === currentHourNum;
+
+                                return (
+                                  <div
+                                    key={hourStr}
+                                    className="relative flex items-start gap-2 sm:gap-4 group min-h-[64px]"
+                                  >
+                                    {/* Sol Saat Etiketi */}
+                                    <div className="w-12 sm:w-14 text-right pt-0.5 shrink-0">
+                                      <span className="font-mono text-xs font-bold text-[#64748B]">
+                                        {hourStr}
+                                      </span>
+                                    </div>
+
+                                    {/* Sağ Çizelge Çizgisi ve İçerik */}
+                                    <div className="flex-1 relative pt-2 pb-2 border-t border-[#E2E8F0]">
+                                      {/* Canlı Şu An Zaman Çizgisi (Amber / Karamel) */}
+                                      {isCurrentHour && (
+                                        <div className="absolute left-0 right-0 z-20 flex items-center pointer-events-none -top-1.5">
+                                          <div className="w-2.5 h-2.5 rounded-full bg-[#0284C7] -ml-1.5 ring-2 ring-[#0284C7] shadow-xs" />
+                                          <div className="h-[2px] bg-[#0284C7] flex-1 shadow-xs" />
+                                        </div>
+                                      )}
+
+                                      {/* Saatteki Randevu Kartları (Tema Kartları) */}
+                                      {slotsInThisHour.length > 0 ? (
+                                        <div className="space-y-2">
+                                          {slotsInThisHour.map((booking) => (
+                                            <div
+                                              key={booking.id}
+                                              className={`p-3 rounded-2xl border-l-4 shadow-xs transition-all ${
+                                                booking.durum === "Yıkanıyor"
+                                                  ? "bg-emerald-50/90 border-emerald-600 text-[#0F172A] border-t border-r border-b border-emerald-200"
+                                                  : booking.durum === "Sırada"
+                                                  ? "bg-[#F8FAFC] border-[#0284C7] text-[#0F172A] border-t border-r border-b border-[#E2E8F0]"
+                                                  : "bg-[#F1F5F9] border-[#64748B] text-[#0F172A] border-t border-r border-b border-[#E2E8F0]"
+                                              }`}
+                                            >
+                                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                  <span className="font-black text-sm text-[#0F172A]">
+                                                    {booking.ogrenciAd}
+                                                  </span>
+                                                  <span className="text-[10px] px-2 py-0.5 rounded-lg bg-white font-bold border border-[#E2E8F0] text-[#64748B]">
+                                                    Oda {booking.odaNo}
+                                                  </span>
+                                                  <span className="text-[10px] px-2 py-0.5 rounded-lg bg-white font-bold border border-[#E2E8F0] text-[#64748B]">
+                                                    {booking.makineNo}
+                                                  </span>
+                                                </div>
+
+                                                <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                                                  <span
+                                                    className={`text-[10px] font-black px-2.5 py-0.5 rounded-lg border ${
+                                                      booking.durum === "Yıkanıyor"
+                                                        ? "bg-emerald-600 text-white border-emerald-700"
+                                                        : booking.durum === "Sırada"
+                                                        ? "bg-[#0284C7] text-[#0F172A] border-[#0284C7]"
+                                                        : "bg-[#E2E8F0] text-[#64748B] border-[#CBD5E1]"
+                                                    }`}
+                                                  >
+                                                    {booking.durum}
+                                                  </span>
+                                                </div>
+                                              </div>
+
+                                              <div className="pt-1.5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                                                <div className="text-xs text-[#64748B]">
+                                                  <span className="font-bold text-[#64748B]">Saat Aralığı:</span> {booking.saatAraligi}
+                                                </div>
+
+                                                <div className="flex items-center gap-1.5">
+                                                  {booking.durum === "Sırada" && (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleUpdateLaundryStatus(booking.id, "Yıkanıyor")}
+                                                      className="px-2.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] cursor-pointer transition-all active:scale-95 shadow-xs"
+                                                    >
+                                                      Başlat
+                                                    </button>
+                                                  )}
+
+                                                  {booking.durum === "Yıkanıyor" && (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleUpdateLaundryStatus(booking.id, "Tamamlandı")}
+                                                      className="px-2.5 py-1 rounded-xl bg-[#0369A1] hover:bg-[#0284C7] text-white font-bold text-[11px] cursor-pointer transition-all active:scale-95 shadow-xs"
+                                                    >
+                                                      Bitir
+                                                    </button>
+                                                  )}
+
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteLaundry(booking.id)}
+                                                    className="px-2 py-1 rounded-xl hover:bg-[#F1F5F9] text-[#64748B] font-bold text-[11px] cursor-pointer transition-all"
+                                                    title="Sırayı Sil / İptal Et"
+                                                  >
+                                                    Sil
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const matchedTimeSlot =
+                                              timeSlots.find((ts) => ts.startsWith(hourStr.slice(0, 2))) ||
+                                              `${hourStr} - ${parseInt(hourStr.slice(0, 2), 10) + 1}:30`;
+                                            openQuickAddLaundry(
+                                              laundryMachines[0]?.id || "Makine 1 (A-1)",
+                                              matchedTimeSlot,
+                                              selectedLaundryDate
+                                            );
+                                          }}
+                                          className="w-full py-2 px-3 rounded-xl border border-dashed border-[#E2E8F0] hover:border-[#0284C7] hover:bg-[#F8FAFC] flex items-center justify-between text-[#64748B] hover:text-[#0F172A] transition-all cursor-pointer group text-xs"
+                                        >
+                                          <span className="text-[11px] text-[#64748B] group-hover:text-[#0F172A] font-medium">Müsait saat dilimi</span>
+                                          <span className="text-[11px] font-bold text-[#0284C7] opacity-0 group-hover:opacity-100 transition-opacity">
+                                            + Sıra Ver
+                                          </span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
 
-              {/* ======================================================== */}
-              {/* MODÜL 6: ARIZA VE TEKNİK BAKIM */}
-              {/* ======================================================== */}
               {managerTab === "arizalar" && (
-                <div className="bg-white border border-yellow-200 p-6 rounded-3xl space-y-4">
-                  <div className="flex justify-between items-center">
+                <div className="bg-white border border-[#E2E8F0] p-4 sm:p-6 rounded-2xl sm:rounded-3xl space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <div>
-                      <h3 className="text-lg font-bold text-stone-900">Arıza ve Bakım Kayıtları</h3>
-                      <p className="text-xs text-stone-500">Odalardan bildirilen teknik arızaları inceleyin veya yeni kayıt açın.</p>
+                      <h3 className="text-base sm:text-lg font-bold text-[#0F172A]">Arıza ve Bakım</h3>
+                      <p className="text-xs text-[#64748B]">Yurt genelindeki arıza kayıtları ve durum güncellemeleri</p>
                     </div>
                     <button
                       onClick={() => setIsAddMaintenanceModalOpen(true)}
-                      className="px-4 py-2 bg-amber-600 hover:bg-yellow-500 text-white font-bold text-xs rounded-xl cursor-pointer"
+                      className="px-4 py-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold text-xs rounded-xl cursor-pointer transition-colors border border-[#0369A1]"
                     >
                       + Yeni Arıza Bildir
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {maintenanceTickets.map((m) => (
                       <div
                         key={m.id}
-                        className="p-4 bg-yellow-50 border border-yellow-200 rounded-2xl space-y-2 hover:border-yellow-300 transition-all"
+                        className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-2.5 hover:border-[#0284C7] transition-all"
                       >
-                        <div className="flex justify-between items-start">
-                          <span className="px-2 py-0.5 rounded bg-indigo-900/40 text-stone-800 font-medium font-bold text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="px-2.5 py-0.5 rounded-lg bg-[#F1F5F9] text-[#0284C7] font-bold text-xs border border-[#E2E8F0]">
                             Oda {m.odaNo}
                           </span>
                           <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
                               m.oncelik === "Acil"
-                                ? "bg-rose-500/20 text-rose-400"
+                                ? "bg-rose-50 text-rose-700 border-rose-200"
                                 : m.oncelik === "Orta"
-                                ? "bg-yellow-500/20 text-yellow-600"
-                                : "bg-slate-700 text-stone-600"
+                                ? "bg-[#F1F5F9] text-[#0284C7] border-[#E2E8F0]"
+                                : "bg-white text-[#64748B] border-[#E2E8F0]"
                             }`}
                           >
                             {m.oncelik}
                           </span>
                         </div>
 
-                        <h4 className="text-sm font-bold text-stone-900">{m.baslik}</h4>
-                        <div className="text-xs text-stone-500">
+                        <h4 className="text-sm font-bold text-[#0F172A]">{m.baslik}</h4>
+                        <div className="text-xs text-[#64748B]">
                           {m.kategori} • Bildiren: {m.bildiren}
                         </div>
 
-                        <div className="pt-2 border-t border-yellow-200 flex justify-between items-center">
+                        <div className="pt-2.5 border-t border-[#E2E8F0] flex justify-between items-center">
                           <span
                             className={`text-xs font-bold ${
                               m.durum === "Çözüldü"
-                                ? "text-emerald-400"
+                                ? "text-[#0284C7]"
                                 : m.durum === "İnceleniyor"
-                                ? "text-yellow-600"
-                                : "text-rose-400"
+                                ? "text-[#0284C7]"
+                                : "text-rose-600"
                             }`}
                           >
                             {m.durum}
@@ -3532,7 +4745,7 @@ export default function Home() {
 
                           <button
                             onClick={() => handleToggleMaintenanceStatus(m.id)}
-                            className="px-3 py-1 bg-yellow-100/70 hover:bg-yellow-100 text-stone-700 text-xs font-semibold rounded-lg cursor-pointer"
+                            className="px-3 py-1.5 bg-white hover:bg-[#F1F5F9] text-[#0F172A] hover:text-[#0284C7] border border-[#E2E8F0] text-xs font-semibold rounded-lg cursor-pointer transition-colors shadow-xs"
                           >
                             Durumu İlerlet →
                           </button>
@@ -3547,47 +4760,44 @@ export default function Home() {
               {/* MODÜL 7: DUYURULAR PANOSU */}
               {/* ======================================================== */}
               {managerTab === "duyurular" && (
-                <div className="bg-white border border-yellow-200 p-6 rounded-3xl space-y-4">
+                <div className="bg-white border border-[#E2E8F0] p-4 sm:p-6 rounded-2xl sm:rounded-3xl space-y-4">
                   <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="text-lg font-bold text-stone-900">Yurt İçi Duyuru ve Anons Panosu</h3>
-                      <p className="text-xs text-stone-500">Öğrencilere duyuru yayınlayın veya eski duyuruları kaldırın.</p>
-                    </div>
+                    <h3 className="text-base sm:text-lg font-bold text-[#0F172A]">Duyurular</h3>
                     <button
                       onClick={() => setIsAddAnnouncementModalOpen(true)}
-                      className="px-4 py-2 bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold font-bold text-xs rounded-xl cursor-pointer"
+                      className="px-4 py-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold text-xs rounded-xl cursor-pointer transition-colors border border-[#0369A1]"
                     >
-                      + Yeni Duyuru Yayınla
+                      + Yeni Duyuru
                     </button>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {announcements.map((a) => (
-                      <div key={a.id} className="p-4 bg-yellow-50 border border-yellow-200 rounded-2xl space-y-2">
+                      <div key={a.id} className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-2 hover:border-[#0284C7] transition-all">
                         <div className="flex justify-between items-start">
                           <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                               a.oncelik === "Acil"
-                                ? "bg-rose-500/20 text-rose-400"
+                                ? "bg-rose-50 text-rose-700 border-rose-200"
                                 : a.oncelik === "Önemli"
-                                ? "bg-yellow-500/20 text-yellow-600"
-                                : "bg-yellow-100/70 text-stone-600"
+                                ? "bg-[#F1F5F9] text-[#0284C7] border-[#E2E8F0]"
+                                : "bg-white text-[#64748B] border-[#E2E8F0]"
                             }`}
                           >
                             {a.oncelik}
                           </span>
                           <div className="flex items-center gap-2">
-                            <span className="text-[11px] text-slate-500">{a.tarih}</span>
+                            <span className="text-[11px] text-[#64748B]">{a.tarih}</span>
                             <button
                               onClick={() => handleDeleteAnnouncement(a.id)}
-                              className="text-slate-500 hover:text-rose-400 text-xs cursor-pointer"
+                              className="text-[#64748B] hover:text-rose-600 text-xs cursor-pointer"
                             >
-                              
+                              Sil
                             </button>
                           </div>
                         </div>
-                        <h4 className="text-sm font-bold text-stone-900">{a.baslik}</h4>
-                        <p className="text-xs text-stone-600">{a.icerik}</p>
+                        <h4 className="text-sm font-bold text-[#0F172A]">{a.baslik}</h4>
+                        <p className="text-xs text-[#64748B]">{a.icerik}</p>
                       </div>
                     ))}
                   </div>
@@ -3595,1191 +4805,1211 @@ export default function Home() {
               )}
 
               {/* ======================================================== */}
-              {/* MODÜL 8: YURT AYARLARI (TAM YETKİLİ) */}
+              {/* MODÜL 8: YURT AYARLARI (YEMEKHANE & ÇAMAŞIRHANE AYARLARI DAHİL) */}
               {/* ======================================================== */}
               {managerTab === "ayarlar" && (
-                <div className="bg-white border border-yellow-200 p-6 sm:p-8 rounded-3xl max-w-3xl w-full mx-auto space-y-6 shadow-sm">
-                  <div className="border-b border-yellow-200 pb-3">
-                    <h3 className="text-xl font-bold text-stone-900">Yurt Kurumsal ve Operasyonel Ayarları</h3>
-                    <p className="text-xs text-stone-500 mt-1">
-                      Yurdun adını, adresini, iletişim bilgilerini ve giriş-çıkış kurallarını kendiniz güncelleyebilirsiniz.
-                    </p>
-                  </div>
-
-                  <form onSubmit={handleSaveYurtSettings} className="space-y-4 text-xs">
-                    <div>
-                      <label className="text-stone-600 font-semibold block mb-1">Yurt Adı:</label>
-                      <input
-                        type="text"
-                        value={yurtSettings.ad}
-                        onChange={(e) => setYurtSettings({ ...yurtSettings, ad: e.target.value })}
-                        className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-3 text-stone-900 focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-amber-300/30 font-bold"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-stone-600 font-semibold block mb-1">Yurt Müdürü / Yetkili Adı:</label>
-                        <input
-                          type="text"
-                          value={yurtSettings.yetkiliAd}
-                          onChange={(e) => setYurtSettings({ ...yurtSettings, yetkiliAd: e.target.value })}
-                          className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-amber-300/30 font-medium"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-stone-600 font-semibold block mb-1">Yetkili Telefon Numarası:</label>
-                        <input
-                          type="text"
-                          value={yurtSettings.yetkiliTel}
-                          onChange={(e) => setYurtSettings({ ...yurtSettings, yetkiliTel: e.target.value })}
-                          className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-amber-300/30 font-medium"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-stone-600 font-semibold block mb-1">Yurt Açık Adresi:</label>
-                      <input
-                        type="text"
-                        value={yurtSettings.adres}
-                        onChange={(e) => setYurtSettings({ ...yurtSettings, adres: e.target.value })}
-                        className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-amber-300/30 font-medium"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-stone-600 font-semibold block mb-1">Toplam Kapasite:</label>
-                        <input
-                          type="number"
-                          value={yurtSettings.kapasite}
-                          onChange={(e) => setYurtSettings({ ...yurtSettings, kapasite: Number(e.target.value) })}
-                          className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-amber-300/30 font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-stone-600 font-semibold block mb-1">Hafta İçi Son Giriş:</label>
-                        <input
-                          type="text"
-                          value={yurtSettings.sonGirisHaftaIci}
-                          onChange={(e) => setYurtSettings({ ...yurtSettings, sonGirisHaftaIci: e.target.value })}
-                          placeholder="23:00"
-                          className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-amber-300/30 font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-stone-600 font-semibold block mb-1">Hafta Sonu Son Giriş:</label>
-                        <input
-                          type="text"
-                          value={yurtSettings.sonGirisHaftaSonu}
-                          onChange={(e) => setYurtSettings({ ...yurtSettings, sonGirisHaftaSonu: e.target.value })}
-                          placeholder="23:45"
-                          className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-amber-300/30 font-bold"
-                        />
-                      </div>
-                    </div>
-
+                <div className="w-full space-y-4 sm:space-y-5">
+                  {/* 1. YÖNETİCİ GİRİŞİ & ŞİFRE AYARLARI (AŞAĞIYA AÇILIR BUTON KART) */}
+                  <div className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl overflow-hidden shadow-xs transition-all">
                     <button
-                      type="submit"
-                      className="w-full py-3.5 bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold rounded-xl cursor-pointer shadow-sm transition-all text-sm mt-2"
+                      type="button"
+                      onClick={() => toggleSettingsSection("guvenlik")}
+                      className="w-full p-4 sm:p-6 flex items-center justify-between gap-3 text-left transition-colors hover:bg-[#F8FAFC]/60 cursor-pointer"
                     >
-                      💾 Yurt Bilgilerini ve Kurallarını Kaydet
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                        <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
+                          openSettingsSections.guvenlik ? "bg-[#0284C7] text-white" : "bg-[#F1F5F9] text-[#0284C7]"
+                        }`}>
+                          <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm sm:text-base font-black text-[#0F172A] truncate">
+                            Yönetici Girişi & Şifre Ayarları
+                          </h3>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center bg-[#F8FAFC] border border-[#E2E8F0] transition-transform duration-300 ${
+                          openSettingsSections.guvenlik ? "rotate-180 bg-[#F1F5F9]" : ""
+                        }`}>
+                          <svg className="w-4 h-4 text-[#0F172A]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
                     </button>
-                  </form>
-                </div>
-              )}
-              </div>
 
-              {/* ======================================================== */}
-              {/* MODAL: YENİ ODA EKLE */}
-              {/* ======================================================== */}
-              {isAddRoomModalOpen && (
-                <div className="fixed inset-0 z-50 bg-stone-900/40  flex items-center justify-center p-4">
-                  <div className="bg-white border border-yellow-200 rounded-3xl p-6 w-full max-w-md shadow-sm space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-bold text-stone-900">Yeni Oda Oluştur</h3>
-                      <button
-                        onClick={() => setIsAddRoomModalOpen(false)}
-                        className="text-stone-600 hover:text-stone-950 text-sm cursor-pointer"
-                      >
-                        
-                      </button>
-                    </div>
-
-                    <form onSubmit={handleAddRoom} className="space-y-3 text-xs">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-stone-500 block mb-1">Oda Numarası *</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="Örn: 204"
-                            value={newRoom.odaNo}
-                            onChange={(e) => setNewRoom({ ...newRoom, odaNo: e.target.value })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-stone-500 block mb-1">Blok Seçimi</label>
-                          <select
-                            value={newRoom.blok}
-                            onChange={(e) => setNewRoom({ ...newRoom, blok: e.target.value })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          >
-                            <option value="A Blok">A Blok</option>
-                            <option value="B Blok">B Blok</option>
-                            <option value="C Blok">C Blok</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-stone-500 block mb-1">Kat Numarası</label>
-                          <input
-                            type="number"
-                            value={newRoom.kat}
-                            onChange={(e) => setNewRoom({ ...newRoom, kat: Number(e.target.value) })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-stone-500 block mb-1">Yatak Kapasitesi *</label>
-                          <select
-                            value={newRoom.kapasite}
-                            onChange={(e) => setNewRoom({ ...newRoom, kapasite: Number(e.target.value) })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          >
-                            <option value={1}>1 Kişilik (Tek)</option>
-                            <option value={2}>2 Kişilik</option>
-                            <option value={3}>3 Kişilik</option>
-                            <option value={4}>4 Kişilik</option>
-                            <option value={5}>5 Kişilik</option>
-                            <option value={6}>6 Kişilik</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-stone-500 block mb-1">Oda Tipi</label>
-                        <input
-                          type="text"
-                          value={newRoom.odaTipi}
-                          onChange={(e) => setNewRoom({ ...newRoom, odaTipi: e.target.value })}
-                          placeholder="Standart Balkonlu, VIP vb."
-                          className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                        />
-                      </div>
-
-                      <div className="flex justify-end gap-2 pt-3">
-                        <button
-                          type="button"
-                          onClick={() => setIsAddRoomModalOpen(false)}
-                          className="px-4 py-2 rounded-xl bg-yellow-100/70 text-stone-600 cursor-pointer"
-                        >
-                          İptal
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-6 py-2 rounded-xl bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold font-bold cursor-pointer"
-                        >
-                          Odayı Oluştur
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* ======================================================== */}
-              {/* MODAL: ODA DÜZENLE (YATAK KAPASİTESİ, TİP VB.) */}
-              {/* ======================================================== */}
-              {editingRoom && (
-                <div className="fixed inset-0 z-50 bg-stone-900/40  flex items-center justify-center p-4">
-                  <div className="bg-white border border-yellow-200 rounded-3xl p-6 w-full max-w-md shadow-sm space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-bold text-stone-900">Oda {editingRoom.odaNo} Ayarlarını Düzenle</h3>
-                      <button
-                        onClick={() => setEditingRoom(null)}
-                        className="text-stone-600 hover:text-stone-950 text-sm cursor-pointer"
-                      >
-                        
-                      </button>
-                    </div>
-
-                    <form onSubmit={handleUpdateRoom} className="space-y-3 text-xs">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-stone-500 block mb-1">Oda No:</label>
-                          <input
-                            type="text"
-                            required
-                            value={editingRoom.odaNo}
-                            onChange={(e) => setEditingRoom({ ...editingRoom, odaNo: e.target.value })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-stone-500 block mb-1">Blok:</label>
-                          <select
-                            value={editingRoom.blok}
-                            onChange={(e) => setEditingRoom({ ...editingRoom, blok: e.target.value })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          >
-                            <option value="A Blok">A Blok</option>
-                            <option value="B Blok">B Blok</option>
-                            <option value="C Blok">C Blok</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-stone-500 block mb-1">Kat:</label>
-                          <input
-                            type="number"
-                            value={editingRoom.kat}
-                            onChange={(e) => setEditingRoom({ ...editingRoom, kat: Number(e.target.value) })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-stone-500 block mb-1">Yatak Kapasitesi:</label>
-                          <select
-                            value={editingRoom.kapasite}
-                            onChange={(e) => setEditingRoom({ ...editingRoom, kapasite: Number(e.target.value) })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          >
-                            <option value={1}>1 Kişilik</option>
-                            <option value={2}>2 Kişilik</option>
-                            <option value={3}>3 Kişilik</option>
-                            <option value={4}>4 Kişilik</option>
-                            <option value={5}>5 Kişilik</option>
-                            <option value={6}>6 Kişilik</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-stone-500 block mb-1">Oda Tipi:</label>
-                        <input
-                          type="text"
-                          value={editingRoom.odaTipi}
-                          onChange={(e) => setEditingRoom({ ...editingRoom, odaTipi: e.target.value })}
-                          className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                        />
-                      </div>
-
-                      <div className="flex justify-end gap-2 pt-3">
-                        <button
-                          type="button"
-                          onClick={() => setEditingRoom(null)}
-                          className="px-4 py-2 rounded-xl bg-yellow-100/70 text-stone-600 cursor-pointer"
-                        >
-                          İptal
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-6 py-2 rounded-xl bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold font-bold cursor-pointer"
-                        >
-                          Değişiklikleri Kaydet
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* ======================================================== */}
-              {/* MODAL: ÖĞRENCİ DÜZENLE (HER BİLGİYİ & ODA/YATAĞI DEĞİŞTİR) */}
-              {/* ======================================================== */}
-              {editingStudent && (
-                <div className="fixed inset-0 z-50 bg-stone-900/40  flex items-center justify-center p-4">
-                  <div className="bg-white border border-yellow-200 rounded-3xl p-6 w-full max-w-lg shadow-sm space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-bold text-stone-900">Öğrenci Bilgilerini Düzenle</h3>
-                      <button
-                        onClick={() => setEditingStudent(null)}
-                        className="text-stone-600 hover:text-stone-950 text-sm cursor-pointer"
-                      >
-                        
-                      </button>
-                    </div>
-
-                    <form onSubmit={handleEditStudent} className="space-y-3 text-xs">
-                      <div>
-                        <label className="text-stone-500 block mb-1">Ad Soyad:</label>
-                        <input
-                          type="text"
-                          required
-                          value={editingStudent.adSoyad}
-                          onChange={(e) => setEditingStudent({ ...editingStudent, adSoyad: e.target.value })}
-                          className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-stone-500 block mb-1">Telefon:</label>
-                          <input
-                            type="text"
-                            value={editingStudent.telefon}
-                            onChange={(e) => setEditingStudent({ ...editingStudent, telefon: e.target.value })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-stone-500 block mb-1">E-Posta:</label>
-                          <input
-                            type="email"
-                            value={editingStudent.eposta}
-                            onChange={(e) => setEditingStudent({ ...editingStudent, eposta: e.target.value })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          />
-                        </div>
-                      </div>
-
-                      {/* ODA & YATAK DEĞİŞTİRME */}
-                      <div className="p-3 bg-yellow-100/70 border border-yellow-300 rounded-2xl space-y-2">
-                        <span className="text-[11px] font-bold text-stone-800 font-medium block">
-                          Oda & Yatak Değiştirme:
-                        </span>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-stone-500 block mb-1">Oda Seçimi:</label>
-                            <select
-                              value={editingStudent.odaNo}
-                              onChange={(e) => setEditingStudent({ ...editingStudent, odaNo: e.target.value })}
-                              className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                            >
-                              {rooms.map((r) => (
-                                <option key={r.id} value={r.odaNo}>
-                                  Oda {r.odaNo} ({r.blok} - {r.kapasite} Yataklı)
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-stone-500 block mb-1">Yatak No:</label>
-                            <select
-                              value={editingStudent.yatakNo}
-                              onChange={(e) => setEditingStudent({ ...editingStudent, yatakNo: e.target.value })}
-                              className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                            >
-                              <option value="1">Yatak 1</option>
-                              <option value="2">Yatak 2</option>
-                              <option value="3">Yatak 3</option>
-                              <option value="4">Yatak 4</option>
-                              <option value="5">Yatak 5</option>
-                              <option value="6">Yatak 6</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-stone-500 block mb-1">Veli Adı:</label>
-                          <input
-                            type="text"
-                            value={editingStudent.veliAd}
-                            onChange={(e) => setEditingStudent({ ...editingStudent, veliAd: e.target.value })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-stone-500 block mb-1">Veli Telefonu:</label>
-                          <input
-                            type="text"
-                            value={editingStudent.veliTel}
-                            onChange={(e) => setEditingStudent({ ...editingStudent, veliTel: e.target.value })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          />
-                        </div>
-                      </div>
-
-
-                      <div className="flex justify-end gap-2 pt-3">
-                        <button
-                          type="button"
-                          onClick={() => setEditingStudent(null)}
-                          className="px-4 py-2 rounded-xl bg-yellow-100/70 text-stone-600 cursor-pointer"
-                        >
-                          İptal
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-6 py-2 rounded-xl bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold font-bold cursor-pointer"
-                        >
-                          Kaydet ve Güncelle
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* ======================================================== */}
-              {/* MODAL: YENİ ÖĞRENCİ EKLE */}
-              {/* ======================================================== */}
-              {isAddStudentModalOpen && (
-                <div className="fixed inset-0 z-50 bg-stone-900/40  flex items-center justify-center p-4">
-                  <div className="bg-white border border-yellow-200 rounded-3xl p-6 w-full max-w-lg shadow-sm space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-bold text-stone-900">Yeni Öğrenci Kaydı</h3>
-                      <button
-                        onClick={() => setIsAddStudentModalOpen(false)}
-                        className="text-stone-600 hover:text-stone-950 text-sm cursor-pointer"
-                      >
-                        
-                      </button>
-                    </div>
-
-                    <form onSubmit={handleAddStudent} className="space-y-3 text-xs">
-                      <div>
-                        <label className="text-stone-500 block mb-1">Ad Soyad *</label>
-                        <input
-                          type="text"
-                          required
-                          value={newStudent.adSoyad}
-                          onChange={(e) => setNewStudent({ ...newStudent, adSoyad: e.target.value })}
-                          placeholder="Ad Soyad..."
-                          className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-stone-500 block mb-1">Telefon No *</label>
-                          <input
-                            type="text"
-                            required
-                            value={newStudent.telefon}
-                            onChange={(e) => setNewStudent({ ...newStudent, telefon: e.target.value })}
-                            placeholder="05xx xxx xx xx"
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-stone-500 block mb-1">E-Posta</label>
-                          <input
-                            type="email"
-                            value={newStudent.eposta}
-                            onChange={(e) => setNewStudent({ ...newStudent, eposta: e.target.value })}
-                            placeholder="ogrenci@gmail.com"
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-stone-500 block mb-1">Oda Seçimi</label>
-                          <select
-                            value={newStudent.odaNo}
-                            onChange={(e) => setNewStudent({ ...newStudent, odaNo: e.target.value })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          >
-                            {rooms.map((r) => (
-                              <option key={r.id} value={r.odaNo}>
-                                Oda {r.odaNo} ({r.blok} - {r.kapasite - r.doluYatak} Boş)
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-stone-500 block mb-1">Yatak No</label>
-                          <select
-                            value={newStudent.yatakNo}
-                            onChange={(e) => setNewStudent({ ...newStudent, yatakNo: e.target.value })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          >
-                            <option value="1">Yatak 1</option>
-                            <option value="2">Yatak 2</option>
-                            <option value="3">Yatak 3</option>
-                            <option value="4">Yatak 4</option>
-                            <option value="5">Yatak 5</option>
-                            <option value="6">Yatak 6</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 pt-2 border-t border-yellow-200">
-                        <div>
-                          <label className="text-stone-500 block mb-1">Veli Ad Soyad</label>
-                          <input
-                            type="text"
-                            value={newStudent.veliAd}
-                            onChange={(e) => setNewStudent({ ...newStudent, veliAd: e.target.value })}
-                            placeholder="Veli adı..."
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-stone-500 block mb-1">Veli Telefonu</label>
-                          <input
-                            type="text"
-                            value={newStudent.veliTel}
-                            onChange={(e) => setNewStudent({ ...newStudent, veliTel: e.target.value })}
-                            placeholder="05xx xxx xx xx"
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end gap-2 pt-3">
-                        <button
-                          type="button"
-                          onClick={() => setIsAddStudentModalOpen(false)}
-                          className="px-4 py-2 rounded-xl bg-yellow-100/70 text-stone-600 cursor-pointer"
-                        >
-                          İptal
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-6 py-2 rounded-xl bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold font-bold cursor-pointer"
-                        >
-                          Kaydet ve Odaya Yerleştir
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-
-              {/* ======================================================== */}
-              {/* MODAL: YENİ ÇAMAŞIR SIRASI EKLE */}
-              {/* ======================================================== */}
-              {isAddLaundryModalOpen && (
-                <div className="fixed inset-0 z-50 bg-stone-900/40 flex items-center justify-center p-4">
-                  <div className="bg-white border border-yellow-200 rounded-3xl p-6 w-full max-w-md shadow-sm space-y-4">
-                    <div className="flex justify-between items-center border-b border-yellow-200 pb-3">
-                      <div>
-                        <h3 className="text-lg font-bold text-stone-900">Yeni Çamaşır Sırası Ekle</h3>
-                        <p className="text-xs text-stone-500">Öğrenciye makine ve saat aralığı rezerve edin.</p>
-                      </div>
-                      <button
-                        onClick={() => setIsAddLaundryModalOpen(false)}
-                        className="text-stone-400 hover:text-stone-700 text-lg cursor-pointer font-bold"
-                      >
-                        ✕
-                      </button>
-                    </div>
-
-                    <form onSubmit={handleSaveLaundry} className="space-y-3.5 text-xs">
-                      <div>
-                        <label className="text-stone-600 font-semibold block mb-1">Öğrenci Adı Soyadı *</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Örn: Zeynep Lermi"
-                          value={newLaundry.ogrenciAd}
-                          onChange={(e) => setNewLaundry({ ...newLaundry, ogrenciAd: e.target.value })}
-                          className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-yellow-400 font-medium"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-stone-600 font-semibold block mb-1">Oda Numarası *</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="Örn: 305"
-                            value={newLaundry.odaNo}
-                            onChange={(e) => setNewLaundry({ ...newLaundry, odaNo: e.target.value })}
-                            className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-yellow-400 font-medium"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-stone-600 font-semibold block mb-1">Tarih *</label>
-                          <input
-                            type="date"
-                            required
-                            value={newLaundry.tarih}
-                            onChange={(e) => setNewLaundry({ ...newLaundry, tarih: e.target.value })}
-                            className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-yellow-400 font-medium"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-stone-600 font-semibold block mb-1">Makine Seçimi *</label>
-                          <select
-                            value={newLaundry.makineNo}
-                            onChange={(e) => setNewLaundry({ ...newLaundry, makineNo: e.target.value })}
-                            className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-yellow-400 font-medium"
-                          >
-                            {laundryMachines.map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.name} ({m.tip})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="text-stone-600 font-semibold block mb-1">Saat Dilimi *</label>
-                          <select
-                            value={newLaundry.saatAraligi}
-                            onChange={(e) => setNewLaundry({ ...newLaundry, saatAraligi: e.target.value })}
-                            className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-yellow-400 font-medium"
-                          >
-                            <option value="09:00 - 10:30">09:00 - 10:30</option>
-                            <option value="10:30 - 12:00">10:30 - 12:00</option>
-                            <option value="13:00 - 14:30">13:00 - 14:30</option>
-                            <option value="15:00 - 16:30">15:00 - 16:30</option>
-                            <option value="17:00 - 18:30">17:00 - 18:30</option>
-                            <option value="19:00 - 20:30">19:00 - 20:30</option>
-                            <option value="20:30 - 22:00">20:30 - 22:00</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-stone-600 font-semibold block mb-1">Yıkama Programı</label>
-                          <select
-                            value={newLaundry.program}
-                            onChange={(e) => setNewLaundry({ ...newLaundry, program: e.target.value as any })}
-                            className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-yellow-400 font-medium"
-                          >
-                            <option value="Renkli & Karışık">Renkli & Karışık</option>
-                            <option value="Beyazlar & Pamuklu">Beyazlar & Pamuklu</option>
-                            <option value="Hızlı Yıkama (30 dk)">Hızlı Yıkama (30 dk)</option>
-                            <option value="Kurutma & Havalandırma">Kurutma & Havalandırma</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="text-stone-600 font-semibold block mb-1">Başlangıç Durumu</label>
-                          <select
-                            value={newLaundry.durum}
-                            onChange={(e) => setNewLaundry({ ...newLaundry, durum: e.target.value as any })}
-                            className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-yellow-400 font-medium"
-                          >
-                            <option value="Sırada">Sırada Bekliyor</option>
-                            <option value="Yıkanıyor">Şu An Yıkanıyor</option>
-                            <option value="Tamamlandı">Tamamlandı</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-stone-600 font-semibold block mb-1">Özel Not (Opsiyonel)</label>
-                        <input
-                          type="text"
-                          placeholder="Örn: 40 derece, yumuşatıcı makine yanında..."
-                          value={newLaundry.not}
-                          onChange={(e) => setNewLaundry({ ...newLaundry, not: e.target.value })}
-                          className="w-full bg-yellow-50/70 border border-yellow-300 rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-yellow-400 font-medium"
-                        />
-                      </div>
-
-                      <div className="flex gap-2 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setIsAddLaundryModalOpen(false)}
-                          className="flex-1 py-2.5 rounded-xl bg-yellow-100 hover:bg-yellow-200 text-stone-700 font-bold cursor-pointer transition-colors"
-                        >
-                          İptal
-                        </button>
-                        <button
-                          type="submit"
-                          className="flex-1 py-2.5 rounded-xl bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold shadow-sm transition-all cursor-pointer"
-                        >
-                          Sıraya Ekle
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-
-              {/* ======================================================== */}
-              {/* MODAL: ÇAMAŞIRHANE MAKİNELERİNİ YÖNET & SAYI AYARLA */}
-              {/* ======================================================== */}
-              {isManageMachinesModalOpen && (() => {
-                const washingCount = laundryMachines.filter((m) => m.tur === "yikama" || m.tip.toLowerCase().includes("yıkama") || m.id.includes("Makine")).length;
-                const dryerCount = laundryMachines.filter((m) => m.tur === "kurutma" || m.tip.toLowerCase().includes("kurutma") || m.id.includes("Kurutma")).length;
-
-                return (
-                  <div className="fixed inset-0 z-50 bg-stone-900/40 flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="bg-white border border-yellow-200 rounded-3xl p-6 w-full max-w-xl shadow-lg space-y-5 my-8">
-                      <div className="flex justify-between items-center border-b border-yellow-200 pb-3">
-                        <div>
-                          <h3 className="text-lg font-bold text-stone-900">Çamaşırhane Makine Ayarları</h3>
-                          <p className="text-xs text-stone-500">Mevcut yıkama ve kurutma makinesi sayılarını anında artırıp azaltabilir veya özel makine ekleyebilirsiniz.</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setIsManageMachinesModalOpen(false)}
-                          className="text-stone-400 hover:text-stone-700 text-sm cursor-pointer font-bold px-2 py-1 rounded-lg"
-                        >
-                          ✕
-                        </button>
-                      </div>
-
-                      {/* 1. HIZLI SAYI AYARLAYICILAR (STEPPER) */}
-                      <div className="space-y-2">
-                        <span className="text-xs font-bold text-stone-800 block">Hızlı Makine Sayısı Ayarı</span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {/* Yıkama Makineleri Stepper */}
-                          <div className="p-4 bg-yellow-50/80 border border-yellow-200 rounded-2xl flex items-center justify-between">
+                    {openSettingsSections.guvenlik && (
+                      <div className="border-t border-[#E2E8F0] p-5 sm:p-8 animate-accordion-down space-y-5 bg-white">
+                        <form onSubmit={handleSaveAdminSecuritySettings} className="space-y-4 text-xs">
+                          {/* Giriş Bilgileri Kartı */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                              <div className="text-xs font-bold text-stone-800">Çamaşır Yıkama</div>
-                              <div className="text-[11px] text-stone-500">Standart 8-9 kg</div>
+                              <label className="text-[#64748B] font-semibold block mb-1">
+                                Kullanıcı Adı
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={yurtSettings.adminKullaniciAdi || "mudur"}
+                                onChange={(e) => setYurtSettings({ ...yurtSettings, adminKullaniciAdi: e.target.value })}
+                                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-2.5 text-[#0F172A] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 font-mono font-bold"
+                                placeholder="mudur"
+                              />
                             </div>
-                            <div className="flex items-center gap-2">
+
+                            <div>
+                              <label className="text-[#64748B] font-semibold block mb-1">
+                                E-posta
+                              </label>
+                              <input
+                                type="email"
+                                required
+                                value={yurtSettings.adminEposta || "mudur@gunesyurdu.com"}
+                                onChange={(e) => setYurtSettings({ ...yurtSettings, adminEposta: e.target.value })}
+                                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-2.5 text-[#0F172A] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 font-mono font-bold"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Güvenli Şifre Değiştirme Kartı */}
+                          <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-3">
+                            <span className="text-xs font-bold text-[#0F172A] block">
+                              Şifre Değiştir
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                <label className="text-[#64748B] font-medium block mb-1">Mevcut Şifre</label>
+                                <input
+                                  type="password"
+                                  value={adminPasswordForm.mevcutSifre}
+                                  onChange={(e) => setAdminPasswordForm({ ...adminPasswordForm, mevcutSifre: e.target.value })}
+                                  placeholder="Mevcut şifreniz..."
+                                  className="w-full bg-white border border-[#E2E8F0] rounded-xl p-2.5 text-[#0F172A] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 font-mono font-medium"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[#64748B] font-medium block mb-1">Yeni Şifre</label>
+                                <input
+                                  type="password"
+                                  value={adminPasswordForm.yeniSifre}
+                                  onChange={(e) => setAdminPasswordForm({ ...adminPasswordForm, yeniSifre: e.target.value })}
+                                  placeholder="Yeni şifre..."
+                                  className="w-full bg-white border border-[#E2E8F0] rounded-xl p-2.5 text-[#0F172A] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 font-mono font-medium"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[#64748B] font-medium block mb-1">Yeni Şifre (Tekrar)</label>
+                                <input
+                                  type="password"
+                                  value={adminPasswordForm.yeniSifreTekrar}
+                                  onChange={(e) => setAdminPasswordForm({ ...adminPasswordForm, yeniSifreTekrar: e.target.value })}
+                                  placeholder="Yeni şifre tekrar..."
+                                  className="w-full bg-white border border-[#E2E8F0] rounded-xl p-2.5 text-[#0F172A] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 font-mono font-medium"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Genel Admin Girişi ve Güvenlik Tercihleri */}
+                          <div className="space-y-2.5 pt-1">
+                            <span className="text-xs font-bold text-[#0F172A] block">
+                              Erişim ve Giriş İzinleri
+                            </span>
+
+                            {/* Ana Yönetici Girişi Açık/Kapalı */}
+                            <div className="flex items-center justify-between p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl gap-3">
+                              <span className="text-xs font-bold text-[#0F172A]">
+                                Genel Yönetici Girişi
+                              </span>
                               <button
                                 type="button"
-                                onClick={() => handleQuickSetCount("yikama", -1)}
-                                disabled={washingCount <= 1}
-                                className="w-8 h-8 rounded-xl bg-white border border-yellow-300 hover:bg-yellow-100 text-stone-800 font-black text-sm flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-all shadow-sm"
-                                title="1 makine azalt"
+                                onClick={() => setYurtSettings({ ...yurtSettings, adminGirisAktif: yurtSettings.adminGirisAktif === false ? true : false })}
+                                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                  yurtSettings.adminGirisAktif !== false ? "bg-[#0284C7]" : "bg-stone-300"
+                                }`}
                               >
-                                -
+                                <span
+                                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                    yurtSettings.adminGirisAktif !== false ? "translate-x-5" : "translate-x-0"
+                                  }`}
+                                />
                               </button>
-                              <span className="w-10 text-center font-black text-base text-stone-900">{washingCount}</span>
+                            </div>
+
+                            {/* Hızlı Giriş Butonları İzni */}
+                            <div className="flex items-center justify-between p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl gap-3">
+                              <span className="text-xs font-bold text-[#0F172A]">
+                                Giriş Ekranında Hızlı Giriş Butonları
+                              </span>
                               <button
                                 type="button"
-                                onClick={() => handleQuickSetCount("yikama", 1)}
-                                className="w-8 h-8 rounded-xl bg-yellow-300 hover:bg-yellow-400 border border-yellow-400 text-stone-900 font-black text-sm flex items-center justify-center cursor-pointer transition-all shadow-sm active:scale-95"
-                                title="1 makine ekle"
+                                onClick={() => setYurtSettings({ ...yurtSettings, hizliGirisIzin: yurtSettings.hizliGirisIzin === false ? true : false })}
+                                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                  yurtSettings.hizliGirisIzin !== false ? "bg-[#0284C7]" : "bg-stone-300"
+                                }`}
                               >
-                                +
+                                <span
+                                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                    yurtSettings.hizliGirisIzin !== false ? "translate-x-5" : "translate-x-0"
+                                  }`}
+                                />
+                              </button>
+                            </div>
+
+                            {/* Güvenli Oturum Koruması */}
+                            <div className="flex items-center justify-between p-3.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl gap-3">
+                              <span className="text-xs font-bold text-[#0F172A]">
+                                Güvenli Oturum Koruması
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setYurtSettings({ ...yurtSettings, guvenliOturum: yurtSettings.guvenliOturum === false ? true : false })}
+                                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                  yurtSettings.guvenliOturum !== false ? "bg-[#0284C7]" : "bg-stone-300"
+                                }`}
+                              >
+                                <span
+                                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                    yurtSettings.guvenliOturum !== false ? "translate-x-5" : "translate-x-0"
+                                  }`}
+                                />
                               </button>
                             </div>
                           </div>
 
-                          {/* Kurutma Makineleri Stepper */}
-                          <div className="p-4 bg-yellow-50/80 border border-yellow-200 rounded-2xl flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold text-stone-800">Kurutma Makinesi</div>
-                              <div className="text-[11px] text-stone-500">Merkezi 10 kg</div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleQuickSetCount("kurutma", -1)}
-                                disabled={dryerCount <= 0}
-                                className="w-8 h-8 rounded-xl bg-white border border-yellow-300 hover:bg-yellow-100 text-stone-800 font-black text-sm flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-all shadow-sm"
-                                title="1 kurutucu azalt"
-                              >
-                                -
-                              </button>
-                              <span className="w-10 text-center font-black text-base text-stone-900">{dryerCount}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleQuickSetCount("kurutma", 1)}
-                                className="w-8 h-8 rounded-xl bg-yellow-300 hover:bg-yellow-400 border border-yellow-400 text-stone-900 font-black text-sm flex items-center justify-center cursor-pointer transition-all shadow-sm active:scale-95"
-                                title="1 kurutucu ekle"
-                              >
-                                +
-                              </button>
-                            </div>
-                          </div>
+                          <button
+                            type="submit"
+                            className="w-full py-3 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl cursor-pointer shadow-xs transition-colors text-xs border border-[#0369A1]"
+                          >
+                            Yönetici Giriş ve Şifre Ayarlarını Kaydet
+                          </button>
+                        </form>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. YURT KURALLARI (AŞAĞIYA AÇILIR BUTON KART) */}
+                  <div className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl overflow-hidden shadow-xs transition-all">
+                    <button
+                      type="button"
+                      onClick={() => toggleSettingsSection("kurallar")}
+                      className="w-full p-4 sm:p-6 flex items-center justify-between gap-3 text-left transition-colors hover:bg-[#F8FAFC]/60 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                        <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
+                          openSettingsSections.kurallar ? "bg-[#0284C7] text-white" : "bg-[#F1F5F9] text-[#0284C7]"
+                        }`}>
+                          <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm sm:text-base font-black text-[#0F172A] truncate">
+                            Giriş & Çıkış Saatleri
+                          </h3>
                         </div>
                       </div>
 
-                      {/* 2. MEVCUT MAKİNELER LİSTESİ */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="font-bold text-stone-800">Mevcut Makineler ({laundryMachines.length})</span>
-                          <span className="text-[11px] text-stone-500">Otomatik takvim ve sıra sütunları güncellenir</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center bg-[#F8FAFC] border border-[#E2E8F0] transition-transform duration-300 ${
+                          openSettingsSections.kurallar ? "rotate-180 bg-[#F1F5F9]" : ""
+                        }`}>
+                          <svg className="w-4 h-4 text-[#0F172A]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </button>
+
+                    {openSettingsSections.kurallar && (
+                      <div className="border-t border-[#E2E8F0] p-5 sm:p-8 animate-accordion-down space-y-5 bg-white">
+                        <form onSubmit={(e) => handleSaveYurtSettings(e, "Giriş ve çıkış kuralları başarıyla kaydedildi.")} className="space-y-4 text-xs">
+                          {/* 1. İlk Çıkış Saatleri */}
+                          <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-3">
+                            <label className="text-xs font-bold text-[#0F172A] block">
+                              İlk Çıkış Saatleri
+                            </label>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {/* Hafta İçi İlk Çıkış Kartı */}
+                              <div className="p-3.5 bg-white border border-[#E2E8F0] rounded-xl space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs font-bold text-[#0F172A]">Hafta İçi</span>
+                                  <span className="text-xs font-mono font-black text-emerald-700 bg-[#F1F5F9] px-2 py-0.5 rounded-lg border border-[#E2E8F0]">
+                                    {yurtSettings.ilkCikisHaftaIci || "06:00"}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => openEntryTimePicker("cikisHaftaIci", "Hafta İçi İlk Çıkış")}
+                                  className="w-full py-2.5 px-3 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs sm:text-sm text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs flex items-center justify-center gap-2 min-h-[44px]"
+                                >
+                                  <span>{yurtSettings.ilkCikisHaftaIci || "06:00"}</span>
+                                </button>
+                              </div>
+
+                              {/* Hafta Sonu İlk Çıkış Kartı */}
+                              <div className="p-3.5 bg-white border border-[#E2E8F0] rounded-xl space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs font-bold text-[#0F172A]">Hafta Sonu</span>
+                                  <span className="text-xs font-mono font-black text-emerald-700 bg-[#F1F5F9] px-2 py-0.5 rounded-lg border border-[#E2E8F0]">
+                                    {yurtSettings.ilkCikisHaftaSonu || "06:30"}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => openEntryTimePicker("cikisHaftaSonu", "Hafta Sonu İlk Çıkış")}
+                                  className="w-full py-2.5 px-3 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs sm:text-sm text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs flex items-center justify-center gap-2 min-h-[44px]"
+                                >
+                                  <span>{yurtSettings.ilkCikisHaftaSonu || "06:30"}</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 2. Son Giriş Saatleri */}
+                          <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-3">
+                            <label className="text-xs font-bold text-[#0F172A] block">
+                              Son Giriş Saatleri
+                            </label>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {/* Hafta İçi Son Giriş Kartı */}
+                              <div className="p-3.5 bg-white border border-[#E2E8F0] rounded-xl space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs font-bold text-[#0F172A]">Hafta İçi</span>
+                                  <span className="text-xs font-mono font-black text-[#0284C7] bg-[#F1F5F9] px-2 py-0.5 rounded-lg border border-[#E2E8F0]">
+                                    {yurtSettings.sonGirisHaftaIci || "23:00"}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => openEntryTimePicker("haftaici", "Hafta İçi Son Giriş")}
+                                  className="w-full py-2.5 px-3 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs sm:text-sm text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs flex items-center justify-center gap-2 min-h-[44px]"
+                                >
+                                  <span>{yurtSettings.sonGirisHaftaIci || "23:00"}</span>
+                                </button>
+                              </div>
+
+                              {/* Hafta Sonu Son Giriş Kartı */}
+                              <div className="p-3.5 bg-white border border-[#E2E8F0] rounded-xl space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs font-bold text-[#0F172A]">Hafta Sonu</span>
+                                  <span className="text-xs font-mono font-black text-[#0284C7] bg-[#F1F5F9] px-2 py-0.5 rounded-lg border border-[#E2E8F0]">
+                                    {yurtSettings.sonGirisHaftaSonu || "23:45"}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => openEntryTimePicker("haftasonu", "Hafta Sonu Son Giriş")}
+                                  className="w-full py-2.5 px-3 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs sm:text-sm text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs flex items-center justify-center gap-2 min-h-[44px]"
+                                >
+                                  <span>{yurtSettings.sonGirisHaftaSonu || "23:45"}</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <button
+                            type="submit"
+                            className="w-full py-3 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl cursor-pointer shadow-xs transition-colors text-xs border border-[#0369A1]"
+                          >
+                            Giriş ve Çıkış Kurallarını Kaydet
+                          </button>
+                        </form>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. ÖĞRENCİLER (AŞAĞIYA AÇILIR BUTON KART) */}
+                  <div className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl overflow-hidden shadow-xs transition-all">
+                    <button
+                      type="button"
+                      onClick={() => toggleSettingsSection("ogrenciler")}
+                      className="w-full p-4 sm:p-6 flex items-center justify-between gap-3 text-left transition-colors hover:bg-[#F8FAFC]/60 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                        <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
+                          openSettingsSections.ogrenciler ? "bg-[#0284C7] text-white" : "bg-[#F1F5F9] text-[#0284C7]"
+                        }`}>
+                          <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm sm:text-base font-black text-[#0F172A] truncate">
+                            Öğrenciler
+                          </h3>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center bg-[#F8FAFC] border border-[#E2E8F0] transition-transform duration-300 ${
+                          openSettingsSections.ogrenciler ? "rotate-180 bg-[#F1F5F9]" : ""
+                        }`}>
+                          <svg className="w-4 h-4 text-[#0F172A]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </button>
+
+                    {openSettingsSections.ogrenciler && (
+                      <div className="border-t border-[#E2E8F0] p-4 sm:p-6 animate-accordion-down space-y-4 bg-white">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-[#0F172A]">Kayıtlı Öğrenci Listesi</h4>
+                            <span className="text-[10px] text-[#64748B]">({filteredStudents.length} gösteriliyor)</span>
+                          </div>
+
+                          <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 w-full sm:w-auto">
+                            <input
+                              type="text"
+                              placeholder="Öğrenci veya Oda ara..."
+                              value={studentSearch}
+                              onChange={(e) => setStudentSearch(e.target.value)}
+                              className="bg-[#F8FAFC] border border-[#E2E8F0] text-xs text-[#0F172A] placeholder-[#94A3B8] rounded-xl px-3 py-2 w-full sm:w-48 focus:outline-none focus:border-[#0284C7]"
+                            />
+
+                            <button
+                              type="button"
+                              onClick={() => setIsAddStudentModalOpen(true)}
+                              className="px-4 py-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold text-xs rounded-xl cursor-pointer transition-colors shrink-0 text-center border border-[#0369A1]"
+                            >
+                              + Yeni Öğrenci
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="max-h-44 overflow-y-auto space-y-1.5 p-2 bg-yellow-50/40 border border-yellow-200 rounded-2xl">
-                          {laundryMachines.map((m) => (
+                        {/* Mobil Kart Görünümü */}
+                        <div className="sm:hidden space-y-3">
+                          {filteredStudents.length === 0 ? (
+                            <div className="p-6 text-center text-xs text-[#64748B] bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0]">
+                              Kayıtlı öğrenci bulunamadı.
+                            </div>
+                          ) : (
+                            filteredStudents.map((std) => (
+                              <div
+                                key={std.id}
+                                className="bg-[#F8FAFC] border border-[#E2E8F0] p-3.5 rounded-2xl space-y-2.5 shadow-xs"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <h4 className="font-bold text-[#0F172A] text-sm truncate">{std.adSoyad}</h4>
+                                    <p className="text-[11px] text-[#64748B] truncate mt-0.5">{std.eposta}</p>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className="px-2.5 py-1 rounded-lg bg-[#0284C7] text-white font-bold text-xs border border-[#0369A1]">
+                                      Oda {std.odaNo}
+                                    </span>
+                                    <span className="px-2 py-1 rounded-lg bg-white text-[#64748B] font-bold text-xs border border-[#E2E8F0]">
+                                      Kat {std.yatakNo}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E2E8F0]">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedStudentForDetail(std)}
+                                    className="flex-1 py-1.5 px-2 bg-white hover:bg-[#F1F5F9] text-[#0F172A] font-bold rounded-lg text-xs border border-[#E2E8F0] transition-colors cursor-pointer text-center"
+                                  >
+                                    Detay
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingStudent(std)}
+                                    className="flex-1 py-1.5 px-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-lg text-xs transition-colors cursor-pointer text-center border border-[#0369A1]"
+                                  >
+                                    Düzenle
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteStudent(std.id, std.adSoyad)}
+                                    className="py-1.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-xs transition-colors cursor-pointer border border-rose-200"
+                                  >
+                                    Sil
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+
+                        {/* Masaüstü Tablo Görünümü */}
+                        <div className="hidden sm:block overflow-x-auto">
+                          <table className="w-full text-left text-xs min-w-[500px]">
+                            <thead className="bg-[#F8FAFC] text-[#64748B] uppercase tracking-wider text-[10px]">
+                              <tr>
+                                <th className="p-3 rounded-l-xl">Öğrenci</th>
+                                <th className="p-3">Oda / Kat</th>
+                                <th className="p-3">E-Posta</th>
+                                <th className="p-3 rounded-r-xl text-right">İşlemler</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#E2E8F0]">
+                              {filteredStudents.length === 0 ? (
+                                <tr>
+                                  <td colSpan={4} className="p-8 text-center text-[#64748B]">
+                                    Kayıtlı öğrenci bulunamadı.
+                                  </td>
+                                </tr>
+                              ) : (
+                                filteredStudents.map((std) => (
+                                  <tr key={std.id} className="hover:bg-[#F8FAFC] transition-colors">
+                                    <td className="p-3">
+                                      <div className="font-bold text-[#0F172A] text-sm">{std.adSoyad}</div>
+                                    </td>
+                                    <td className="p-3">
+                                      <div className="inline-flex items-center gap-1.5">
+                                        <span className="px-2.5 py-1 rounded-lg bg-[#0284C7] text-white font-bold border border-[#0369A1]">
+                                          Oda {std.odaNo}
+                                        </span>
+                                        <span className="px-2 py-1 rounded-lg bg-[#F8FAFC] text-[#64748B] font-bold border border-[#E2E8F0]">
+                                          Kat {std.yatakNo}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="p-3">
+                                      <div className="text-[#0F172A] font-medium">{std.eposta}</div>
+                                    </td>
+                                    <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingStudent(std)}
+                                        className="px-2.5 py-1 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-lg text-[11px] cursor-pointer transition-colors border border-[#0369A1]"
+                                        title="Tüm bilgilerini ve oda/yatağını düzenle"
+                                      >
+                                        Düzenle
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedStudentForDetail(std)}
+                                        className="px-2.5 py-1 bg-[#F8FAFC] hover:bg-[#E2E8F0] text-[#0F172A] font-medium rounded-lg text-[11px] cursor-pointer border border-[#E2E8F0] transition-colors"
+                                      >
+                                        Kart
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteStudent(std.id, std.adSoyad)}
+                                        className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-[11px] cursor-pointer transition-colors border border-rose-200"
+                                      >
+                                        Sil
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. YEMEKHANE MENÜ & SERVİS AYARLARI (AŞAĞIYA AÇILIR BUTON KART) */}
+                  <div className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl overflow-hidden shadow-xs transition-all">
+                    <button
+                      type="button"
+                      onClick={() => toggleSettingsSection("yemekhane")}
+                      className="w-full p-4 sm:p-6 flex items-center justify-between gap-3 text-left transition-colors hover:bg-[#F8FAFC]/60 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                        <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
+                          openSettingsSections.yemekhane ? "bg-[#0284C7] text-white" : "bg-[#F1F5F9] text-[#0284C7]"
+                        }`}>
+                          <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="text-sm sm:text-base font-black text-[#0F172A] truncate">
+                            Yemekhane Ayarları
+                          </h3>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center bg-[#F8FAFC] border border-[#E2E8F0] transition-transform duration-300 ${
+                          openSettingsSections.yemekhane ? "rotate-180 bg-[#F1F5F9]" : ""
+                        }`}>
+                          <svg className="w-4 h-4 text-[#0F172A]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </button>
+
+                    {openSettingsSections.yemekhane && (
+                      <div className="border-t border-[#E2E8F0] p-5 sm:p-8 animate-accordion-down space-y-4 text-xs bg-white">
+                        {/* A. BUGÜNÜN GEÇERLİ YEMEK SAATİ TARİFESİ SEÇİCİ */}
+                        <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-2.5">
+                          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1.5">
+                            <label className="text-xs font-bold text-[#0F172A] flex items-center gap-1.5">
+                              Bugünün Yemek Saati Tarifesi
+                            </label>
+                            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md bg-[#F1F5F9] text-[#0F172A] border border-[#E2E8F0] self-start sm:self-auto">
+                              Geçerli: {dailyMenu.gunTipi === "haftasonu" ? "Hafta Sonu" : dailyMenu.gunTipi === "ozelgun" ? "Bayram / Özel Gün" : "Hafta İçi"}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                            {/* 1. Hafta İçi Kartı */}
                             <div
-                              key={m.id}
-                              className="p-2.5 bg-white border border-yellow-200 rounded-xl flex items-center justify-between text-xs"
+                              onClick={() => handleToggleGunTipi("haftaici")}
+                              className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
+                                dailyMenu.gunTipi === "haftaici" || !dailyMenu.gunTipi
+                                  ? "bg-white border-2 border-[#0284C7] shadow-xs"
+                                  : "bg-white border-[#E2E8F0] hover:border-[#0284C7]"
+                              }`}
                             >
-                              <div className="flex items-center gap-2">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  m.tur === "kurutma" || m.id.includes("Kurutma")
-                                    ? "bg-amber-100 text-amber-800 border border-amber-300"
-                                    : "bg-yellow-100 text-stone-800 border border-yellow-300"
-                                }`}>
-                                  {m.tur === "kurutma" || m.id.includes("Kurutma") ? "Kurutma" : "Yıkama"}
-                                </span>
+                              <div className="flex items-center justify-between">
                                 <div>
-                                  <span className="font-bold text-stone-800 block">{m.name}</span>
-                                  <span className="text-[10px] text-stone-500">{m.tip}</span>
+                                  <div className="font-bold text-xs text-[#0F172A]">Hafta İçi</div>
+                                  <div className="text-[10px] text-[#64748B]">Pzt - Cuma</div>
+                                </div>
+                                {dailyMenu.gunTipi === "haftaici" || !dailyMenu.gunTipi ? (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0284C7] text-[#0F172A] border border-[#0369A1]">
+                                    Geçerli
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleGunTipi("haftaici");
+                                    }}
+                                    className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#64748B] hover:bg-[#0284C7] hover:text-[#0F172A] transition-colors"
+                                  >
+                                    Seç
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="space-y-2 pt-2 border-t border-[#E2E8F0]" onClick={(e) => e.stopPropagation()}>
+                                <div className="space-y-1">
+                                  <span className="text-[11px] font-semibold text-[#64748B] block">Kahvaltı</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => openTimePicker("haftaici", "kahvalti", "Hafta İçi • Sabah Kahvaltısı")}
+                                    className="w-full py-1.5 px-2 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs"
+                                  >
+                                    {formatDisplayHours(dailyMenu.saatler?.haftaici?.kahvalti || "07:30 - 10:00")}
+                                  </button>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-[11px] font-semibold text-[#64748B] block">Akşam</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => openTimePicker("haftaici", "aksam", "Hafta İçi • Akşam Yemeği")}
+                                    className="w-full py-1.5 px-2 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs"
+                                  >
+                                    {formatDisplayHours(dailyMenu.saatler?.haftaici?.aksam || "18:00 - 20:30")}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 2. Hafta Sonu Kartı */}
+                            <div
+                              onClick={() => handleToggleGunTipi("haftasonu")}
+                              className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
+                                dailyMenu.gunTipi === "haftasonu"
+                                  ? "bg-white border-2 border-[#0284C7] shadow-xs"
+                                  : "bg-white border-[#E2E8F0] hover:border-[#0284C7]"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-bold text-xs text-[#0F172A]">Hafta Sonu</div>
+                                  <div className="text-[10px] text-[#64748B]">Cmt - Pazar</div>
+                                </div>
+                                {dailyMenu.gunTipi === "haftasonu" ? (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0284C7] text-[#0F172A] border border-[#0369A1]">
+                                    Geçerli
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleGunTipi("haftasonu");
+                                    }}
+                                    className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#64748B] hover:bg-[#0284C7] hover:text-[#0F172A] transition-colors"
+                                  >
+                                    Seç
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="space-y-2 pt-2 border-t border-[#E2E8F0]" onClick={(e) => e.stopPropagation()}>
+                                <div className="space-y-1">
+                                  <span className="text-[11px] font-semibold text-[#64748B] block">Kahvaltı</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => openTimePicker("haftasonu", "kahvalti", "Hafta Sonu • Sabah Kahvaltısı")}
+                                    className="w-full py-1.5 px-2 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs"
+                                  >
+                                    {formatDisplayHours(dailyMenu.saatler?.haftasonu?.kahvalti || "08:30 - 11:30")}
+                                  </button>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-[11px] font-semibold text-[#64748B] block">Akşam</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => openTimePicker("haftasonu", "aksam", "Hafta Sonu • Akşam Yemeği")}
+                                    className="w-full py-1.5 px-2 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs"
+                                  >
+                                    {formatDisplayHours(dailyMenu.saatler?.haftasonu?.aksam || "18:30 - 21:00")}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 3. Bayram / Özel Gün Kartı */}
+                            <div
+                              onClick={() => handleToggleGunTipi("ozelgun")}
+                              className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
+                                dailyMenu.gunTipi === "ozelgun"
+                                  ? "bg-white border-2 border-[#0284C7] shadow-xs"
+                                  : "bg-white border-[#E2E8F0] hover:border-[#0284C7]"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-bold text-xs text-[#0F172A]">Bayram / Özel</div>
+                                  <div className="text-[10px] text-[#64748B]">Tatil & Özel Gün</div>
+                                </div>
+                                {dailyMenu.gunTipi === "ozelgun" ? (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0284C7] text-[#0F172A] border border-[#0369A1]">
+                                    Geçerli
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleGunTipi("ozelgun");
+                                    }}
+                                    className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#64748B] hover:bg-[#0284C7] hover:text-[#0F172A] transition-colors"
+                                  >
+                                    Seç
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="space-y-2 pt-2 border-t border-[#E2E8F0]" onClick={(e) => e.stopPropagation()}>
+                                <div className="space-y-1">
+                                  <span className="text-[11px] font-semibold text-[#64748B] block">Kahvaltı</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => openTimePicker("ozelgun", "kahvalti", "Bayram / Özel • Sabah Kahvaltısı")}
+                                    className="w-full py-1.5 px-2 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs"
+                                  >
+                                    {formatDisplayHours(dailyMenu.saatler?.ozelgun?.kahvalti || "09:00 - 12:00")}
+                                  </button>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-[11px] font-semibold text-[#64748B] block">Akşam</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => openTimePicker("ozelgun", "aksam", "Bayram / Özel • Akşam Yemeği")}
+                                    className="w-full py-1.5 px-2 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs"
+                                  >
+                                    {formatDisplayHours(dailyMenu.saatler?.ozelgun?.aksam || "19:00 - 21:30")}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. ÇAMAŞIRHANE & MAKİNE KAPASİTE AYARLARI (AŞAĞIYA AÇILIR BUTON KART) */}
+                  <div className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl overflow-hidden shadow-xs transition-all">
+                    {(() => {
+                      const washingCount = laundryMachines.filter((m) => m.tur === "yikama" || m.tip.toLowerCase().includes("yıkama") || m.id.includes("Makine")).length;
+                      const dryerCount = laundryMachines.filter((m) => m.tur === "kurutma" || m.tip.toLowerCase().includes("kurutma") || m.id.includes("Kurutma")).length;
+
+                      return (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => toggleSettingsSection("camasirhane")}
+                            className="w-full p-4 sm:p-6 flex items-center justify-between gap-3 text-left transition-colors hover:bg-[#F8FAFC]/60 cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                              <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
+                                openSettingsSections.camasirhane ? "bg-[#0284C7] text-white" : "bg-[#F1F5F9] text-[#0284C7]"
+                              }`}>
+                                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h16v16H4V4zm8 12a4 4 0 100-8 4 4 0 000 8zm-5-9h.01M10 7h.01" />
+                                </svg>
+                              </div>
+                              <div className="min-w-0">
+                                <h3 className="text-sm sm:text-base font-black text-[#0F172A] truncate">
+                                  Çamaşırhane ve Makine Ayarları
+                                </h3>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center bg-[#F8FAFC] border border-[#E2E8F0] transition-transform duration-300 ${
+                                openSettingsSections.camasirhane ? "rotate-180 bg-[#F1F5F9]" : ""
+                              }`}>
+                                <svg className="w-4 h-4 text-[#0F172A]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </div>
+                            </div>
+                          </button>
+
+                          {openSettingsSections.camasirhane && (
+                            <div className="border-t border-[#E2E8F0] p-5 sm:p-8 animate-accordion-down space-y-5 text-xs bg-white">
+                              {/* Günlük Maksimum Çamaşır Atma Limiti (Kişi Başı ve Yurt Başı) */}
+                              <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-3">
+                                {/* Kapsam Seçici Sekmeler (Kişi Başı vs Yurt Başı) */}
+                                <div className="flex items-center gap-1.5 p-1 bg-white border border-[#E2E8F0] rounded-xl">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSettingsLaundryScope("kisi")}
+                                    className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer text-center min-h-[38px] ${
+                                      settingsLaundryScope === "kisi"
+                                        ? "bg-[#0284C7] text-white shadow-xs"
+                                        : "text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
+                                    }`}
+                                  >
+                                    Kişi Başı Limit ({dailyLaundryLimit === 0 ? "Sınırsız" : `${dailyLaundryLimit} Yıkama`})
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSettingsLaundryScope("yurt")}
+                                    className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer text-center min-h-[38px] ${
+                                      settingsLaundryScope === "yurt"
+                                        ? "bg-[#0284C7] text-white shadow-xs"
+                                        : "text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
+                                    }`}
+                                  >
+                                    Yurt Başı Toplam ({dailyDormLaundryLimit === 0 ? "Sınırsız" : `${dailyDormLaundryLimit} Yıkama`})
+                                  </button>
+                                </div>
+
+                                {settingsLaundryScope === "kisi" && (
+                                  <div className="space-y-3">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                      <div>
+                                        <span className="font-bold text-sm text-[#0F172A] block">
+                                          Öğrenci Başına Günlük Hak
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSetDailyLaundryLimit(Math.max(0, dailyLaundryLimit - 1))}
+                                          disabled={dailyLaundryLimit <= 0}
+                                          className="w-10 h-10 rounded-xl bg-white hover:bg-[#F1F5F9] border border-[#E2E8F0] text-[#0F172A] font-black text-base flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer active:scale-95 shadow-xs"
+                                          title="Kişi başı limiti 1 azalt"
+                                          aria-label="Kişi başı limiti 1 azalt"
+                                        >
+                                          -
+                                        </button>
+                                        <div className="min-w-[120px] text-center px-3 py-1 bg-white border border-[#0284C7]/40 rounded-xl shadow-xs flex flex-col items-center justify-center focus-within:ring-2 focus-within:ring-[#0284C7]/20 focus-within:border-[#0284C7]">
+                                          <div className="flex items-center justify-center gap-1 w-full">
+                                            <input
+                                              type="number"
+                                              min={0}
+                                              max={999}
+                                              value={dailyLaundryLimit === 0 ? "" : dailyLaundryLimit}
+                                              placeholder="0"
+                                              onChange={(e) => {
+                                                const val = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
+                                                handleSetDailyLaundryLimit(isNaN(val) ? 0 : Math.max(0, val));
+                                              }}
+                                              className="w-14 text-center font-black text-sm text-[#0284C7] bg-transparent focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                              title="Manuel sayı girin (0: Sınırsız)"
+                                            />
+                                            <span className="text-[11px] font-bold text-[#64748B]">Yıkama</span>
+                                          </div>
+                                          <span className="text-[10px] text-[#64748B] font-medium block">
+                                            {dailyLaundryLimit === 0 ? "0: Sınırsız" : "Günlük / Kişi"}
+                                          </span>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleSetDailyLaundryLimit(dailyLaundryLimit + 1)}
+                                          className="w-10 h-10 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white font-black text-base flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-xs border border-[#0369A1]"
+                                          title="Kişi başı limiti 1 artır"
+                                          aria-label="Kişi başı limiti 1 artır"
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {settingsLaundryScope === "yurt" && (
+                                  <div className="space-y-3">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                      <div>
+                                        <span className="font-bold text-sm text-[#0F172A] block">
+                                          Yurt Geneli Günlük Toplam Kapasite
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const step = dailyDormLaundryLimit <= 5 ? 1 : 5;
+                                            handleSetDailyDormLaundryLimit(Math.max(0, dailyDormLaundryLimit - step));
+                                          }}
+                                          disabled={dailyDormLaundryLimit <= 0}
+                                          className="w-10 h-10 rounded-xl bg-white hover:bg-[#F1F5F9] border border-[#E2E8F0] text-[#0F172A] font-black text-base flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer active:scale-95 shadow-xs"
+                                          title="Yurt toplam limitini azalt"
+                                          aria-label="Yurt toplam limitini azalt"
+                                        >
+                                          -
+                                        </button>
+                                        <div className="min-w-[120px] text-center px-3 py-1 bg-white border border-[#0284C7]/40 rounded-xl shadow-xs flex flex-col items-center justify-center focus-within:ring-2 focus-within:ring-[#0284C7]/20 focus-within:border-[#0284C7]">
+                                          <div className="flex items-center justify-center gap-1 w-full">
+                                            <input
+                                              type="number"
+                                              min={0}
+                                              max={9999}
+                                              value={dailyDormLaundryLimit === 0 ? "" : dailyDormLaundryLimit}
+                                              placeholder="0"
+                                              onChange={(e) => {
+                                                const val = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
+                                                handleSetDailyDormLaundryLimit(isNaN(val) ? 0 : Math.max(0, val));
+                                              }}
+                                              className="w-16 text-center font-black text-sm text-[#0284C7] bg-transparent focus:outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                              title="Manuel sayı girin (0: Sınırsız)"
+                                            />
+                                            <span className="text-[11px] font-bold text-[#64748B]">Yıkama</span>
+                                          </div>
+                                          <span className="text-[10px] text-[#64748B] font-medium block">
+                                            {dailyDormLaundryLimit === 0 ? "0: Sınırsız" : "Günlük / Yurt"}
+                                          </span>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const step = dailyDormLaundryLimit < 5 ? 1 : 5;
+                                            handleSetDailyDormLaundryLimit(dailyDormLaundryLimit + step);
+                                          }}
+                                          className="w-10 h-10 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white font-black text-base flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-xs border border-[#0369A1]"
+                                          title="Yurt toplam limitini artır"
+                                          aria-label="Yurt toplam limitini artır"
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Mevcut Makineler Listesi */}
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center text-xs">
+                                  <span className="font-bold text-[#0F172A]">Mevcut Makineler ({laundryMachines.length})</span>
+                                </div>
+
+                                <div className="max-h-56 overflow-y-auto space-y-1.5 p-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl">
+                                  {laundryMachines.map((m) => (
+                                    <div
+                                      key={m.id}
+                                      className="p-2.5 bg-white border border-[#E2E8F0] rounded-xl flex items-center justify-between text-xs"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                            m.tur === "kurutma" || m.id.includes("Kurutma")
+                                              ? "bg-[#0284C7]/20 text-[#64748B] border border-[#0284C7]"
+                                              : "bg-[#F1F5F9] text-[#0F172A] border border-[#E2E8F0]"
+                                          }`}
+                                        >
+                                          {m.tur === "kurutma" || m.id.includes("Kurutma") ? "Kurutma" : "Yıkama"}
+                                        </span>
+                                        <div>
+                                          <span className="font-bold text-[#0F172A] block">{m.name}</span>
+                                          <span className="text-[10px] text-[#64748B]">{m.tip}</span>
+                                        </div>
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteMachine(m.id)}
+                                        disabled={laundryMachines.length <= 1}
+                                        className="text-[11px] text-[#64748B] hover:text-rose-600 font-semibold px-2 py-1 rounded cursor-pointer transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                        title="Bu makineyi kaldır"
+                                      >
+                                        Sil
+                                      </button>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
 
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteMachine(m.id)}
-                                disabled={laundryMachines.length <= 1}
-                                className="text-[11px] text-stone-400 hover:text-rose-600 font-semibold px-2 py-1 rounded cursor-pointer transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                title="Bu makineyi kaldır"
-                              >
-                                Sil
-                              </button>
+                              {/* Özel Yeni Makine Tanımlama Formu */}
+                              <form onSubmit={handleAddCustomMachine} className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-3 text-xs">
+                                <span className="font-bold text-[#0F172A] block text-xs">
+                                  + Yeni Makine Ekle
+                                </span>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                  <div>
+                                    <label className="text-[11px] text-[#64748B] block mb-1">Makine Adı:</label>
+                                    <input
+                                      type="text"
+                                      required
+                                      placeholder="Örn: Makine 7"
+                                      value={newCustomMachine.name}
+                                      onChange={(e) => setNewCustomMachine({ ...newCustomMachine, name: e.target.value })}
+                                      className="w-full bg-white border border-[#E2E8F0] rounded-xl p-2 text-[#0F172A] focus:outline-none focus:border-[#0284C7]"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[11px] text-[#64748B] block mb-1">Konum:</label>
+                                    <input
+                                      type="text"
+                                      placeholder="Örn: A Blok, Zemin Kat"
+                                      value={newCustomMachine.blok}
+                                      onChange={(e) => setNewCustomMachine({ ...newCustomMachine, blok: e.target.value })}
+                                      className="w-full bg-white border border-[#E2E8F0] rounded-xl p-2 text-[#0F172A] focus:outline-none focus:border-[#0284C7]"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                  <div>
+                                    <label className="text-[11px] text-[#64748B] block mb-1">Makine Türü:</label>
+                                    <select
+                                      value={newCustomMachine.tur}
+                                      onChange={(e) => setNewCustomMachine({ ...newCustomMachine, tur: e.target.value as any })}
+                                      className="w-full bg-white border border-[#E2E8F0] rounded-xl p-2 text-[#0F172A] focus:outline-none focus:border-[#0284C7] font-medium"
+                                    >
+                                      <option value="yikama">Çamaşır Yıkama Makinesi</option>
+                                      <option value="kurutma">Kurutma Makinesi</option>
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[11px] text-[#64748B] block mb-1">Kapasite (kg) (İsteğe Bağlı):</label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max="50"
+                                      placeholder="Örn: 9"
+                                      value={newCustomMachine.kapasiteKg}
+                                      onChange={(e) => setNewCustomMachine({ ...newCustomMachine, kapasiteKg: e.target.value.replace(/^0+/, "") })}
+                                      className="w-full bg-white border border-[#E2E8F0] rounded-xl p-2 text-[#0F172A] focus:outline-none focus:border-[#0284C7]"
+                                    />
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="submit"
+                                  className="w-full py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl cursor-pointer transition-colors text-xs border border-[#0369A1] shadow-xs"
+                                >
+                                  + Yeni Makineyi Filoya Ekle
+                                </button>
+                              </form>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* 3. ÖZEL YENİ MAKİNE TANIMLAMA FORMU */}
-                      <form onSubmit={handleAddCustomMachine} className="p-3.5 bg-yellow-50/70 border border-yellow-300 rounded-2xl space-y-3 text-xs">
-                        <span className="font-bold text-stone-800 block text-xs">
-                          + İsteğe Bağlı Özel Makine Ekle
-                        </span>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                          <div>
-                            <label className="text-[11px] text-stone-600 block mb-1">Makine Adı / Kodu:</label>
-                            <input
-                              type="text"
-                              required
-                              placeholder="Örn: Makine 5 veya Hızlı Yıkama-1"
-                              value={newCustomMachine.name}
-                              onChange={(e) => setNewCustomMachine({ ...newCustomMachine, name: e.target.value })}
-                              className="w-full bg-white border border-yellow-300 rounded-xl p-2 text-stone-900 focus:outline-none focus:border-yellow-400"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-[11px] text-stone-600 block mb-1">Blok / Konum:</label>
-                            <select
-                              value={newCustomMachine.blok}
-                              onChange={(e) => setNewCustomMachine({ ...newCustomMachine, blok: e.target.value })}
-                              className="w-full bg-white border border-yellow-300 rounded-xl p-2 text-stone-900 focus:outline-none focus:border-yellow-400 font-medium"
-                            >
-                              <option value="A Blok">A Blok</option>
-                              <option value="B Blok">B Blok</option>
-                              <option value="C Blok">C Blok</option>
-                              <option value="Zemin Kat">Zemin Kat</option>
-                              <option value="Merkez">Merkez</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2.5">
-                          <div>
-                            <label className="text-[11px] text-stone-600 block mb-1">Makine Türü:</label>
-                            <select
-                              value={newCustomMachine.tur}
-                              onChange={(e) => setNewCustomMachine({ ...newCustomMachine, tur: e.target.value as any })}
-                              className="w-full bg-white border border-yellow-300 rounded-xl p-2 text-stone-900 focus:outline-none focus:border-yellow-400 font-medium"
-                            >
-                              <option value="yikama">Çamaşır Yıkama Makinesi</option>
-                              <option value="kurutma">Kurutma Makinesi</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="text-[11px] text-stone-600 block mb-1">Kapasite (kg):</label>
-                            <select
-                              value={newCustomMachine.kapasiteKg}
-                              onChange={(e) => setNewCustomMachine({ ...newCustomMachine, kapasiteKg: Number(e.target.value) })}
-                              className="w-full bg-white border border-yellow-300 rounded-xl p-2 text-stone-900 focus:outline-none focus:border-yellow-400 font-medium"
-                            >
-                              <option value={7}>7 kg</option>
-                              <option value={8}>8 kg</option>
-                              <option value={9}>9 kg</option>
-                              <option value={10}>10 kg</option>
-                              <option value={12}>12 kg</option>
-                              <option value={15}>15 kg Endüstriyel</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <button
-                          type="submit"
-                          className="w-full py-2 bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold rounded-xl cursor-pointer transition-all shadow-sm"
-                        >
-                          Özel Makineyi Listeye Ekle
-                        </button>
-                      </form>
-
-                      {/* Modal Footer */}
-                      <div className="flex justify-end pt-2 border-t border-yellow-200">
-                        <button
-                          type="button"
-                          onClick={() => setIsManageMachinesModalOpen(false)}
-                          className="px-6 py-2.5 rounded-xl bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold text-xs cursor-pointer transition-all shadow-sm"
-                        >
-                          Tamamla ve Kapat
-                        </button>
-                      </div>
-                    </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
-                );
-              })()}
 
+                  {/* TEMA AYARLARI */}
+                  <div className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xs space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-[#F1F5F9] text-[#0284C7]">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                        </svg>
+                      </div>
+                      <h3 className="text-sm sm:text-base font-black text-[#0F172A]">
+                        Tema
+                      </h3>
+                    </div>
 
-              {/* ======================================================== */}
-              {/* MODAL: YENİ ARIZA KAYDI */}
-              {/* ======================================================== */}
-              {isAddMaintenanceModalOpen && (
-                <div className="fixed inset-0 z-50 bg-stone-900/40  flex items-center justify-center p-4">
-                  <div className="bg-white border border-yellow-200 rounded-3xl p-6 w-full max-w-md shadow-sm space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-bold text-stone-900">Yeni Arıza Kaydı</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {/* Aydınlık Mod Seçeneği */}
                       <button
-                        onClick={() => setIsAddMaintenanceModalOpen(false)}
-                        className="text-stone-600 hover:text-stone-950 text-sm cursor-pointer"
+                        type="button"
+                        onClick={() => selectTheme("light", true)}
+                        className={`p-3 rounded-xl sm:rounded-2xl border text-left transition-colors cursor-pointer flex items-center justify-between gap-3 min-h-[48px] active:scale-[0.99] ${
+                          theme === "light"
+                            ? "border-[#0284C7] bg-[#F1F5F9] dark:bg-[#162032]"
+                            : "border-[#E2E8F0] dark:border-[#334155] bg-[#F8FAFC] dark:bg-[#0F172A] hover:border-[#CBD5E1] dark:hover:border-[#475569] hover:bg-white dark:hover:bg-[#1E293B]"
+                        }`}
                       >
-                        
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                            theme === "light"
+                              ? "bg-[#0284C7] text-white"
+                              : "bg-white dark:bg-[#1E293B] text-[#64748B] dark:text-[#94A3B8] border border-[#E2E8F0] dark:border-[#334155]"
+                          }`}>
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="5" />
+                              <line x1="12" y1="1" x2="12" y2="3" />
+                              <line x1="12" y1="21" x2="12" y2="23" />
+                              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                              <line x1="1" y1="12" x2="3" y2="12" />
+                              <line x1="21" y1="12" x2="23" y2="12" />
+                              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                            </svg>
+                          </div>
+                          <span className="text-xs sm:text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">Aydınlık Mod</span>
+                        </div>
+
+                        {theme === "light" ? (
+                          <span className="w-5 h-5 rounded-full bg-[#0284C7] text-white flex items-center justify-center shrink-0">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </span>
+                        ) : (
+                          <span className="w-5 h-5 rounded-full border-2 border-[#CBD5E1] dark:border-[#475569] shrink-0" />
+                        )}
+                      </button>
+
+                      {/* Karanlık Mod Seçeneği */}
+                      <button
+                        type="button"
+                        onClick={() => selectTheme("dark", true)}
+                        className={`p-3 rounded-xl sm:rounded-2xl border text-left transition-colors cursor-pointer flex items-center justify-between gap-3 min-h-[48px] active:scale-[0.99] ${
+                          theme === "dark"
+                            ? "border-[#0284C7] bg-[#F1F5F9] dark:bg-[#162032]"
+                            : "border-[#E2E8F0] dark:border-[#334155] bg-[#F8FAFC] dark:bg-[#0F172A] hover:border-[#CBD5E1] dark:hover:border-[#475569] hover:bg-white dark:hover:bg-[#1E293B]"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                            theme === "dark"
+                              ? "bg-[#0284C7] text-white"
+                              : "bg-white dark:bg-[#1E293B] text-[#64748B] dark:text-[#94A3B8] border border-[#E2E8F0] dark:border-[#334155]"
+                          }`}>
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                            </svg>
+                          </div>
+                          <span className="text-xs sm:text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">Karanlık Mod</span>
+                        </div>
+
+                        {theme === "dark" ? (
+                          <span className="w-5 h-5 rounded-full bg-[#0284C7] text-white flex items-center justify-center shrink-0">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </span>
+                        ) : (
+                          <span className="w-5 h-5 rounded-full border-2 border-[#CBD5E1] dark:border-[#475569] shrink-0" />
+                        )}
                       </button>
                     </div>
-
-                    <form onSubmit={handleAddMaintenance} className="space-y-3 text-xs">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-stone-500 block mb-1">Oda No</label>
-                          <input
-                            type="text"
-                            required
-                            value={newMaintenance.odaNo}
-                            onChange={(e) => setNewMaintenance({ ...newMaintenance, odaNo: e.target.value })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-stone-500 block mb-1">Kategori</label>
-                          <select
-                            value={newMaintenance.kategori}
-                            onChange={(e) =>
-                              setNewMaintenance({ ...newMaintenance, kategori: e.target.value as any })
-                            }
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          >
-                            <option value="Tesisat">Tesisat</option>
-                            <option value="Elektrik">Elektrik</option>
-                            <option value="İnternet">İnternet</option>
-                            <option value="Mobilya">Mobilya</option>
-                            <option value="Diğer">Diğer</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-stone-500 block mb-1">Arıza Başlığı / Açıklaması *</label>
-                        <input
-                          type="text"
-                          required
-                          value={newMaintenance.baslik}
-                          onChange={(e) => setNewMaintenance({ ...newMaintenance, baslik: e.target.value })}
-                          placeholder="Lavabo bataryası damlatıyor vb."
-                          className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-stone-500 block mb-1">Öncelik Derecesi</label>
-                          <select
-                            value={newMaintenance.oncelik}
-                            onChange={(e) =>
-                              setNewMaintenance({ ...newMaintenance, oncelik: e.target.value as any })
-                            }
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          >
-                            <option value="Düşük">Düşük</option>
-                            <option value="Orta">Orta</option>
-                            <option value="Acil">Acil</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-stone-500 block mb-1">Bildiren Kişi</label>
-                          <input
-                            type="text"
-                            value={newMaintenance.bildiren}
-                            onChange={(e) => setNewMaintenance({ ...newMaintenance, bildiren: e.target.value })}
-                            className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end gap-2 pt-3">
-                        <button
-                          type="button"
-                          onClick={() => setIsAddMaintenanceModalOpen(false)}
-                          className="px-4 py-2 rounded-xl bg-yellow-100/70 text-stone-600 cursor-pointer"
-                        >
-                          İptal
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-6 py-2 rounded-xl bg-amber-600 hover:bg-yellow-500 text-white font-bold cursor-pointer"
-                        >
-                          Kaydı Aç
-                        </button>
-                      </div>
-                    </form>
                   </div>
+
+                  {/* Çıkış Yap Butonu */}
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full py-3 px-4 rounded-2xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 font-bold text-xs sm:text-sm border border-rose-200 dark:border-rose-900/50 transition-colors cursor-pointer text-center min-h-[44px]"
+                  >
+                    Çıkış Yap
+                  </button>
                 </div>
               )}
+            </div>
 
-              {/* ======================================================== */}
-              {/* MODAL: YENİ DUYURU */}
-              {/* ======================================================== */}
-              {isAddAnnouncementModalOpen && (
-                <div className="fixed inset-0 z-50 bg-stone-900/40  flex items-center justify-center p-4">
-                  <div className="bg-white border border-yellow-200 rounded-3xl p-6 w-full max-w-md shadow-sm space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-bold text-stone-900">Yeni Duyuru Yayınla</h3>
-                      <button
-                        onClick={() => setIsAddAnnouncementModalOpen(false)}
-                        className="text-stone-600 hover:text-stone-950 text-sm cursor-pointer"
-                      >
-                        
-                      </button>
-                    </div>
+              {/* MODALLAR (MODÜLER BİLEŞENLER) */}
+              <AddRoomModal
+                isOpen={isAddRoomModalOpen}
+                newRoom={newRoom}
+                setNewRoom={setNewRoom}
+                onClose={() => setIsAddRoomModalOpen(false)}
+                onSubmit={handleAddRoom}
+              />
 
-                    <form onSubmit={handleAddAnnouncement} className="space-y-3 text-xs">
-                      <div>
-                        <label className="text-stone-500 block mb-1">Duyuru Başlığı *</label>
-                        <input
-                          type="text"
-                          required
-                          value={newAnnouncement.baslik}
-                          onChange={(e) => setNewAnnouncement({ ...newAnnouncement, baslik: e.target.value })}
-                          placeholder="Duyuru başlığı..."
-                          className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                        />
-                      </div>
+              <EditRoomModal
+                editingRoom={editingRoom}
+                setEditingRoom={setEditingRoom}
+                onSubmit={handleUpdateRoom}
+              />
 
-                      <div>
-                        <label className="text-stone-500 block mb-1">Öncelik Derecesi</label>
-                        <select
-                          value={newAnnouncement.oncelik}
-                          onChange={(e) =>
-                            setNewAnnouncement({ ...newAnnouncement, oncelik: e.target.value as any })
-                          }
-                          className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                        >
-                          <option value="Normal">Normal</option>
-                          <option value="Önemli">Önemli</option>
-                          <option value="Acil">Acil</option>
-                        </select>
-                      </div>
+              <AddStudentModal
+                isOpen={isAddStudentModalOpen}
+                newStudent={newStudent}
+                setNewStudent={setNewStudent}
+                onClose={() => setIsAddStudentModalOpen(false)}
+                onSubmit={handleAddStudent}
+              />
 
-                      <div>
-                        <label className="text-stone-500 block mb-1">Duyuru Metni *</label>
-                        <textarea
-                          rows={4}
-                          required
-                          value={newAnnouncement.icerik}
-                          onChange={(e) => setNewAnnouncement({ ...newAnnouncement, icerik: e.target.value })}
-                          placeholder="Duyuru içeriği..."
-                          className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                        />
-                      </div>
+              <EditStudentModal
+                editingStudent={editingStudent}
+                setEditingStudent={setEditingStudent}
+                onSubmit={handleEditStudent}
+              />
 
-                      <div className="flex justify-end gap-2 pt-3">
-                        <button
-                          type="button"
-                          onClick={() => setIsAddAnnouncementModalOpen(false)}
-                          className="px-4 py-2 rounded-xl bg-yellow-100/70 text-stone-600 cursor-pointer"
-                        >
-                          İptal
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-6 py-2 rounded-xl bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold font-bold cursor-pointer"
-                        >
-                          Yayınla
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
+              <StudentDetailModal
+                student={selectedStudentForDetail}
+                onClose={() => setSelectedStudentForDetail(null)}
+                onEdit={(student) => {
+                  setSelectedStudentForDetail(null);
+                  setEditingStudent(student);
+                }}
+              />
 
-              {/* ======================================================== */}
-              {/* MODAL: ÖĞRENCİ DETAY KARTI */}
-              {/* ======================================================== */}
-              {selectedStudentForDetail && (
-                <div className="fixed inset-0 z-50 bg-stone-900/40  flex items-center justify-center p-4">
-                  <div className="bg-white border border-yellow-200 rounded-3xl p-6 w-full max-w-md shadow-sm space-y-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-yellow-100 text-stone-800 border border-yellow-300 text-stone-800 font-medium">
-                          Öğrenci Kütük Kartı
-                        </span>
-                        <h3 className="text-xl font-black text-stone-900 mt-1">
-                          {selectedStudentForDetail.adSoyad}
-                        </h3>
-                      </div>
-                      <button
-                        onClick={() => setSelectedStudentForDetail(null)}
-                        className="text-stone-600 hover:text-stone-950 text-sm cursor-pointer"
-                      >
-                        
-                      </button>
-                    </div>
+              <AddLaundryModal
+                isOpen={isAddLaundryModalOpen}
+                laundryMachines={laundryMachines}
+                newLaundry={newLaundry}
+                setNewLaundry={setNewLaundry}
+                onClose={() => setIsAddLaundryModalOpen(false)}
+                onSubmit={handleSaveLaundry}
+              />
 
-                    <div className="space-y-3 text-xs bg-yellow-50 p-4 rounded-2xl border border-yellow-200">
-                      <div className="flex justify-between py-1 border-b border-yellow-200">
-                        <span className="text-stone-500">Oda & Yatak:</span>
-                        <span className="font-bold text-stone-800 font-medium">
-                          Oda {selectedStudentForDetail.odaNo} / Yatak {selectedStudentForDetail.yatakNo}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-yellow-200">
-                        <span className="text-stone-500">Öğrenci Telefonu:</span>
-                        <a
-                          href={`tel:${selectedStudentForDetail.telefon}`}
-                          className="font-bold text-emerald-400 hover:underline"
-                        >
-                          {selectedStudentForDetail.telefon}
-                        </a>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-yellow-200">
-                        <span className="text-stone-500">E-Posta:</span>
-                        <span className="text-stone-700">{selectedStudentForDetail.eposta}</span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-yellow-200">
-                        <span className="text-stone-500">Veli Bilgisi:</span>
-                        <span className="font-bold text-stone-800">{selectedStudentForDetail.veliAd}</span>
-                      </div>
-                      <div className="flex justify-between py-1 border-b border-yellow-200">
-                        <span className="text-stone-500">Veli Telefonu:</span>
-                        <a
-                          href={`tel:${selectedStudentForDetail.veliTel}`}
-                          className="font-bold text-emerald-400 hover:underline"
-                        >
-                          {selectedStudentForDetail.veliTel}
-                        </a>
-                      </div>
-                      <div className="flex justify-between py-1">
-                        <span className="text-stone-500">Kayıt Tarihi:</span>
-                        <span className="text-stone-600">{selectedStudentForDetail.kayitTarihi}</span>
-                      </div>
-                    </div>
+              <ManageMachinesModal
+                isOpen={isManageMachinesModalOpen}
+                laundryMachines={laundryMachines}
+                newCustomMachine={newCustomMachine}
+                setNewCustomMachine={setNewCustomMachine}
+                onQuickSetCount={handleQuickSetCount}
+                onDeleteMachine={handleDeleteMachine}
+                onAddCustomMachine={handleAddCustomMachine}
+                dailyLaundryLimit={dailyLaundryLimit}
+                onSetDailyLaundryLimit={handleSetDailyLaundryLimit}
+                dailyDormLaundryLimit={dailyDormLaundryLimit}
+                onSetDailyDormLaundryLimit={handleSetDailyDormLaundryLimit}
+                onClose={() => setIsManageMachinesModalOpen(false)}
+              />
 
-                    <div className="flex justify-end gap-2 pt-2">
-                      <button
-                        onClick={() => {
-                          const target = selectedStudentForDetail;
-                          setSelectedStudentForDetail(null);
-                          setEditingStudent(target);
-                        }}
-                        className="flex-1 py-2.5 rounded-xl bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold font-bold text-xs cursor-pointer"
-                      >
-                        Bilgileri / Odayı Düzenle
-                      </button>
-                      <button
-                        onClick={() => setSelectedStudentForDetail(null)}
-                        className="py-2.5 px-4 rounded-xl bg-yellow-100/70 hover:bg-yellow-100 text-stone-700 font-bold text-xs cursor-pointer"
-                      >
-                        Kapat
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <AddMaintenanceModal
+                isOpen={isAddMaintenanceModalOpen}
+                newMaintenance={newMaintenance}
+                setNewMaintenance={setNewMaintenance}
+                onClose={() => setIsAddMaintenanceModalOpen(false)}
+                onSubmit={handleAddMaintenance}
+              />
+
+              <AddAnnouncementModal
+                isOpen={isAddAnnouncementModalOpen}
+                newAnnouncement={newAnnouncement}
+                setNewAnnouncement={setNewAnnouncement}
+                onClose={() => setIsAddAnnouncementModalOpen(false)}
+                onSubmit={handleAddAnnouncement}
+              />
             </div>
           );
         })()}
@@ -4787,614 +6017,193 @@ export default function Home() {
         {/* ========================================================= */}
         {/* C. ÖĞRENCİ PANELİ */}
         {/* ========================================================= */}
+        {/* ========================================================= */}
+        {/* C. ÖĞRENCİ PANELİ */}
+        {/* ========================================================= */}
         {currentUser.role === "ogrenci" && (
-          <div className="space-y-6">
-            <div className="bg-white border border-[#E8DCCF] p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <h2 className="text-2xl font-black text-[#3D110B]">Hoş geldin, {currentUser.name}!</h2>
-                <p className="text-sm text-[#855342] mt-1">
-                  Kayıtlı Yurt: <strong className="text-[#3D110B]">{currentUser.selectedYurtName || yurtlar[0]?.ad}</strong> • Oda:{" "}
-                  <strong className="text-[#662B16]">B-305</strong> • Yatak:{" "}
-                  <strong className="text-[#662B16]">1</strong>
-                </p>
-              </div>
-              <span className="px-3.5 py-1.5 rounded-xl bg-[#F4ECE1] text-xs font-bold text-[#662B16] border border-[#E8DCCF]">
-                Giriş Turnikesi: Aktif
-              </span>
-            </div>
+          <StudentPortalView
+            currentUser={currentUser}
+            yurtSettings={yurtSettings}
+            yurtlar={yurtlar}
+            dailyMenu={dailyMenu}
+            announcements={announcements}
+            maintenanceTickets={maintenanceTickets}
+            rooms={rooms}
+            students={students}
+            laundrySlots={laundrySlots}
+            laundryMachines={laundryMachines}
+            onAddLaundrySlot={(slot) => {
+              const { formattedRange } = parseSlotMinutes(slot.saatAraligi);
+              const dynamicStatus = getDynamicSlotStatus({
+                tarih: slot.tarih,
+                saatAraligi: formattedRange,
+                durum: slot.durum,
+              });
+              const normalizedSlot = { ...slot, saatAraligi: formattedRange, durum: dynamicStatus };
 
-            {/* Öğrenci Yemekhane Menüsü (Yönetici Tercihlerine Göre Canlı Yansır) */}
-            <div className="bg-white border border-[#E8DCCF] p-6 rounded-3xl space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-black text-[#3D110B] flex items-center gap-2">
-                    Günün Yemekhane Menüsü
-                  </h3>
-                  <p className="text-xs text-[#855342] mt-0.5">
-                    Yurt idaresi tarafından yayınlanan güncel menü
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[11px] font-bold px-3 py-1 rounded-xl bg-[#F4ECE1] text-[#99501B] border border-[#D1841A]/30">
-                    {dailyMenu.gunTipi === "haftasonu" ? "Hafta Sonu Tarifesi" : dailyMenu.gunTipi === "ozelgun" ? "Bayram / Özel Gün" : "Hafta İçi Tarifesi"}
-                  </span>
-                  <span className="text-[11px] font-semibold px-3 py-1 rounded-xl bg-[#FAF7F2] text-[#662B16] border border-[#E8DCCF]">
-                    {dailyMenu.gorunumModu === "birlikte" ? "Kahvaltı & Akşam Yemeği" : (dailyMenu.aktifOgun === "kahvalti" ? "Sabah Servisi" : "Akşam Servisi")}
-                  </span>
-                </div>
-              </div>
-
-              {dailyMenu.gorunumModu === "birlikte" ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Sabah Kahvaltısı */}
-                  <div className="p-4 bg-yellow-50/70 border border-yellow-300/80 rounded-2xl space-y-2.5 shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-100 border border-yellow-300">
-                         Sabah Kahvaltısı
-                      </span>
-                      <span className="text-xs font-semibold text-stone-600 bg-white px-2.5 py-0.5 rounded-lg border border-yellow-200">
-                        {dailyMenu.kahvaltiSaat}
-                      </span>
-                    </div>
-                    <p className="text-xs text-stone-700 leading-relaxed font-medium">
-                      {dailyMenu.kahvalti}
-                    </p>
-                    <div className="text-[11px] text-stone-500 pt-2 border-t border-yellow-200 flex justify-between items-center">
-                      {dailyMenu.kaloriGoster ? (
-                        <span>Tahmini Kalori: <strong className="text-amber-800 font-bold">{dailyMenu.kahvaltiKalori}</strong></span>
-                      ) : (
-                        <span className="text-stone-500 text-[11px]">Günün Servisi</span>
-                      )}
-                      <span className="text-emerald-600 font-bold text-[11px] flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Servis Hazır
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Akşam Yemeği */}
-                  <div className="p-4 bg-yellow-50/70 border border-yellow-300/80 rounded-2xl space-y-2.5 shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-100 border border-yellow-300">
-                         Akşam Yemeği
-                      </span>
-                      <span className="text-xs font-semibold text-stone-600 bg-white px-2.5 py-0.5 rounded-lg border border-yellow-200">
-                        {dailyMenu.aksamSaat}
-                      </span>
-                    </div>
-                    <p className="text-xs text-stone-700 leading-relaxed font-medium">
-                      {dailyMenu.aksam}
-                    </p>
-                    <div className="text-[11px] text-stone-500 pt-2 border-t border-yellow-200 flex justify-between items-center">
-                      {dailyMenu.kaloriGoster ? (
-                        <span>Tahmini Kalori: <strong className="text-amber-800 font-bold">{dailyMenu.aksamKalori}</strong></span>
-                      ) : (
-                        <span className="text-stone-500 text-[11px]">Günün Servisi</span>
-                      )}
-                      <span className="text-emerald-600 font-bold text-[11px] flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Sıcak Servis
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* Tek Öğün Görünümü */
-                dailyMenu.aktifOgun === "kahvalti" ? (
-                  <div className="p-4 bg-yellow-50/70 border border-yellow-300/80 rounded-2xl space-y-2.5 shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-100 border border-yellow-300">
-                         Sabah Kahvaltısı Servisi
-                      </span>
-                      <span className="text-xs font-semibold text-stone-600 bg-white px-2.5 py-0.5 rounded-lg border border-yellow-200">
-                        {dailyMenu.kahvaltiSaat}
-                      </span>
-                    </div>
-                    <p className="text-xs text-stone-700 leading-relaxed font-medium">
-                      {dailyMenu.kahvalti}
-                    </p>
-                    <div className="text-[11px] text-stone-500 pt-2 border-t border-yellow-200 flex justify-between items-center">
-                      {dailyMenu.kaloriGoster ? (
-                        <span>Tahmini Kalori: <strong className="text-amber-800 font-bold">{dailyMenu.kahvaltiKalori}</strong></span>
-                      ) : (
-                        <span className="text-stone-500 text-[11px]">Günün Servisi</span>
-                      )}
-                      <span className="text-emerald-600 font-bold text-[11px] flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Servis Hazır
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-yellow-50/70 border border-yellow-300/80 rounded-2xl space-y-2.5 shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-100 border border-yellow-300">
-                         Akşam Yemeği Servisi
-                      </span>
-                      <span className="text-xs font-semibold text-stone-600 bg-white px-2.5 py-0.5 rounded-lg border border-yellow-200">
-                        {dailyMenu.aksamSaat}
-                      </span>
-                    </div>
-                    <p className="text-xs text-stone-700 leading-relaxed font-medium">
-                      {dailyMenu.aksam}
-                    </p>
-                    <div className="text-[11px] text-stone-500 pt-2 border-t border-yellow-200 flex justify-between items-center">
-                      {dailyMenu.kaloriGoster ? (
-                        <span>Tahmini Kalori: <strong className="text-amber-800 font-bold">{dailyMenu.aksamKalori}</strong></span>
-                      ) : (
-                        <span className="text-stone-500 text-[11px]">Günün Servisi</span>
-                      )}
-                      <span className="text-emerald-600 font-bold text-[11px] flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Sıcak Servis
-                      </span>
-                    </div>
-                  </div>
-                )
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Yurt Duyuruları */}
-              <div className="bg-white p-6 rounded-3xl border border-yellow-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
-                     Güncel Yurt Duyuruları
-                  </h3>
-                  <span className="text-[10px] text-stone-500">Pano</span>
-                </div>
-                <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                  {announcements.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-stone-500">
-                      Aktif duyuru bulunmamaktadır.
-                    </div>
-                  ) : (
-                    announcements.map((anc) => (
-                      <div
-                        key={anc.id}
-                        className="p-3.5 rounded-2xl bg-yellow-50 border border-yellow-200 space-y-1"
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="font-bold text-xs text-stone-800">{anc.baslik}</span>
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                              anc.oncelik === "Acil"
-                                ? "bg-rose-500/20 text-rose-400"
-                                : anc.oncelik === "Önemli"
-                                ? "bg-yellow-500/20 text-yellow-600"
-                                : "bg-yellow-100 text-stone-800 border border-yellow-300 text-stone-800 font-medium"
-                            }`}
-                          >
-                            {anc.oncelik}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-stone-600 leading-relaxed">{anc.icerik}</p>
-                        <div className="text-[10px] text-slate-500">{anc.tarih}</div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Arıza & Teknik Destek Bildirimi */}
-              <div className="bg-white p-6 rounded-3xl border border-yellow-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
-                     Arıza & Destek Bildirimi
-                  </h3>
-                  <span className="text-[10px] text-stone-500">Oda B-305</span>
-                </div>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const form = e.target as HTMLFormElement;
-                    const baslikInput = form.elements.namedItem("arizaBaslik") as HTMLInputElement;
-                    const katInput = form.elements.namedItem("arizaKat") as HTMLSelectElement;
-                    if (!baslikInput.value.trim()) return;
-
-                    const newTicket: MaintenanceTicket = {
-                      id: "mnt-" + Date.now(),
-                      odaNo: "305",
-                      baslik: baslikInput.value.trim(),
-                      kategori: (katInput.value as any) || "Tesisat",
-                      oncelik: "Orta",
-                      durum: "Açık",
-                      bildiren: currentUser?.name || "Öğrenci",
-                      tarih: new Date().toLocaleDateString("tr-TR"),
-                    };
-
-                    const updated = [newTicket, ...maintenanceTickets];
-                    setMaintenanceTickets(updated);
-                    if (typeof window !== "undefined") {
-                      localStorage.setItem("yurtify_maintenance", JSON.stringify(updated));
+              let currentSlots = laundrySlots;
+              if (typeof window !== "undefined") {
+                try {
+                  const raw = localStorage.getItem("yurtify_laundry") || localStorage.getItem("yurtify_laundry_slots");
+                  if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) currentSlots = parsed;
+                  }
+                } catch {}
+              }
+              const updated = [normalizedSlot, ...currentSlots.filter((s) => s.id !== normalizedSlot.id)];
+              const { updatedSlots } = syncSlotsWithCurrentTime(updated);
+              setLaundrySlots(updatedSlots);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("yurtify_laundry", JSON.stringify(updatedSlots));
+                localStorage.setItem("yurtify_laundry_slots", JSON.stringify(updatedSlots));
+              }
+            }}
+            onCancelLaundrySlot={(slotId) => {
+              let currentSlots = laundrySlots;
+              if (typeof window !== "undefined") {
+                try {
+                  const raw = localStorage.getItem("yurtify_laundry") || localStorage.getItem("yurtify_laundry_slots");
+                  if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) currentSlots = parsed;
+                  }
+                } catch {}
+              }
+              const updated = currentSlots.filter((s) => s.id !== slotId);
+              setLaundrySlots(updated);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("yurtify_laundry", JSON.stringify(updated));
+                localStorage.setItem("yurtify_laundry_slots", JSON.stringify(updated));
+              }
+            }}
+            onUpdateStudentPassword={(studentName, newPass) => {
+              const updated = students.map((s) =>
+                s.adSoyad.trim().toLowerCase() === studentName.trim().toLowerCase()
+                  ? { ...s, sifre: newPass }
+                  : s
+              );
+              setStudents(updated);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("yurtify_students", JSON.stringify(updated));
+              }
+            }}
+            onUpdateStudentProfile={(studentName, updates) => {
+              const updated = students.map((s) =>
+                s.adSoyad.trim().toLowerCase() === studentName.trim().toLowerCase()
+                  ? {
+                      ...s,
+                      ...(updates.kullaniciAdi ? { kullaniciAdi: updates.kullaniciAdi.trim() } : {}),
+                      ...(updates.eposta ? { eposta: updates.eposta.trim() } : {}),
+                      ...(updates.sifre ? { sifre: updates.sifre } : {}),
                     }
-                    baslikInput.value = "";
-                    showToast("Arıza bildiriminiz idareye iletildi!");
-                  }}
-                  className="space-y-3 text-xs"
-                >
-                  <div>
-                    <label className="text-stone-500 block mb-1">Kategori</label>
-                    <select
-                      name="arizaKat"
-                      defaultValue="Tesisat"
-                      className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-stone-900 bg-white focus:outline-none focus:border-yellow-300"
-                    >
-                      <option value="Tesisat">Sıhhi Tesisat / Banyo</option>
-                      <option value="Elektrik">Elektrik / Aydınlatma</option>
-                      <option value="İnternet">Wi-Fi / İnternet</option>
-                      <option value="Mobilya">Mobilya / Dolap / Yatak</option>
-                      <option value="Diğer">Diğer Konular</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-stone-500 block mb-1">Arıza Açıklaması</label>
-                    <textarea
-                      name="arizaBaslik"
-                      required
-                      rows={3}
-                      placeholder="Örn: Odamızdaki duş başlığı su kaçırıyor..."
-                      className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-3 text-stone-900 bg-white placeholder-stone-400 focus:outline-none focus:border-yellow-300"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="w-full py-2.5 bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold font-bold rounded-xl cursor-pointer transition-all"
-                  >
-                    Talebi İdareye İlet
-                  </button>
-                </form>
-              </div>
-            </div>
-          </div>
+                  : s
+              );
+              setStudents(updated);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("yurtify_students", JSON.stringify(updated));
+              }
+            }}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onSelectTheme={(selectedTheme) => selectTheme(selectedTheme, true)}
+            onLogout={handleLogout}
+            onAddMaintenanceTicket={(ticket) => {
+              let currentMnt = maintenanceTickets;
+              if (typeof window !== "undefined") {
+                try {
+                  const raw = localStorage.getItem("yurtify_maintenance");
+                  if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) currentMnt = parsed;
+                  }
+                } catch {}
+              }
+              const updated = [ticket, ...currentMnt.filter((t) => t.id !== ticket.id)];
+              setMaintenanceTickets(updated);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("yurtify_maintenance", JSON.stringify(updated));
+              }
+            }}
+            showToast={showToast}
+          />
         )}
       </main>
 
-      <footer className="mt-auto border-t border-yellow-200 bg-yellow-50 px-6 py-4 text-center text-xs text-slate-500">
-        Yurtify Çoklu Yurt Yönetim ve Otomasyon Sistemi
+      <footer className="mt-auto border-t border-[#E2E8F0] bg-[#F8FAFC] px-6 py-3 mb-16 md:mb-0 text-center text-xs text-[#64748B]">
+        Yurtify
       </footer>
 
       {/* ======================================================== */}
-      {/* ZAMAN SEÇİCİ (WHEEL / SCROLL TIME PICKER) MODALI */}
+      {/* MOBİL ALT GEZİNME ÇUBUĞU (BOTTOM NAVIGATION BAR) */}
       {/* ======================================================== */}
-      {timePickerModal.isOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/40  animate-in fade-in duration-200"
-          onClick={() => setTimePickerModal((prev) => ({ ...prev, isOpen: false }))}
+      {currentUser.role === "yonetici" && (
+        <nav
+          className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#E2E8F0] shadow-lg px-2 py-1 pb-[max(0.4rem,env(safe-area-inset-bottom))]"
+          aria-label="Mobil Alt Menü"
         >
-          <div
-            className="bg-white border border-yellow-300 rounded-3xl max-w-lg w-full p-6 shadow-sm space-y-5 text-white animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Başlığı */}
-            <div className="flex items-center justify-between pb-3 border-b border-yellow-200">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-yellow-100 text-yellow-700 border border-yellow-300 flex items-center justify-center text-lg">
+          <div className="flex items-center justify-around gap-0.5 max-w-lg mx-auto">
+            {managerTabItems.map((tab) => {
+              const isActive = managerTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setManagerTab(tab.id as any)}
+                  className={`flex flex-col items-center justify-center flex-1 py-1.5 px-0.5 rounded-xl transition-all cursor-pointer relative min-h-[44px] ${
+                    isActive
+                      ? "text-[#0284C7] font-bold bg-[#F1F5F9]"
+                      : "text-[#64748B] hover:text-[#0F172A] font-medium"
+                  }`}
+                >
+                  <div className="relative">
+                    <span className={`w-5 h-5 flex items-center justify-center ${isActive ? "text-[#0284C7]" : "text-[#64748B]"}`}>
+                      {tab.icon}
+                    </span>
+                    {tab.id === "arizalar" && openTickets > 0 && (
+                      <span className="absolute -top-1 -right-2.5 w-4 h-4 rounded-full bg-rose-600 text-white text-[9px] font-black flex items-center justify-center shadow-xs">
+                        {openTickets}
+                      </span>
+                    )}
                   </div>
-                <div>
-                  <h4 className="font-bold text-sm text-stone-900 flex items-center gap-1.5">
-                    Servis Saati Aralığını Ayarla
-                  </h4>
-                  <p className="text-[11px] text-stone-500 font-medium">
-                    {timePickerModal.title}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTimePickerModal((prev) => ({ ...prev, isOpen: false }))}
-                className="w-8 h-8 rounded-full bg-yellow-100/70 hover:bg-yellow-100 text-stone-600 hover:text-stone-950 flex items-center justify-center text-xs transition-colors cursor-pointer"
-              >
-                
-              </button>
-            </div>
-
-            {/* Hızlı Hazır Seçenekler */}
-            <div>
-              <span className="text-[11px] font-semibold text-stone-500 block mb-1.5 flex items-center gap-1">
-                 Hızlı Şablonlar:
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {(timePickerModal.field === "kahvalti"
-                  ? [
-                      { label: "07:00 - 09:30", sH: 7, sM: 0, eH: 9, eM: 30 },
-                      { label: "07:30 - 10:00", sH: 7, sM: 30, eH: 10, eM: 0 },
-                      { label: "08:00 - 10:30", sH: 8, sM: 0, eH: 10, eM: 30 },
-                      { label: "08:30 - 11:30", sH: 8, sM: 30, eH: 11, eM: 30 },
-                      { label: "09:00 - 12:00", sH: 9, sM: 0, eH: 12, eM: 0 },
-                    ]
-                  : [
-                      { label: "17:30 - 20:00", sH: 17, sM: 30, eH: 20, eM: 0 },
-                      { label: "18:00 - 20:30", sH: 18, sM: 0, eH: 20, eM: 30 },
-                      { label: "18:30 - 21:00", sH: 18, sM: 30, eH: 21, eM: 0 },
-                      { label: "19:00 - 21:30", sH: 19, sM: 0, eH: 21, eM: 30 },
-                      { label: "19:30 - 22:00", sH: 19, sM: 30, eH: 22, eM: 0 },
-                    ]
-                ).map((item) => (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={() => {
-                      setTimePickerModal((prev) => ({
-                        ...prev,
-                        startHour: item.sH,
-                        startMinute: item.sM,
-                        endHour: item.eH,
-                        endMinute: item.eM,
-                      }));
-                      setTimeout(() => {
-                        document.getElementById(`wheel-sh-${item.sH}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                        document.getElementById(`wheel-sm-${item.sM}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                        document.getElementById(`wheel-eh-${item.eH}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                        document.getElementById(`wheel-em-${item.eM}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                      }, 50);
-                    }}
-                    className="px-2.5 py-1 rounded-xl text-xs font-mono font-medium bg-yellow-50 border border-yellow-200 text-stone-600 hover:border-yellow-300 hover:text-stone-800 font-medium hover:bg-indigo-950/20 transition-all cursor-pointer"
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Kaydırmalı Saat Çarkları (Başlangıç ve Bitiş) */}
-            <div className="grid grid-cols-2 gap-3.5 p-3.5 bg-yellow-50 rounded-2xl border border-yellow-200">
-              {/* Başlangıç Saati Çarkı */}
-              <div className="flex flex-col items-center p-3 rounded-2xl bg-yellow-50 border border-yellow-300/30">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <span className="w-2 h-2 rounded-full bg-yellow-400 text-stone-900" />
-                  <span className="text-xs font-bold text-yellow-600">Başlangıç Saati</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* Başlangıç Saat Sütunu */}
-                  <div className="flex flex-col items-center">
-                    <span className="text-[10px] uppercase font-bold text-stone-500 mb-1">Saat</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextH = (timePickerModal.startHour + 23) % 24;
-                        setTimePickerModal((p) => ({ ...p, startHour: nextH }));
-                        document.getElementById(`wheel-sh-${nextH}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                      }}
-                      className="text-stone-600 hover:text-stone-950 p-0.5 text-xs transition-colors cursor-pointer"
-                      title="Bir saat geri"
-                    >
-                      ▲
-                    </button>
-                    <div className="h-32 w-14 overflow-y-auto scroll-smooth snap-y snap-mandatory bg-yellow-50 border border-yellow-200 rounded-xl py-12 flex flex-col items-center text-center scrollbar-none">
-                      {Array.from({ length: 24 }, (_, i) => i).map((h) => (
-                        <div
-                          key={`sh-${h}`}
-                          id={`wheel-sh-${h}`}
-                          onClick={() => {
-                            setTimePickerModal((p) => ({ ...p, startHour: h }));
-                            document.getElementById(`wheel-sh-${h}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                          }}
-                          className={`snap-center h-8 min-h-[32px] flex items-center justify-center font-mono cursor-pointer transition-all text-sm w-full select-none ${
-                            timePickerModal.startHour === h
-                              ? "font-bold text-yellow-600 text-base bg-yellow-500/20 rounded-lg scale-110 shadow-sm"
-                              : "text-slate-500 hover:text-stone-600"
-                          }`}
-                        >
-                          {String(h).padStart(2, "0")}
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextH = (timePickerModal.startHour + 1) % 24;
-                        setTimePickerModal((p) => ({ ...p, startHour: nextH }));
-                        document.getElementById(`wheel-sh-${nextH}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                      }}
-                      className="text-stone-600 hover:text-stone-950 p-0.5 text-xs transition-colors cursor-pointer"
-                      title="Bir saat ileri"
-                    >
-                      ▼
-                    </button>
-                  </div>
-
-                  <span className="text-xl font-bold text-yellow-600 font-mono mt-3">:</span>
-
-                  {/* Başlangıç Dakika Sütunu */}
-                  <div className="flex flex-col items-center">
-                    <span className="text-[10px] uppercase font-bold text-stone-500 mb-1">Dakika</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextM = (timePickerModal.startMinute + 55) % 60;
-                        setTimePickerModal((p) => ({ ...p, startMinute: nextM }));
-                        document.getElementById(`wheel-sm-${nextM}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                      }}
-                      className="text-stone-600 hover:text-stone-950 p-0.5 text-xs transition-colors cursor-pointer"
-                      title="5 dakika geri"
-                    >
-                      ▲
-                    </button>
-                    <div className="h-32 w-14 overflow-y-auto scroll-smooth snap-y snap-mandatory bg-yellow-50 border border-yellow-200 rounded-xl py-12 flex flex-col items-center text-center scrollbar-none">
-                      {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => (
-                        <div
-                          key={`sm-${m}`}
-                          id={`wheel-sm-${m}`}
-                          onClick={() => {
-                            setTimePickerModal((p) => ({ ...p, startMinute: m }));
-                            document.getElementById(`wheel-sm-${m}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                          }}
-                          className={`snap-center h-8 min-h-[32px] flex items-center justify-center font-mono cursor-pointer transition-all text-sm w-full select-none ${
-                            timePickerModal.startMinute === m
-                              ? "font-bold text-yellow-600 text-base bg-yellow-500/20 rounded-lg scale-110 shadow-sm"
-                              : "text-slate-500 hover:text-stone-600"
-                          }`}
-                        >
-                          {String(m).padStart(2, "0")}
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextM = (timePickerModal.startMinute + 5) % 60;
-                        setTimePickerModal((p) => ({ ...p, startMinute: nextM }));
-                        document.getElementById(`wheel-sm-${nextM}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                      }}
-                      className="text-stone-600 hover:text-stone-950 p-0.5 text-xs transition-colors cursor-pointer"
-                      title="5 dakika ileri"
-                    >
-                      ▼
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-2.5 px-3 py-1 rounded-xl bg-yellow-500/10 border border-yellow-300/20 text-xs font-mono font-bold text-yellow-600">
-                  {String(timePickerModal.startHour).padStart(2, "0")}:{String(timePickerModal.startMinute).padStart(2, "0")}
-                </div>
-              </div>
-
-              {/* Bitiş Saati Çarkı */}
-              <div className="flex flex-col items-center p-3 rounded-2xl bg-yellow-50 border border-yellow-300">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span className="text-xs font-bold text-stone-800">Bitiş Saati</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {/* Bitiş Saat Sütunu */}
-                  <div className="flex flex-col items-center">
-                    <span className="text-[10px] uppercase font-bold text-stone-500 mb-1">Saat</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextH = (timePickerModal.endHour + 23) % 24;
-                        setTimePickerModal((p) => ({ ...p, endHour: nextH }));
-                        document.getElementById(`wheel-eh-${nextH}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                      }}
-                      className="text-stone-600 hover:text-stone-950 p-0.5 text-xs transition-colors cursor-pointer"
-                      title="Bir saat geri"
-                    >
-                      ▲
-                    </button>
-                    <div className="h-32 w-14 overflow-y-auto scroll-smooth snap-y snap-mandatory bg-yellow-50 border border-yellow-200 rounded-xl py-12 flex flex-col items-center text-center scrollbar-none">
-                      {Array.from({ length: 24 }, (_, i) => i).map((h) => (
-                        <div
-                          key={`eh-${h}`}
-                          id={`wheel-eh-${h}`}
-                          onClick={() => {
-                            setTimePickerModal((p) => ({ ...p, endHour: h }));
-                            document.getElementById(`wheel-eh-${h}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                          }}
-                          className={`snap-center h-8 min-h-[32px] flex items-center justify-center font-mono cursor-pointer transition-all text-sm w-full select-none ${
-                            timePickerModal.endHour === h
-                              ? "font-bold text-stone-900 text-base bg-yellow-200 rounded-lg scale-110 shadow-sm border border-yellow-400"
-                              : "text-slate-500 hover:text-stone-600"
-                          }`}
-                        >
-                          {String(h).padStart(2, "0")}
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextH = (timePickerModal.endHour + 1) % 24;
-                        setTimePickerModal((p) => ({ ...p, endHour: nextH }));
-                        document.getElementById(`wheel-eh-${nextH}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                      }}
-                      className="text-stone-600 hover:text-stone-950 p-0.5 text-xs transition-colors cursor-pointer"
-                      title="Bir saat ileri"
-                    >
-                      ▼
-                    </button>
-                  </div>
-
-                  <span className="text-xl font-bold text-yellow-600 font-mono mt-3">:</span>
-
-                  {/* Bitiş Dakika Sütunu */}
-                  <div className="flex flex-col items-center">
-                    <span className="text-[10px] uppercase font-bold text-stone-500 mb-1">Dakika</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextM = (timePickerModal.endMinute + 55) % 60;
-                        setTimePickerModal((p) => ({ ...p, endMinute: nextM }));
-                        document.getElementById(`wheel-em-${nextM}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                      }}
-                      className="text-stone-600 hover:text-stone-950 p-0.5 text-xs transition-colors cursor-pointer"
-                      title="5 dakika geri"
-                    >
-                      ▲
-                    </button>
-                    <div className="h-32 w-14 overflow-y-auto scroll-smooth snap-y snap-mandatory bg-yellow-50 border border-yellow-200 rounded-xl py-12 flex flex-col items-center text-center scrollbar-none">
-                      {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => (
-                        <div
-                          key={`em-${m}`}
-                          id={`wheel-em-${m}`}
-                          onClick={() => {
-                            setTimePickerModal((p) => ({ ...p, endMinute: m }));
-                            document.getElementById(`wheel-em-${m}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                          }}
-                          className={`snap-center h-8 min-h-[32px] flex items-center justify-center font-mono cursor-pointer transition-all text-sm w-full select-none ${
-                            timePickerModal.endMinute === m
-                              ? "font-bold text-stone-900 text-base bg-yellow-200 rounded-lg scale-110 shadow-sm border border-yellow-400"
-                              : "text-slate-500 hover:text-stone-600"
-                          }`}
-                        >
-                          {String(m).padStart(2, "0")}
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextM = (timePickerModal.endMinute + 5) % 60;
-                        setTimePickerModal((p) => ({ ...p, endMinute: nextM }));
-                        document.getElementById(`wheel-em-${nextM}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                      }}
-                      className="text-stone-600 hover:text-stone-950 p-0.5 text-xs transition-colors cursor-pointer"
-                      title="5 dakika ileri"
-                    >
-                      ▼
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-2.5 px-3 py-1 rounded-xl bg-yellow-100 border border-yellow-300 text-xs font-mono font-bold text-stone-800">
-                  {String(timePickerModal.endHour).padStart(2, "0")}:{String(timePickerModal.endMinute).padStart(2, "0")}
-                </div>
-              </div>
-            </div>
-
-            {/* Canlı Önizleme Çubuğu */}
-            <div className="p-3.5 rounded-2xl bg-yellow-100/70 border border-yellow-300 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] text-stone-800 font-medium font-medium block">
-                  Uygulanacak Saat Aralığı:
-                </span>
-                <span className="text-base font-extrabold font-mono text-stone-800 tracking-wide">
-                  {String(timePickerModal.startHour).padStart(2, "0")}:{String(timePickerModal.startMinute).padStart(2, "0")} - {String(timePickerModal.endHour).padStart(2, "0")}:{String(timePickerModal.endMinute).padStart(2, "0")}
-                </span>
-              </div>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-yellow-100 text-yellow-700 text-stone-800 border border-yellow-300">
-                {timePickerModal.tip === "haftasonu" ? "Hafta Sonu" : timePickerModal.tip === "ozelgun" ? "Bayram / Özel" : "Hafta İçi"}
-              </span>
-            </div>
-
-            {/* Butonlar */}
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-yellow-200">
-              <button
-                type="button"
-                onClick={() => setTimePickerModal((prev) => ({ ...prev, isOpen: false }))}
-                className="px-4 py-2.5 rounded-xl bg-yellow-100/70 hover:bg-yellow-100 text-stone-600 hover:text-white text-xs font-semibold transition-colors cursor-pointer"
-              >
-                Vazgeç
-              </button>
-              <button
-                type="button"
-                onClick={handleApplyTimePicker}
-                className="px-5 py-2.5 rounded-xl bg-yellow-300 hover:bg-yellow-400 text-stone-900 font-bold text-xs font-bold shadow-sm  transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-              >
-                 Saati Kaydet & Uygula
-              </button>
-            </div>
+                  <span className="text-[10.5px] mt-0.5 tracking-tight whitespace-nowrap">
+                    {(tab as any).shortName || tab.name}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        </div>
+        </nav>
       )}
+
+      {/* ======================================================== */}
+      {/* ZAMAN SEÇİCİ VE YURDA GİRİŞ/ÇIKIŞ SAATİ MODALLARI */}
+      {/* ======================================================== */}
+      <MenuTimePickerModal
+        isOpen={timePickerModal.isOpen}
+        title={timePickerModal.title}
+        startHour={timePickerModal.startHour}
+        startMinute={timePickerModal.startMinute}
+        endHour={timePickerModal.endHour}
+        endMinute={timePickerModal.endMinute}
+        onStartHourChange={(h) => setTimePickerModal((p) => ({ ...p, startHour: h }))}
+        onStartMinuteChange={(m) => setTimePickerModal((p) => ({ ...p, startMinute: m }))}
+        onEndHourChange={(h) => setTimePickerModal((p) => ({ ...p, endHour: h }))}
+        onEndMinuteChange={(m) => setTimePickerModal((p) => ({ ...p, endMinute: m }))}
+        onClose={() => setTimePickerModal((prev) => ({ ...prev, isOpen: false }))}
+        onSave={handleApplyTimePicker}
+      />
+
+      <EntryTimeModal
+        isOpen={entryTimeModal.isOpen}
+        title={entryTimeModal.title}
+        hour={entryTimeModal.hour}
+        minute={entryTimeModal.minute}
+        onHourChange={(h) => setEntryTimeModal((p) => ({ ...p, hour: h }))}
+        onMinuteChange={(m) => setEntryTimeModal((p) => ({ ...p, minute: m }))}
+        onClose={() => setEntryTimeModal((prev) => ({ ...prev, isOpen: false }))}
+        onSave={handleApplyEntryTime}
+      />
     </div>
   );
 }
