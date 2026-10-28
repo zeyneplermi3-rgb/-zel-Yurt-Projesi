@@ -2595,16 +2595,8 @@ export default function Home() {
   if (isAuthChecking) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0F172A] flex flex-col justify-center items-center p-4 relative font-sans">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-[#0284C7] border border-[#0369A1] flex items-center justify-center text-white font-black text-2xl shadow-xs animate-pulse">
-            Y
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#0284C7] animate-ping"></span>
-            <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">
-              Yurtify hazırlanıyor...
-            </span>
-          </div>
+        <div className="w-14 h-14 rounded-2xl bg-[#0284C7] border border-[#0369A1] flex items-center justify-center text-white font-black text-2xl shadow-xs animate-pulse">
+          Y
         </div>
       </div>
     );
