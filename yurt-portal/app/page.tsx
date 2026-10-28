@@ -3933,7 +3933,7 @@ export default function Home() {
 
                 // Ay boyunca toplam randevu sayısı
                 const monthPrefix = `${laundryViewYear}-${String(laundryViewMonth + 1).padStart(2, "0")}`;
-                const currentMonthSlotsCount = laundrySlots.filter(s => s.tarih.startsWith(monthPrefix) && s.durum !== "İptal").length;
+                const currentMonthSlotsCount = liveLaundrySlots.filter(s => normalizeDateStr(s.tarih).startsWith(monthPrefix) && s.durum !== "İptal").length;
 
                 const goToPrevMonth = () => {
                   if (laundryViewMonth === 0) {
@@ -4279,7 +4279,7 @@ export default function Home() {
                           ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                               {freeMachinesList.map((m) => {
-                                const nextQueueSlot = laundrySlots.find(
+                                const nextQueueSlot = liveLaundrySlots.find(
                                   (s) => s.makineNo === m.id && s.durum === "Sırada"
                                 );
 
