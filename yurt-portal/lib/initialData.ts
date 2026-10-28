@@ -161,7 +161,7 @@ export const defaultMaintenanceTickets: MaintenanceTicket[] = [
 ];
 
 export const defaultAnnouncements: Announcement[] = [
-  { id: "anc-1", baslik: "Giriş ve Çıkış Saatleri Hatırlatması", icerik: "Hafta içi son giriş saati 23:00, hafta sonu ise 23:45'tir. Tüm öğrencilerin yoklama saatinde odalarında bulunması zorunludur.", oncelik: "Önemli", tarih: "18.10.2026" },
+  { id: "anc-1", baslik: "Yurt Düzeni ve Genel Bilgilendirme", icerik: "Ortak alanların temiz tutulması ve dinlenme saatlerinde sessizliğe özen gösterilmesi rica olunur.", oncelik: "Önemli", tarih: "18.10.2026" },
   { id: "anc-2", baslik: "Haftalık Çamaşırhane & Ütü Odası Programı", icerik: "B Blok kat sakinleri için çamaşırhane Salı ve Cuma günleri 09:00 - 21:00 arası rezerve edilmiştir.", oncelik: "Normal", tarih: "17.10.2026" },
   { id: "anc-3", baslik: "Merkezi Isıtma & Sıcak Su Saatleri", icerik: "Kış tarifesi gereği kaloriferler sabah 06:00-09:00 ve akşam 17:00-24:00 saatleri arasında kesintisiz devrededir.", oncelik: "Normal", tarih: "15.10.2026" },
 ];

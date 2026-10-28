@@ -486,16 +486,6 @@ export default function StudentPortalView({
                 <strong className="text-[#0F172A] font-bold">{odaNo}</strong>
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <span className="px-2.5 sm:px-3 py-1 rounded-lg sm:rounded-xl bg-[#F8FAFC] text-[11px] sm:text-xs font-bold text-emerald-700 border border-emerald-500/20">
-                Çıkış: {yurtSettings.ilkCikisHaftaIci || "06:00"} (Hafta İçi) •{" "}
-                {yurtSettings.ilkCikisHaftaSonu || "06:30"} (Hafta Sonu)
-              </span>
-              <span className="px-2.5 sm:px-3 py-1 rounded-lg sm:rounded-xl bg-[#F1F5F9] text-[11px] sm:text-xs font-bold text-[#64748B] border border-[#E2E8F0]">
-                Giriş: {yurtSettings.sonGirisHaftaIci || "23:00"} (Hafta İçi) •{" "}
-                {yurtSettings.sonGirisHaftaSonu || "23:45"} (Hafta Sonu)
-              </span>
-            </div>
           </div>
 
           {/* Öğrenci Yemekhane Menüsü */}

@@ -899,7 +899,7 @@ export default function Home() {
           setAnnouncements(JSON.parse(savedAnc));
         } else {
           const defaultAnc: Announcement[] = [
-            { id: "anc-1", baslik: "Giriş ve Çıkış Saatleri Hatırlatması", icerik: "Hafta içi son giriş saati 23:00, hafta sonu ise 23:45'tir. Tüm öğrencilerin yoklama saatinde odalarında bulunması zorunludur.", oncelik: "Önemli", tarih: "18.10.2026" },
+            { id: "anc-1", baslik: "Yurt Düzeni ve Genel Bilgilendirme", icerik: "Ortak alanların temiz tutulması ve dinlenme saatlerinde sessizliğe özen gösterilmesi rica olunur.", oncelik: "Önemli", tarih: "18.10.2026" },
             { id: "anc-2", baslik: "Haftalık Çamaşırhane & Ütü Odası Programı", icerik: "B Blok kat sakinleri için çamaşırhane Salı ve Cuma günleri 09:00 - 21:00 arası rezerve edilmiştir.", oncelik: "Normal", tarih: "17.10.2026" },
             { id: "anc-3", baslik: "Merkezi Isıtma & Sıcak Su Saatleri", icerik: "Kış tarifesi gereği kaloriferler sabah 06:00-09:00 ve akşam 17:00-24:00 saatleri arasında kesintisiz devrededir.", oncelik: "Normal", tarih: "15.10.2026" }
           ];
@@ -5033,138 +5033,7 @@ export default function Home() {
                     )}
                   </div>
 
-                  {/* 3. YURT KURALLARI (AŞAĞIYA AÇILIR BUTON KART) */}
-                  <div className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl overflow-hidden shadow-xs transition-all">
-                    <button
-                      type="button"
-                      onClick={() => toggleSettingsSection("kurallar")}
-                      className="w-full p-4 sm:p-6 flex items-center justify-between gap-3 text-left transition-colors hover:bg-[#F8FAFC]/60 cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                        <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
-                          openSettingsSections.kurallar ? "bg-[#0284C7] text-white" : "bg-[#F1F5F9] text-[#0284C7]"
-                        }`}>
-                          <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </div>
-                        <div className="min-w-0">
-                          <h3 className="text-sm sm:text-base font-black text-[#0F172A] truncate">
-                            Giriş & Çıkış Saatleri
-                          </h3>
-                        </div>
-                      </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center bg-[#F8FAFC] border border-[#E2E8F0] transition-transform duration-300 ${
-                          openSettingsSections.kurallar ? "rotate-180 bg-[#F1F5F9]" : ""
-                        }`}>
-                          <svg className="w-4 h-4 text-[#0F172A]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </div>
-                    </button>
-
-                    {openSettingsSections.kurallar && (
-                      <div className="border-t border-[#E2E8F0] p-5 sm:p-8 animate-accordion-down space-y-5 bg-white">
-                        <form onSubmit={(e) => handleSaveYurtSettings(e, "Giriş ve çıkış kuralları başarıyla kaydedildi.")} className="space-y-4 text-xs">
-                          {/* 1. İlk Çıkış Saatleri */}
-                          <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-3">
-                            <label className="text-xs font-bold text-[#0F172A] block">
-                              İlk Çıkış Saatleri
-                            </label>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              {/* Hafta İçi İlk Çıkış Kartı */}
-                              <div className="p-3.5 bg-white border border-[#E2E8F0] rounded-xl space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs font-bold text-[#0F172A]">Hafta İçi</span>
-                                  <span className="text-xs font-mono font-black text-emerald-700 bg-[#F1F5F9] px-2 py-0.5 rounded-lg border border-[#E2E8F0]">
-                                    {yurtSettings.ilkCikisHaftaIci || "06:00"}
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => openEntryTimePicker("cikisHaftaIci", "Hafta İçi İlk Çıkış")}
-                                  className="w-full py-2.5 px-3 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs sm:text-sm text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs flex items-center justify-center gap-2 min-h-[44px]"
-                                >
-                                  <span>{yurtSettings.ilkCikisHaftaIci || "06:00"}</span>
-                                </button>
-                              </div>
-
-                              {/* Hafta Sonu İlk Çıkış Kartı */}
-                              <div className="p-3.5 bg-white border border-[#E2E8F0] rounded-xl space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs font-bold text-[#0F172A]">Hafta Sonu</span>
-                                  <span className="text-xs font-mono font-black text-emerald-700 bg-[#F1F5F9] px-2 py-0.5 rounded-lg border border-[#E2E8F0]">
-                                    {yurtSettings.ilkCikisHaftaSonu || "06:30"}
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => openEntryTimePicker("cikisHaftaSonu", "Hafta Sonu İlk Çıkış")}
-                                  className="w-full py-2.5 px-3 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs sm:text-sm text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs flex items-center justify-center gap-2 min-h-[44px]"
-                                >
-                                  <span>{yurtSettings.ilkCikisHaftaSonu || "06:30"}</span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 2. Son Giriş Saatleri */}
-                          <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-3">
-                            <label className="text-xs font-bold text-[#0F172A] block">
-                              Son Giriş Saatleri
-                            </label>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                              {/* Hafta İçi Son Giriş Kartı */}
-                              <div className="p-3.5 bg-white border border-[#E2E8F0] rounded-xl space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs font-bold text-[#0F172A]">Hafta İçi</span>
-                                  <span className="text-xs font-mono font-black text-[#0284C7] bg-[#F1F5F9] px-2 py-0.5 rounded-lg border border-[#E2E8F0]">
-                                    {yurtSettings.sonGirisHaftaIci || "23:00"}
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => openEntryTimePicker("haftaici", "Hafta İçi Son Giriş")}
-                                  className="w-full py-2.5 px-3 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs sm:text-sm text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs flex items-center justify-center gap-2 min-h-[44px]"
-                                >
-                                  <span>{yurtSettings.sonGirisHaftaIci || "23:00"}</span>
-                                </button>
-                              </div>
-
-                              {/* Hafta Sonu Son Giriş Kartı */}
-                              <div className="p-3.5 bg-white border border-[#E2E8F0] rounded-xl space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-xs font-bold text-[#0F172A]">Hafta Sonu</span>
-                                  <span className="text-xs font-mono font-black text-[#0284C7] bg-[#F1F5F9] px-2 py-0.5 rounded-lg border border-[#E2E8F0]">
-                                    {yurtSettings.sonGirisHaftaSonu || "23:45"}
-                                  </span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => openEntryTimePicker("haftasonu", "Hafta Sonu Son Giriş")}
-                                  className="w-full py-2.5 px-3 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs sm:text-sm text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs flex items-center justify-center gap-2 min-h-[44px]"
-                                >
-                                  <span>{yurtSettings.sonGirisHaftaSonu || "23:45"}</span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-
-                          <button
-                            type="submit"
-                            className="w-full py-3 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl cursor-pointer shadow-xs transition-colors text-xs border border-[#0369A1]"
-                          >
-                            Giriş ve Çıkış Kurallarını Kaydet
-                          </button>
-                        </form>
-                      </div>
-                    )}
-                  </div>
 
                   {/* 3. ÖĞRENCİLER (AŞAĞIYA AÇILIR BUTON KART) */}
                   <div className="bg-white border border-[#E2E8F0] rounded-2xl sm:rounded-3xl overflow-hidden shadow-xs transition-all">
