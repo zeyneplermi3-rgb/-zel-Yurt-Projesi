@@ -85,13 +85,14 @@ export function parseSlotMinutes(saatAraligi?: string, defaultDurationMinutes: n
  */
 export function getDynamicSlotStatus(
   slot: Pick<LaundrySlot, "tarih" | "saatAraligi" | "durum">,
-  now: Date = new Date()
+  now?: Date
 ): "Sırada" | "Yıkanıyor" | "Tamamlandı" | "İptal" {
   if (slot.durum === "İptal") {
     return "İptal";
   }
 
-  const todayStr = getTodayDateKey(now);
+  const targetNow = now || new Date();
+  const todayStr = getTodayDateKey(targetNow);
   const slotDate = normalizeDateStr(slot.tarih);
 
   // Eski statik şablon tarihi kontrolü (2026-10-19 vb. ise bugün olarak ele al)
@@ -108,7 +109,7 @@ export function getDynamicSlotStatus(
 
   // Bugün ise saat kontrolü yapılır
   const { startMinutes, endMinutes } = parseSlotMinutes(slot.saatAraligi);
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const currentMinutes = targetNow.getHours() * 60 + targetNow.getMinutes();
 
   if (currentMinutes < startMinutes) {
     return "Sırada";

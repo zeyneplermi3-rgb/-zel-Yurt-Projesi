@@ -26,18 +26,18 @@
   --color-flat-border-strong: #CBD5E1;
   --color-flat-border-accent: #0284C7;
 
-  /* Slate & Sky Utility Remapping */
-  --color-yellow-50: #F8FAFC;
-  --color-yellow-100: #F1F5F9;
-  --color-yellow-200: #E2E8F0;
-  --color-yellow-300: #38BDF8;
-  --color-yellow-400: #0284C7;
-  --color-yellow-500: #0369A1;
-  --color-yellow-600: #075985;
-  --color-yellow-700: #0F172A;
-  --color-yellow-800: #0B1220;
-  --color-yellow-900: #070D18;
-  --color-yellow-950: #030712;
+  /* Sky Palette Utility Remapping */
+  --color-yellow-50: #F0F9FF;
+  --color-yellow-100: #E0F2FE;
+  --color-yellow-200: #BAE6FD;
+  --color-yellow-300: #7DD3FC;
+  --color-yellow-400: #38BDF8;
+  --color-yellow-500: #0EA5E9;
+  --color-yellow-600: #0284C7;
+  --color-yellow-700: #0369A1;
+  --color-yellow-800: #075985;
+  --color-yellow-900: #0C4A6E;
+  --color-yellow-950: #082F49;
 
   /* Slate Text Tones */
   --color-stone-950: #020617;
@@ -56,6 +56,7 @@
 html {
   scrollbar-gutter: stable both-edges;
   overflow-y: scroll;
+  overflow-x: hidden;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
@@ -97,11 +98,52 @@ html.has-session .login-screen-container {
   display: none !important;
 }
 
-/* Otomatik Boyutlanan ve Tutamacı Gizlenmiş Textarea Standartları */
+/* Rahat ve Zarif Textarea Standartları */
 textarea {
   resize: none !important;
-  field-sizing: content;
-  max-height: 480px;
+  min-height: 52px;
+  max-height: 350px;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 13.5px;
+  padding: 8px 12px !important;
+  line-height: 1.4 !important;
+}
+
+/* Dokunmatik iyileştirmesi: Çift tıklama gecikmesini ve istem dışı sıçramaları önler */
+input,
+textarea,
+select,
+button {
+  touch-action: manipulation;
+}
+
+/* Zarif, dengeli ve kompakt form elemanları (Kutucukların içi orantılı ve şık) */
+input:not([type="checkbox"]):not([type="radio"]),
+select {
+  font-family: inherit;
+  font-size: 13px;
+  height: 36px;
+  box-sizing: border-box;
+}
+
+/* Mobilde dengeli ve kompakt form elemanları */
+@media (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 13px !important;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  select {
+    height: 36px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    box-sizing: border-box !important;
+  }
 }
 
 /* Modern Flat Scrollbar - Light */
@@ -312,12 +354,10 @@ html.dark body, .dark body {
 .dark .border-slate-100 {
   border-color: #334155 !important;
 }
-.dark .border-t-\[\#0284C7\],
-.dark .border-t-\[\#4E7867\] {
+.dark .border-t-\[\#0284C7\] {
   border-top-color: #38BDF8 !important;
 }
-.dark .hover\:border-\[\#0284C7\]:hover,
-.dark .hover\:border-\[\#4E7867\]:hover {
+.dark .hover\:border-\[\#0284C7\]:hover {
   border-color: #38BDF8 !important;
 }
 .dark .divide-\[\#E2E8F0\] > :not([hidden]) ~ :not([hidden]),
@@ -325,19 +365,16 @@ html.dark body, .dark body {
   border-color: #334155 !important;
 }
 
-/* Koyu Mod Aktif Sekme / Butonlar (Sky 400 - #38BDF8) */
-.dark .bg-\[\#0284C7\],
-.dark .bg-\[\#4E7867\] {
-  background-color: #38BDF8 !important;
-  color: #0F172A !important;
+/* Koyu Mod Aktif Sekme / Butonlar (Sky 600 - #0284C7 & Sky 400 - #38BDF8) */
+.dark .bg-\[\#0284C7\] {
+  background-color: #0284C7 !important;
+  color: #FFFFFF !important;
 }
-.dark .text-\[\#0284C7\],
-.dark .text-\[\#4E7867\] {
+.dark .text-\[\#0284C7\] {
   color: #38BDF8 !important;
 }
-.dark .hover\:bg-\[\#0369A1\]:hover,
-.dark .hover\:bg-\[\#3D6152\]:hover {
-  background-color: #0284C7 !important;
+.dark .hover\:bg-\[\#0369A1\]:hover {
+  background-color: #0369A1 !important;
   color: #FFFFFF !important;
 }
 .dark .hover\:text-\[\#0284C7\]:hover {
@@ -543,4 +580,24 @@ html.dark body, .dark body {
   will-change: transform, opacity;
   backface-visibility: hidden;
   transform: translateZ(0);
+}
+
+/* Kutucuklarin farkli zamanlamalarla (150ms, 300ms, 500ms vb.) degismesini engelleyen kural */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  -webkit-transition: none !important;
+  -moz-transition: none !important;
+  -o-transition: none !important;
+  -ms-transition: none !important;
+  transition: none !important;
+  animation-duration: 0s !important;
+}
+
+/* Akici ve Kusursuz Tema Gecisi (View Transitions API) */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.2s;
+  animation-timing-function: ease-in-out;
 }

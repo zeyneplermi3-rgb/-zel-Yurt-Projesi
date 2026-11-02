@@ -162,7 +162,7 @@ export default function AddYurtModal({
                     placeholder="05XX XXX XX XX"
                     value={newYurt.yetkiliTel}
                     onChange={(e) => setNewYurt({ ...newYurt, yetkiliTel: e.target.value })}
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20 font-mono"
+                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20 font-medium"
                   />
                 </div>
 

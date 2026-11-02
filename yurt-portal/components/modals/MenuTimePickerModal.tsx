@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 interface MenuTimePickerModalProps {
   isOpen: boolean;
@@ -17,6 +17,10 @@ interface MenuTimePickerModalProps {
   onSave: () => void;
 }
 
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+const ITEM_HEIGHT = 36;
+
 export default function MenuTimePickerModal({
   isOpen,
   title,
@@ -31,19 +35,102 @@ export default function MenuTimePickerModal({
   onClose,
   onSave,
 }: MenuTimePickerModalProps) {
+  const startHourRef = useRef<HTMLDivElement>(null);
+  const startMinuteRef = useRef<HTMLDivElement>(null);
+  const endHourRef = useRef<HTMLDivElement>(null);
+  const endMinuteRef = useRef<HTMLDivElement>(null);
+  const isProgrammaticRef = useRef(false);
+  const initialAlignedRef = useRef(false);
+
+  // Modal acildiginda carklari tam matematiksel merkez konumlarina tasi
   useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => {
-        document.getElementById(`wheel-sh-${startHour}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-        document.getElementById(`wheel-sm-${startMinute}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-        document.getElementById(`wheel-eh-${endHour}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-        document.getElementById(`wheel-em-${endMinute}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-      }, 80);
-      return () => clearTimeout(timer);
+    if (!isOpen) {
+      initialAlignedRef.current = false;
+      return;
     }
+    if (initialAlignedRef.current) return;
+    initialAlignedRef.current = true;
+
+    const alignColumn = (ref: React.RefObject<HTMLDivElement | null>, idx: number) => {
+      if (!ref.current) return;
+      const child = ref.current.children[idx] as HTMLElement | undefined;
+      if (child) {
+        const targetTop = child.offsetTop - (ref.current.clientHeight - child.clientHeight) / 2;
+        ref.current.scrollTop = targetTop;
+      }
+    };
+
+    const alignAll = () => {
+      isProgrammaticRef.current = true;
+      alignColumn(startHourRef, startHour);
+      const smIdx = MINUTES.indexOf(startMinute);
+      if (smIdx !== -1) alignColumn(startMinuteRef, smIdx);
+
+      alignColumn(endHourRef, endHour);
+      const emIdx = MINUTES.indexOf(endMinute);
+      if (emIdx !== -1) alignColumn(endMinuteRef, emIdx);
+
+      setTimeout(() => {
+        isProgrammaticRef.current = false;
+      }, 200);
+    };
+
+    requestAnimationFrame(alignAll);
+    const t1 = setTimeout(alignAll, 60);
+    const t2 = setTimeout(alignAll, 180);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, [isOpen, startHour, startMinute, endHour, endMinute]);
 
   if (!isOpen) return null;
+
+  const createScrollHandler = (
+    items: number[],
+    onChange: (val: number) => void
+  ) => {
+    return (e: React.UIEvent<HTMLDivElement>) => {
+      if (isProgrammaticRef.current) return;
+      const target = e.currentTarget;
+      const center = target.scrollTop + target.clientHeight / 2;
+      let closestIdx = 0;
+      let minDiff = Infinity;
+      for (let i = 0; i < target.children.length; i++) {
+        const child = target.children[i] as HTMLElement;
+        const childCenter = child.offsetTop + child.clientHeight / 2;
+        const diff = Math.abs(center - childCenter);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestIdx = i;
+        }
+      }
+      if (items[closestIdx] !== undefined) {
+        onChange(items[closestIdx]);
+      }
+    };
+  };
+
+  const handleItemClick = (
+    ref: React.RefObject<HTMLDivElement | null>,
+    index: number,
+    value: number,
+    onChange: (val: number) => void
+  ) => {
+    onChange(value);
+    if (ref.current) {
+      isProgrammaticRef.current = true;
+      const child = ref.current.children[index] as HTMLElement | undefined;
+      if (child) {
+        const targetTop = child.offsetTop - (ref.current.clientHeight - child.clientHeight) / 2;
+        ref.current.scrollTo({ top: targetTop, behavior: "smooth" });
+      }
+      setTimeout(() => {
+        isProgrammaticRef.current = false;
+      }, 300);
+    }
+  };
 
   return (
     <div
@@ -51,23 +138,23 @@ export default function MenuTimePickerModal({
       onClick={onClose}
     >
       <div
-        className="bg-white border border-[#E2E8F0] rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-xl space-y-4 animate-in zoom-in-95 duration-200"
+        className="bg-white dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-xl space-y-4 animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Basligi */}
-        <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0]">
+        {/* Modal Başlığı */}
+        <div className="flex items-center justify-between pb-3 border-b border-[#E2E8F0] dark:border-[#334155]">
           <div>
-            <h4 className="font-bold text-sm sm:text-base text-[#0F172A]">
+            <h4 className="font-bold text-sm sm:text-base text-[#0F172A] dark:text-[#F8FAFC]">
               Servis Saati Aralığını Ayarla
             </h4>
-            <p className="text-[11px] sm:text-xs text-[#64748B] font-medium mt-0.5">
+            <p className="text-[11px] sm:text-xs text-[#64748B] dark:text-[#94A3B8] font-medium mt-0.5">
               {title}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#64748B] hover:text-[#0F172A] flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full bg-[#F1F5F9] dark:bg-[#1E293B] hover:bg-[#E2E8F0] dark:hover:bg-[#334155] text-[#64748B] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] flex items-center justify-center transition-colors cursor-pointer"
             aria-label="Kapat"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -76,39 +163,39 @@ export default function MenuTimePickerModal({
           </button>
         </div>
 
-        {/* Cift Cark Secici (Baslangic ve Bitis) */}
+        {/* Çift Çark Seçici (Başlangıç ve Bitiş) */}
         <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          {/* Baslangic Bolumu */}
+          {/* Başlangıç Bölümü */}
           <div className="flex flex-col items-center">
             <div className="flex items-center justify-between w-full px-1 mb-2">
-              <span className="text-xs font-bold text-[#0F172A]">Başlangıç</span>
-              <span className="text-xs font-mono font-extrabold text-[#0284C7] bg-[#F1F5F9] px-2 py-0.5 rounded-lg border border-[#0284C7]/20">
+              <span className="text-xs font-bold text-[#0F172A] dark:text-[#F8FAFC]">Başlangıç</span>
+              <span className="text-xs font-mono font-extrabold text-[#0284C7] bg-[#F1F5F9] dark:bg-[#1E293B] px-2 py-0.5 rounded-lg border border-[#0284C7]/20 shadow-2xs">
                 {String(startHour).padStart(2, "0")}:{String(startMinute).padStart(2, "0")}
               </span>
             </div>
 
-            {/* Baslangic Kaydirmali Carki */}
-            <div className="relative w-full h-44 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] overflow-hidden">
-              <div className="pointer-events-none absolute inset-x-1.5 top-1/2 -translate-y-1/2 h-9 rounded-xl bg-white shadow-xs border border-[#0284C7]/25 z-0" />
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-[#F8FAFC] via-[#F8FAFC]/80 to-transparent z-10" />
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/80 to-transparent z-10" />
+            {/* Başlangıç Kaydırmalı Çarkı */}
+            <div className="relative w-full h-[180px] rounded-2xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] overflow-hidden">
+              <div className="pointer-events-none absolute inset-x-1.5 top-1/2 -translate-y-1/2 h-[36px] rounded-xl bg-white dark:bg-[#1E293B] shadow-xs border border-[#0284C7]/25 z-0" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-[50px] bg-gradient-to-b from-[#F8FAFC] via-[#F8FAFC]/80 to-transparent dark:from-[#0F172A] dark:via-[#0F172A]/80 z-10" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[50px] bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/80 to-transparent dark:from-[#0F172A] dark:via-[#0F172A]/80 z-10" />
 
               <div className="relative z-20 flex items-center justify-center h-full px-1">
-                {/* Saat Sutunu */}
-                <div className="flex-1 h-full overflow-y-auto snap-y snap-mandatory scrollbar-none py-[68px] text-center">
-                  {Array.from({ length: 24 }, (_, i) => i).map((h) => {
+                {/* Saat Sütunu */}
+                <div
+                  ref={startHourRef}
+                  onScroll={createScrollHandler(HOURS, onStartHourChange)}
+                  className="flex-1 h-full overflow-y-auto snap-y snap-mandatory scrollbar-none py-[72px] text-center"
+                >
+                  {HOURS.map((h, idx) => {
                     const isSelected = startHour === h;
                     return (
                       <div
                         key={`sh-${h}`}
-                        id={`wheel-sh-${h}`}
-                        onClick={() => {
-                          onStartHourChange(h);
-                          document.getElementById(`wheel-sh-${h}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                        }}
-                        className={`snap-center h-9 min-h-[36px] flex items-center justify-center font-mono cursor-pointer transition-all select-none ${
+                        onClick={() => handleItemClick(startHourRef, idx, h, onStartHourChange)}
+                        className={`snap-center h-[36px] min-h-[36px] max-h-[36px] flex items-center justify-center font-mono cursor-pointer transition-all select-none ${
                           isSelected
-                            ? "text-[#0F172A] font-black text-base sm:text-lg scale-110"
+                            ? "text-[#0F172A] dark:text-[#F8FAFC] font-black text-base sm:text-lg scale-110"
                             : "text-[#64748B]/50 text-xs sm:text-sm hover:text-[#0F172A]"
                         }`}
                       >
@@ -118,23 +205,23 @@ export default function MenuTimePickerModal({
                   })}
                 </div>
 
-                <span className="text-base font-bold text-[#0F172A] select-none px-0.5 mb-0.5">:</span>
+                <span className="text-base font-bold text-[#0F172A] dark:text-[#F8FAFC] select-none px-0.5 mb-0.5">:</span>
 
-                {/* Dakika Sutunu */}
-                <div className="flex-1 h-full overflow-y-auto snap-y snap-mandatory scrollbar-none py-[68px] text-center">
-                  {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => {
+                {/* Dakika Sütunu */}
+                <div
+                  ref={startMinuteRef}
+                  onScroll={createScrollHandler(MINUTES, onStartMinuteChange)}
+                  className="flex-1 h-full overflow-y-auto snap-y snap-mandatory scrollbar-none py-[72px] text-center"
+                >
+                  {MINUTES.map((m, idx) => {
                     const isSelected = startMinute === m;
                     return (
                       <div
                         key={`sm-${m}`}
-                        id={`wheel-sm-${m}`}
-                        onClick={() => {
-                          onStartMinuteChange(m);
-                          document.getElementById(`wheel-sm-${m}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                        }}
-                        className={`snap-center h-9 min-h-[36px] flex items-center justify-center font-mono cursor-pointer transition-all select-none ${
+                        onClick={() => handleItemClick(startMinuteRef, idx, m, onStartMinuteChange)}
+                        className={`snap-center h-[36px] min-h-[36px] max-h-[36px] flex items-center justify-center font-mono cursor-pointer transition-all select-none ${
                           isSelected
-                            ? "text-[#0F172A] font-black text-base sm:text-lg scale-110"
+                            ? "text-[#0F172A] dark:text-[#F8FAFC] font-black text-base sm:text-lg scale-110"
                             : "text-[#64748B]/50 text-xs sm:text-sm hover:text-[#0F172A]"
                         }`}
                       >
@@ -147,37 +234,37 @@ export default function MenuTimePickerModal({
             </div>
           </div>
 
-          {/* Bitis Bolumu */}
+          {/* Bitiş Bölümü */}
           <div className="flex flex-col items-center">
             <div className="flex items-center justify-between w-full px-1 mb-2">
-              <span className="text-xs font-bold text-[#0F172A]">Bitiş</span>
-              <span className="text-xs font-mono font-extrabold text-[#0284C7] bg-[#F1F5F9] px-2 py-0.5 rounded-lg border border-[#0284C7]/20">
+              <span className="text-xs font-bold text-[#0F172A] dark:text-[#F8FAFC]">Bitiş</span>
+              <span className="text-xs font-mono font-extrabold text-[#0284C7] bg-[#F1F5F9] dark:bg-[#1E293B] px-2 py-0.5 rounded-lg border border-[#0284C7]/20 shadow-2xs">
                 {String(endHour).padStart(2, "0")}:{String(endMinute).padStart(2, "0")}
               </span>
             </div>
 
-            {/* Bitis Kaydirmali Carki */}
-            <div className="relative w-full h-44 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] overflow-hidden">
-              <div className="pointer-events-none absolute inset-x-1.5 top-1/2 -translate-y-1/2 h-9 rounded-xl bg-white shadow-xs border border-[#0284C7]/30 z-0" />
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-[#F8FAFC] via-[#F8FAFC]/80 to-transparent z-10" />
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/80 to-transparent z-10" />
+            {/* Bitiş Kaydırmalı Çarkı */}
+            <div className="relative w-full h-[180px] rounded-2xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] overflow-hidden">
+              <div className="pointer-events-none absolute inset-x-1.5 top-1/2 -translate-y-1/2 h-[36px] rounded-xl bg-white dark:bg-[#1E293B] shadow-xs border border-[#0284C7]/30 z-0" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-[50px] bg-gradient-to-b from-[#F8FAFC] via-[#F8FAFC]/80 to-transparent dark:from-[#0F172A] dark:via-[#0F172A]/80 z-10" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[50px] bg-gradient-to-t from-[#F8FAFC] via-[#F8FAFC]/80 to-transparent dark:from-[#0F172A] dark:via-[#0F172A]/80 z-10" />
 
               <div className="relative z-20 flex items-center justify-center h-full px-1">
-                {/* Saat Sutunu */}
-                <div className="flex-1 h-full overflow-y-auto snap-y snap-mandatory scrollbar-none py-[68px] text-center">
-                  {Array.from({ length: 24 }, (_, i) => i).map((h) => {
+                {/* Saat Sütunu */}
+                <div
+                  ref={endHourRef}
+                  onScroll={createScrollHandler(HOURS, onEndHourChange)}
+                  className="flex-1 h-full overflow-y-auto snap-y snap-mandatory scrollbar-none py-[72px] text-center"
+                >
+                  {HOURS.map((h, idx) => {
                     const isSelected = endHour === h;
                     return (
                       <div
                         key={`eh-${h}`}
-                        id={`wheel-eh-${h}`}
-                        onClick={() => {
-                          onEndHourChange(h);
-                          document.getElementById(`wheel-eh-${h}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                        }}
-                        className={`snap-center h-9 min-h-[36px] flex items-center justify-center font-mono cursor-pointer transition-all select-none ${
+                        onClick={() => handleItemClick(endHourRef, idx, h, onEndHourChange)}
+                        className={`snap-center h-[36px] min-h-[36px] max-h-[36px] flex items-center justify-center font-mono cursor-pointer transition-all select-none ${
                           isSelected
-                            ? "text-[#0F172A] font-black text-base sm:text-lg scale-110"
+                            ? "text-[#0F172A] dark:text-[#F8FAFC] font-black text-base sm:text-lg scale-110"
                             : "text-[#64748B]/50 text-xs sm:text-sm hover:text-[#0F172A]"
                         }`}
                       >
@@ -187,23 +274,23 @@ export default function MenuTimePickerModal({
                   })}
                 </div>
 
-                <span className="text-base font-bold text-[#0F172A] select-none px-0.5 mb-0.5">:</span>
+                <span className="text-base font-bold text-[#0F172A] dark:text-[#F8FAFC] select-none px-0.5 mb-0.5">:</span>
 
-                {/* Dakika Sutunu */}
-                <div className="flex-1 h-full overflow-y-auto snap-y snap-mandatory scrollbar-none py-[68px] text-center">
-                  {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => {
+                {/* Dakika Sütunu */}
+                <div
+                  ref={endMinuteRef}
+                  onScroll={createScrollHandler(MINUTES, onEndMinuteChange)}
+                  className="flex-1 h-full overflow-y-auto snap-y snap-mandatory scrollbar-none py-[72px] text-center"
+                >
+                  {MINUTES.map((m, idx) => {
                     const isSelected = endMinute === m;
                     return (
                       <div
                         key={`em-${m}`}
-                        id={`wheel-em-${m}`}
-                        onClick={() => {
-                          onEndMinuteChange(m);
-                          document.getElementById(`wheel-em-${m}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-                        }}
-                        className={`snap-center h-9 min-h-[36px] flex items-center justify-center font-mono cursor-pointer transition-all select-none ${
+                        onClick={() => handleItemClick(endMinuteRef, idx, m, onEndMinuteChange)}
+                        className={`snap-center h-[36px] min-h-[36px] max-h-[36px] flex items-center justify-center font-mono cursor-pointer transition-all select-none ${
                           isSelected
-                            ? "text-[#0F172A] font-black text-base sm:text-lg scale-110"
+                            ? "text-[#0F172A] dark:text-[#F8FAFC] font-black text-base sm:text-lg scale-110"
                             : "text-[#64748B]/50 text-xs sm:text-sm hover:text-[#0F172A]"
                         }`}
                       >
@@ -218,18 +305,18 @@ export default function MenuTimePickerModal({
         </div>
 
         {/* Butonlar */}
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E2E8F0]">
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E2E8F0] dark:border-[#334155]">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#64748B] hover:text-[#0F172A] text-xs font-bold transition-colors cursor-pointer min-h-[44px]"
+            className="px-4 py-2.5 rounded-xl bg-[#F1F5F9] dark:bg-[#1E293B] hover:bg-[#E2E8F0] dark:hover:bg-[#334155] text-[#64748B] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] text-xs font-bold transition-colors cursor-pointer min-h-[44px]"
           >
             Vazgeç
           </button>
           <button
             type="button"
             onClick={onSave}
-            className="px-5 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold shadow-sm transition-all flex items-center justify-center cursor-pointer active:scale-95 min-h-[44px]"
+            className="px-5 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold shadow-sm transition-all flex items-center justify-center cursor-pointer active:scale-95 min-h-[44px] border border-[#0369A1]"
           >
             Kaydet
           </button>

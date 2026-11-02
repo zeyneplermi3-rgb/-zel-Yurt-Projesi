@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getTodayDateKey } from "../../lib/menuUtils";
-import { cleanMachineName, getDynamicSlotStatus, parseSlotMinutes } from "../../lib/laundryUtils";
+import { cleanMachineName, getDynamicSlotStatus, parseSlotMinutes, normalizeDateStr } from "../../lib/laundryUtils";
 import {
   Announcement,
   MaintenanceTicket,
@@ -24,6 +24,8 @@ interface StudentPortalViewProps {
     details?: string;
     role?: Role;
   };
+  activeTab?: StudentTab;
+  onTabChange?: (tab: StudentTab) => void;
   yurtSettings: {
     ad?: string;
     ilkCikisHaftaIci?: string;
@@ -69,6 +71,8 @@ interface StudentPortalViewProps {
 
 export default function StudentPortalView({
   currentUser,
+  activeTab: controlledTab,
+  onTabChange,
   yurtSettings,
   yurtlar,
   dailyMenu,
@@ -91,14 +95,19 @@ export default function StudentPortalView({
   onSelectTheme,
   onLogout,
 }: StudentPortalViewProps) {
-  const [activeTab, setActiveTab] = useState<StudentTab>("anasayfa");
+  const [internalTab, setInternalTab] = useState<StudentTab>("anasayfa");
+  const activeTab = controlledTab !== undefined ? controlledTab : internalTab;
+  const setActiveTab = (tab: StudentTab) => {
+    setInternalTab(tab);
+    if (onTabChange) onTabChange(tab);
+  };
 
   // Yönetim paneli tarzı açılır/kapanır ayarlar kartları
   const [openSettingsSections, setOpenSettingsSections] = useState<{
     guvenlik: boolean;
     tema: boolean;
   }>({
-    guvenlik: true,
+    guvenlik: false,
     tema: true,
   });
 
@@ -117,6 +126,12 @@ export default function StudentPortalView({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
+  // Zorunlu ilk giriş geçici şifre değiştirme state'leri
+  const [forcedNewPassword, setForcedNewPassword] = useState("");
+  const [forcedConfirmPassword, setForcedConfirmPassword] = useState("");
+  const [forcedPasswordError, setForcedPasswordError] = useState("");
+  const [isForcedUpdating, setIsForcedUpdating] = useState(false);
+
   // Yeni çamaşır randevusu alma state'leri
   const defaultMachineId =
     cleanMachineName(laundryMachines[0]?.name || laundryMachines[0]?.id || "Makine 1");
@@ -127,6 +142,43 @@ export default function StudentPortalView({
   useEffect(() => {
     setSelectedLaundryDate(getTodayDateKey());
   }, []);
+
+  // Seçili makine dolu ise otomatik olarak ilk boş makineye geçiş yap
+  useEffect(() => {
+    const todayKey = getTodayDateKey();
+    const isToday = normalizeDateStr(selectedLaundryDate) === todayKey;
+    if (!isToday) return;
+
+    const list = laundryMachines;
+
+    const isCurrentBusy = laundrySlots.some((slot) => {
+      const slotClean = cleanMachineName(slot.makineNo);
+      return (
+        (slotClean === cleanMachineName(selectedMachine) || slot.makineNo === selectedMachine) &&
+        normalizeDateStr(slot.tarih) === todayKey &&
+        slot.durum !== "İptal" &&
+        getDynamicSlotStatus(slot) === "Yıkanıyor"
+      );
+    });
+
+    if (isCurrentBusy) {
+      const firstFree = list.find((m) => {
+        const cleanName = cleanMachineName(m.name || m.id);
+        return !laundrySlots.some((slot) => {
+          const slotClean = cleanMachineName(slot.makineNo);
+          return (
+            (slotClean === cleanName || slot.makineNo === m.id) &&
+            normalizeDateStr(slot.tarih) === todayKey &&
+            slot.durum !== "İptal" &&
+            getDynamicSlotStatus(slot) === "Yıkanıyor"
+          );
+        });
+      });
+      if (firstFree) {
+        setSelectedMachine(cleanMachineName(firstFree.name || firstFree.id));
+      }
+    }
+  }, [selectedLaundryDate, laundrySlots, selectedMachine, laundryMachines]);
 
   useEffect(() => {
     if (laundryMachines.length > 0 && (!selectedMachine || selectedMachine.includes("-1793"))) {
@@ -156,10 +208,15 @@ export default function StudentPortalView({
 
     if (currentStudent?.eposta) {
       setStudentEmail(currentStudent.eposta);
+    } else if (currentUser.details && currentUser.details.includes("@")) {
+      const emailPart = currentUser.details.includes("•")
+        ? currentUser.details.split("•")[1]?.trim() || ""
+        : currentUser.details.trim();
+      setStudentEmail(emailPart);
     } else {
-      setStudentEmail("ogrenci@yurtify.com");
+      setStudentEmail("");
     }
-  }, [currentStudent?.kullaniciAdi, currentStudent?.adSoyad, currentStudent?.eposta, currentUser?.name]);
+  }, [currentStudent?.kullaniciAdi, currentStudent?.adSoyad, currentStudent?.eposta, currentUser?.name, currentUser?.details]);
 
   let odaNo = currentStudent?.odaNo;
   if (!odaNo && currentUser.details) {
@@ -169,8 +226,44 @@ export default function StudentPortalView({
     }
   }
   if (!odaNo) {
-    odaNo = "B-305";
+    odaNo = "-";
   }
+
+  // Geçici şifre ile ilk giriş kontrolü (Zorunlu şifre belirleme)
+  const isTemporaryPasswordActive = Boolean(
+    currentStudent &&
+    (currentStudent.geciciSifreMi === true || currentStudent.sifre === "ogrenci123")
+  );
+
+  const handleForcedPasswordChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    setForcedPasswordError("");
+
+    if (!forcedNewPassword || forcedNewPassword.length < 6) {
+      setForcedPasswordError("Yeni şifreniz en az 6 karakter olmalıdır.");
+      return;
+    }
+    if (forcedNewPassword.toLowerCase() === "ogrenci123") {
+      setForcedPasswordError("Yeni şifreniz geçici şifrenizle (ogrenci123) aynı olamaz.");
+      return;
+    }
+    if (forcedNewPassword !== forcedConfirmPassword) {
+      setForcedPasswordError("Girdiğiniz yeni şifreler birbiriyle eşleşmiyor.");
+      return;
+    }
+
+    setIsForcedUpdating(true);
+    if (onUpdateStudentPassword && currentStudent) {
+      onUpdateStudentPassword(currentStudent.adSoyad, forcedNewPassword);
+    } else if (onUpdateStudentProfile && currentStudent) {
+      onUpdateStudentProfile(currentStudent.adSoyad, { sifre: forcedNewPassword });
+    }
+
+    showToast("Yeni şifreniz başarıyla belirlendi. Yurtify portalına hoş geldiniz!");
+    setIsForcedUpdating(false);
+    setForcedNewPassword("");
+    setForcedConfirmPassword("");
+  };
 
   const matchedRoom = rooms?.find(
     (r) =>
@@ -222,15 +315,15 @@ export default function StudentPortalView({
     );
   };
 
-  let katDisplay: string | number = "";
+  let katDisplay: string | number = "-";
   if (matchedRoom?.kat !== undefined) {
     katDisplay = matchedRoom.kat === 0 ? "Zemin" : matchedRoom.kat;
-  } else {
+  } else if (odaNo && odaNo !== "-") {
     const digitMatch = odaNo.match(/\d+/);
     if (digitMatch && digitMatch[0].length >= 3) {
       katDisplay = digitMatch[0][0];
     } else {
-      katDisplay = "3";
+      katDisplay = "-";
     }
   }
 
@@ -340,18 +433,42 @@ export default function StudentPortalView({
 
     const { formattedRange } = parseSlotMinutes(selectedStartTime);
 
-    // Seçilen saatte makine çakışma kontrolü
-    const isConflict = laundrySlots.some(
-      (s) =>
-        s.tarih === selectedLaundryDate &&
-        s.makineNo === selectedMachine &&
-        (s.saatAraligi === formattedRange || s.saatAraligi === selectedStartTime) &&
-        s.durum !== "İptal" &&
-        s.durum !== "Tamamlandı"
-    );
+    const cleanSelectedMachine = cleanMachineName(selectedMachine);
+    const todayKey = getTodayDateKey();
+    const isToday = normalizeDateStr(selectedLaundryDate) === todayKey;
 
-    if (isConflict) {
-      showToast("Seçilen makine ve saatte başka bir randevu mevcuttur.");
+    // Dolu makineye sıra oluşturulmasını engelle (Şu an çalışan makine kontrolü)
+    const isCurrentlyWorking = laundrySlots.some((slot) => {
+      const slotClean = cleanMachineName(slot.makineNo);
+      return (
+        (slotClean === cleanSelectedMachine || slot.makineNo === selectedMachine) &&
+        normalizeDateStr(slot.tarih) === todayKey &&
+        slot.durum !== "İptal" &&
+        getDynamicSlotStatus(slot) === "Yıkanıyor"
+      );
+    });
+
+    if (isToday && isCurrentlyWorking) {
+      showToast("Seçilen makine şu anda kullanımda (dolu). Dolu olan makineye sıra oluşturulamaz.");
+      return;
+    }
+
+    // Seçilen saat aralığında çakışma ve doluluk kontrolü
+    const { startMinutes: newStart, endMinutes: newEnd } = parseSlotMinutes(formattedRange);
+
+    const isSlotConflict = laundrySlots.some((s) => {
+      const slotClean = cleanMachineName(s.makineNo);
+      const isSameMachine = slotClean === cleanSelectedMachine || s.makineNo === selectedMachine;
+      const isSameDate = normalizeDateStr(s.tarih) === normalizeDateStr(selectedLaundryDate);
+      if (!isSameMachine || !isSameDate || s.durum === "İptal" || s.durum === "Tamamlandı") {
+        return false;
+      }
+      const { startMinutes: existingStart, endMinutes: existingEnd } = parseSlotMinutes(s.saatAraligi);
+      return Math.max(newStart, existingStart) < Math.min(newEnd, existingEnd);
+    });
+
+    if (isSlotConflict) {
+      showToast("Seçilen makine belirtilen saat aralığında doludur. Sıra oluşturulamaz.");
       return;
     }
 
@@ -448,19 +565,17 @@ export default function StudentPortalView({
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-2 ${
-                isActive
+              className={`px-5 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-all flex items-center gap-2 ${isActive
                   ? "bg-[#0284C7] text-white border border-[#0369A1] shadow-xs"
                   : "text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-[#F1F5F9] hover:bg-white dark:hover:bg-[#0F172A]"
-              }`}
+                }`}
             >
               <span className="w-4 h-4 flex items-center justify-center">{tab.icon}</span>
               <span>{tab.label}</span>
               {tab.badge !== undefined && tab.badge > 0 && (
                 <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                    isActive ? "bg-white text-[#0284C7]" : "bg-rose-600 text-white"
-                  }`}
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${isActive ? "bg-white text-[#0284C7]" : "bg-rose-600 text-white"
+                    }`}
                 >
                   {tab.badge}
                 </span>
@@ -626,11 +741,10 @@ export default function StudentPortalView({
                 </span>
                 {currentAttendance?.status && (
                   <span
-                    className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                      currentAttendance.status === "var"
+                    className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${currentAttendance.status === "var"
                         ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
                         : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
-                    }`}
+                      }`}
                   >
                     Seçim: {currentAttendance.status === "var" ? "Varım" : "Yokum"}
                   </span>
@@ -652,11 +766,10 @@ export default function StudentPortalView({
                     <button
                       type="button"
                       onClick={() => handleSelectAttendance("var")}
-                      className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] active:scale-95 ${
-                        selectedAttendance === "var"
+                      className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] active:scale-95 ${selectedAttendance === "var"
                           ? "bg-emerald-600 text-white shadow-xs font-black ring-2 ring-emerald-500/30"
                           : "bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] hover:border-emerald-500"
-                      }`}
+                        }`}
                     >
                       <span className={`w-2 h-2 rounded-full ${selectedAttendance === "var" ? "bg-white" : "bg-emerald-500"}`} />
                       Varım
@@ -666,11 +779,10 @@ export default function StudentPortalView({
                     <button
                       type="button"
                       onClick={() => handleSelectAttendance("yok")}
-                      className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] active:scale-95 ${
-                        selectedAttendance === "yok"
+                      className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] active:scale-95 ${selectedAttendance === "yok"
                           ? "bg-rose-600 text-white shadow-xs font-black ring-2 ring-rose-500/30"
                           : "bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] hover:border-rose-500"
-                      }`}
+                        }`}
                     >
                       <span className={`w-2 h-2 rounded-full ${selectedAttendance === "yok" ? "bg-white" : "bg-rose-500"}`} />
                       Yokum
@@ -721,11 +833,10 @@ export default function StudentPortalView({
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-xs text-stone-800">{anc.baslik}</span>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                          anc.oncelik === "Acil"
+                        className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${anc.oncelik === "Acil"
                             ? "bg-rose-500/20 text-rose-500"
                             : "bg-[#F1F5F9] text-[#0284C7] border border-[#E2E8F0]"
-                        }`}
+                          }`}
                       >
                         {anc.oncelik}
                       </span>
@@ -758,6 +869,101 @@ export default function StudentPortalView({
             </div>
           </div>
 
+          {/* Çamaşırhane Doluluk Durumu (Yıkama ve Kurutma Ayrı Kartlar) */}
+          {(() => {
+            const todayKey = getTodayDateKey();
+            const machinesList = laundryMachines;
+
+            const isMachineBusy = (m: (typeof machinesList)[0]) => {
+              const cleanId = cleanMachineName(m.id);
+              const cleanName = cleanMachineName(m.name || m.id);
+              return laundrySlots.some((slot) => {
+                const slotClean = cleanMachineName(slot.makineNo);
+                return (
+                  (slotClean === cleanId || slotClean === cleanName || slot.makineNo === m.id) &&
+                  normalizeDateStr(slot.tarih) === todayKey &&
+                  slot.durum !== "İptal" &&
+                  getDynamicSlotStatus(slot) === "Yıkanıyor"
+                );
+              });
+            };
+
+            const washMachines = machinesList.filter((m) => m.tur !== "kurutma");
+            const dryMachines = machinesList.filter((m) => m.tur === "kurutma");
+
+            const washTotal = washMachines.length;
+            const washBusy = washMachines.filter(isMachineBusy).length;
+            const washFree = Math.max(0, washTotal - washBusy);
+            const washPercent = washTotal > 0 ? Math.round((washBusy / washTotal) * 100) : 0;
+
+            const dryTotal = dryMachines.length;
+            const dryBusy = dryMachines.filter(isMachineBusy).length;
+            const dryFree = Math.max(0, dryTotal - dryBusy);
+            const dryPercent = dryTotal > 0 ? Math.round((dryBusy / dryTotal) * 100) : 0;
+
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+                {/* Yıkama Doluluk Durumu */}
+                <div className="bg-white dark:bg-[#1E293B] p-4 sm:p-5 rounded-2xl border border-[#E2E8F0] dark:border-[#334155] shadow-xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm sm:text-base font-bold text-stone-900 dark:text-[#F1F5F9]">
+                      Yıkama Doluluk Durumu
+                    </h4>
+                    <span className="text-sm sm:text-base font-bold text-amber-500 dark:text-amber-400">
+                      %{washPercent} Dolu
+                    </span>
+                  </div>
+
+                  {/* İlerleme Çubuğu (Gradient Bar) */}
+                  <div className="w-full h-2.5 bg-stone-100 dark:bg-[#0F172A] rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-emerald-500 via-amber-500 to-rose-500"
+                      style={{ width: `${washPercent}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-stone-500 dark:text-stone-400 font-medium">
+                      {washBusy} Makine Çalışıyor
+                    </span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                      {washFree} Makine Müsait (Boş)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Kurutma Doluluk Durumu */}
+                <div className="bg-white dark:bg-[#1E293B] p-4 sm:p-5 rounded-2xl border border-[#E2E8F0] dark:border-[#334155] shadow-xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm sm:text-base font-bold text-stone-900 dark:text-[#F1F5F9]">
+                      Kurutma Doluluk Durumu
+                    </h4>
+                    <span className="text-sm sm:text-base font-bold text-amber-500 dark:text-amber-400">
+                      %{dryPercent} Dolu
+                    </span>
+                  </div>
+
+                  {/* İlerleme Çubuğu (Gradient Bar) */}
+                  <div className="w-full h-2.5 bg-stone-100 dark:bg-[#0F172A] rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-emerald-500 via-amber-500 to-rose-500"
+                      style={{ width: `${dryPercent}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-stone-500 dark:text-stone-400 font-medium">
+                      {dryBusy} Makine Çalışıyor
+                    </span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                      {dryFree} Makine Müsait (Boş)
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Yeni Randevu Alma Formu */}
           <div className="bg-white dark:bg-[#1E293B] p-5 sm:p-6 rounded-2xl sm:rounded-3xl border border-[#E2E8F0] dark:border-[#334155] space-y-4 shadow-xs">
             <div className="border-b border-[#E2E8F0] dark:border-[#334155] pb-3">
@@ -778,29 +984,60 @@ export default function StudentPortalView({
                 </div>
 
                 <div>
-                  <label className="text-stone-600 dark:text-[#94A3B8] block mb-1 font-semibold">Makine Seçimi</label>
-                  <select
-                    value={selectedMachine}
-                    onChange={(e) => setSelectedMachine(e.target.value)}
-                    className="w-full bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-xl p-2.5 text-stone-900 dark:text-[#F1F5F9] font-medium focus:outline-none focus:border-[#0284C7]"
-                  >
-                    {laundryMachines.length > 0 ? (
-                      laundryMachines.map((m) => {
-                        const cleanName = cleanMachineName(m.name || m.id);
+                  {(() => {
+                    const todayKey = getTodayDateKey();
+                    const isSelectedDateToday = normalizeDateStr(selectedLaundryDate) === todayKey;
+                    const machinesList = laundryMachines;
+
+                    const checkMachineBusy = (name: string, id: string) => {
+                      const cleanName = cleanMachineName(name || id);
+                      return laundrySlots.some((slot) => {
+                        const slotClean = cleanMachineName(slot.makineNo);
                         return (
-                          <option key={m.id} value={cleanName}>
-                            {cleanName} ({m.tur === "kurutma" ? "Kurutma" : "Yıkama"})
-                          </option>
+                          (slotClean === cleanName || slot.makineNo === id) &&
+                          normalizeDateStr(slot.tarih) === todayKey &&
+                          slot.durum !== "İptal" &&
+                          getDynamicSlotStatus(slot) === "Yıkanıyor"
                         );
-                      })
-                    ) : (
+                      });
+                    };
+
+                    const isSelectedMachineBusy = isSelectedDateToday && checkMachineBusy(selectedMachine, selectedMachine);
+
+                    return (
                       <>
-                        <option value="Makine 1">Makine 1 (Yıkama)</option>
-                        <option value="Makine 2">Makine 2 (Yıkama)</option>
-                        <option value="Kurutma 1">Kurutma 1 (Kurutma)</option>
+                        <label className="text-stone-600 dark:text-[#94A3B8] block mb-1 font-semibold">Makine Seçimi</label>
+                        <select
+                          value={selectedMachine}
+                          onChange={(e) => setSelectedMachine(e.target.value)}
+                          className={`w-full bg-[#F8FAFC] dark:bg-[#0F172A] border rounded-xl p-2.5 text-stone-900 dark:text-[#F1F5F9] font-medium focus:outline-none transition-colors ${isSelectedMachineBusy
+                              ? "border-amber-400 dark:border-amber-600"
+                              : "border-[#E2E8F0] dark:border-[#334155] focus:border-[#0284C7]"
+                            }`}
+                        >
+                          {machinesList.map((m) => {
+                            const cleanName = cleanMachineName(m.name || m.id);
+                            const isBusy = isSelectedDateToday && checkMachineBusy(m.name || m.id, m.id);
+                            const turLabel = m.tur === "kurutma" ? "Kurutma" : "Yıkama";
+                            return (
+                              <option key={m.id} value={cleanName} disabled={isBusy}>
+                                {cleanName} ({turLabel}) {isBusy ? "- Dolu (Seçilemez)" : "- Müsait"}
+                              </option>
+                            );
+                          })}
+                        </select>
+
+                        {isSelectedMachineBusy && (
+                          <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <span>Bu makine şu anda kullanımda (dolu). Sıra oluşturulamaz.</span>
+                          </div>
+                        )}
                       </>
-                    )}
-                  </select>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -822,12 +1059,32 @@ export default function StudentPortalView({
                 />
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl cursor-pointer transition-all min-h-[44px] shadow-xs active:scale-[0.99]"
-              >
-                Randevuyu Onayla
-              </button>
+              {(() => {
+                const todayKey = getTodayDateKey();
+                const isSelectedDateToday = normalizeDateStr(selectedLaundryDate) === todayKey;
+                const isSelectedBusy = isSelectedDateToday && laundrySlots.some((slot) => {
+                  const slotClean = cleanMachineName(slot.makineNo);
+                  return (
+                    (slotClean === cleanMachineName(selectedMachine) || slot.makineNo === selectedMachine) &&
+                    normalizeDateStr(slot.tarih) === todayKey &&
+                    slot.durum !== "İptal" &&
+                    getDynamicSlotStatus(slot) === "Yıkanıyor"
+                  );
+                });
+
+                return (
+                  <button
+                    type="submit"
+                    disabled={isSelectedBusy}
+                    className={`w-full py-2.5 font-bold rounded-xl transition-all min-h-[44px] shadow-xs active:scale-[0.99] flex items-center justify-center gap-2 ${isSelectedBusy
+                        ? "bg-stone-200 dark:bg-stone-800 text-stone-500 dark:text-stone-400 cursor-not-allowed border border-stone-300 dark:border-stone-700"
+                        : "bg-[#0284C7] hover:bg-[#0369A1] text-white cursor-pointer"
+                      }`}
+                  >
+                    {isSelectedBusy ? "Makine Dolu - Sıra Oluşturulamaz" : "Randevuyu Onayla"}
+                  </button>
+                );
+              })()}
             </form>
           </div>
 
@@ -859,15 +1116,14 @@ export default function StudentPortalView({
                             {cleanMachineName(slot.makineNo)}
                           </span>
                           <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                              currentStatus === "Yıkanıyor"
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${currentStatus === "Yıkanıyor"
                                 ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
                                 : currentStatus === "Sırada"
-                                ? "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800"
-                                : currentStatus === "İptal"
-                                ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
-                                : "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
-                            }`}
+                                  ? "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800"
+                                  : currentStatus === "İptal"
+                                    ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
+                                    : "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+                              }`}
                           >
                             {currentStatus}
                           </span>
@@ -927,7 +1183,7 @@ export default function StudentPortalView({
                     id: "mnt-" + Date.now(),
                     odaNo: odaNo,
                     baslik: baslikInput.value.trim(),
-                    kategori: (katInput.value as any) || "Tesisat",
+                    kategori: (katInput.value as MaintenanceTicket["kategori"]) || "Tesisat",
                     oncelik: "Orta",
                     durum: "Açık",
                     bildiren: currentUser?.name || "Öğrenci",
@@ -1001,13 +1257,12 @@ export default function StudentPortalView({
                           {t.baslik}
                         </span>
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${
-                            t.durum === "Çözüldü"
+                          className={`px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${t.durum === "Çözüldü"
                               ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
                               : t.durum === "İnceleniyor"
-                              ? "bg-amber-100 text-amber-800 border border-amber-300"
-                              : "bg-rose-100 text-rose-800 border border-rose-300"
-                          }`}
+                                ? "bg-amber-100 text-amber-800 border border-amber-300"
+                                : "bg-rose-100 text-rose-800 border border-rose-300"
+                            }`}
                         >
                           {t.durum}
                         </span>
@@ -1039,11 +1294,10 @@ export default function StudentPortalView({
             >
               <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                 <div
-                  className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
-                    openSettingsSections.guvenlik
+                  className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${openSettingsSections.guvenlik
                       ? "bg-[#0284C7] text-white"
                       : "bg-[#F1F5F9] dark:bg-[#0F172A] text-[#0284C7]"
-                  }`}
+                    }`}
                 >
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
@@ -1063,9 +1317,8 @@ export default function StudentPortalView({
 
               <div className="flex items-center gap-2 shrink-0">
                 <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] transition-transform duration-300 ${
-                    openSettingsSections.guvenlik ? "rotate-180 bg-[#F1F5F9] dark:bg-[#1E293B]" : ""
-                  }`}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] transition-transform duration-300 ${openSettingsSections.guvenlik ? "rotate-180 bg-[#F1F5F9] dark:bg-[#1E293B]" : ""
+                    }`}
                 >
                   <svg className="w-4 h-4 text-[#0F172A] dark:text-[#F1F5F9]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
@@ -1108,7 +1361,7 @@ export default function StudentPortalView({
                         required
                         value={studentEmail}
                         onChange={(e) => setStudentEmail(e.target.value)}
-                        placeholder="ogrenci@yurtify.com"
+                        placeholder="ogrenci@eposta.com"
                         className="w-full bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-xl p-2.5 text-[#0F172A] dark:text-[#F1F5F9] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 font-mono font-bold"
                       />
                     </div>
@@ -1179,11 +1432,10 @@ export default function StudentPortalView({
             >
               <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                 <div
-                  className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${
-                    openSettingsSections.tema
+                  className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${openSettingsSections.tema
                       ? "bg-[#0284C7] text-white"
                       : "bg-[#F1F5F9] dark:bg-[#0F172A] text-[#0284C7]"
-                  }`}
+                    }`}
                 >
                   <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
@@ -1203,9 +1455,8 @@ export default function StudentPortalView({
 
               <div className="flex items-center gap-2 shrink-0">
                 <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] transition-transform duration-300 ${
-                    openSettingsSections.tema ? "rotate-180 bg-[#F1F5F9] dark:bg-[#1E293B]" : ""
-                  }`}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] transition-transform duration-300 ${openSettingsSections.tema ? "rotate-180 bg-[#F1F5F9] dark:bg-[#1E293B]" : ""
+                    }`}
                 >
                   <svg className="w-4 h-4 text-[#0F172A] dark:text-[#F1F5F9]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
@@ -1227,19 +1478,17 @@ export default function StudentPortalView({
                         onToggleTheme();
                       }
                     }}
-                    className={`p-3.5 rounded-xl sm:rounded-2xl border text-left transition-colors cursor-pointer flex items-center justify-between gap-3 min-h-[48px] active:scale-[0.99] ${
-                      theme === "light"
+                    className={`p-3.5 rounded-xl sm:rounded-2xl border text-left transition-colors cursor-pointer flex items-center justify-between gap-3 min-h-[48px] active:scale-[0.99] ${theme === "light"
                         ? "border-[#0284C7] bg-[#F1F5F9] dark:bg-[#162032]"
                         : "border-[#E2E8F0] dark:border-[#334155] bg-[#F8FAFC] dark:bg-[#0F172A] hover:border-[#CBD5E1] dark:hover:border-[#475569] hover:bg-white dark:hover:bg-[#1E293B]"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div
-                        className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                          theme === "light"
+                        className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${theme === "light"
                             ? "bg-[#0284C7] text-white"
                             : "bg-white dark:bg-[#1E293B] text-[#64748B] dark:text-[#94A3B8] border border-[#E2E8F0] dark:border-[#334155]"
-                        }`}
+                          }`}
                       >
                         <svg
                           className="w-4 h-4"
@@ -1287,19 +1536,17 @@ export default function StudentPortalView({
                         onToggleTheme();
                       }
                     }}
-                    className={`p-3.5 rounded-xl sm:rounded-2xl border text-left transition-colors cursor-pointer flex items-center justify-between gap-3 min-h-[48px] active:scale-[0.99] ${
-                      theme === "dark"
+                    className={`p-3.5 rounded-xl sm:rounded-2xl border text-left transition-colors cursor-pointer flex items-center justify-between gap-3 min-h-[48px] active:scale-[0.99] ${theme === "dark"
                         ? "border-[#0284C7] bg-[#F1F5F9] dark:bg-[#162032]"
                         : "border-[#E2E8F0] dark:border-[#334155] bg-[#F8FAFC] dark:bg-[#0F172A] hover:border-[#CBD5E1] dark:hover:border-[#475569] hover:bg-white dark:hover:bg-[#1E293B]"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div
-                        className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                          theme === "dark"
+                        className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${theme === "dark"
                             ? "bg-[#0284C7] text-white"
                             : "bg-white dark:bg-[#1E293B] text-[#64748B] dark:text-[#94A3B8] border border-[#E2E8F0] dark:border-[#334155]"
-                        }`}
+                          }`}
                       >
                         <svg
                           className="w-4 h-4"
@@ -1347,48 +1594,89 @@ export default function StudentPortalView({
       )}
 
       {/* ======================================================== */}
-      {/* 6. MOBİL ALT GEZİNME ÇUBUĞU (Kullanıcı Talebi: Alt Butonlar) */}
+      {/* GEÇİCİ ŞİFRE ZORUNLU DEĞİŞTİRME MODALI (ogrenci123)      */}
       {/* ======================================================== */}
-      <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-md border-t border-[#E2E8F0] dark:border-[#1E293B] shadow-lg px-2 py-1 pb-[max(0.4rem,env(safe-area-inset-bottom))]"
-        aria-label="Öğrenci Mobil Alt Menü"
-      >
-        <div className="flex items-center justify-around gap-1 max-w-lg mx-auto">
-          {studentTabItems.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex flex-col items-center justify-center flex-1 py-1.5 px-1 rounded-xl transition-all cursor-pointer relative min-h-[44px] ${
-                  isActive
-                    ? "text-[#0284C7] font-bold bg-[#F1F5F9] dark:bg-[#1E293B]"
-                    : "text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-[#F1F5F9] font-medium"
-                }`}
-              >
-                <div className="relative">
-                  <span
-                    className={`w-5 h-5 flex items-center justify-center ${
-                      isActive ? "text-[#0284C7]" : "text-[#64748B] dark:text-[#94A3B8]"
-                    }`}
+      {isTemporaryPasswordActive && (
+        <div className="fixed inset-0 z-[9999] bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-md bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-2xl relative my-auto animate-in fade-in duration-200">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 flex items-center justify-center text-[#0284C7] dark:text-[#38BDF8] shrink-0">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 leading-tight">
+                  Geçici Şifrenizi Değiştiriniz
+                </h3>
+                <p className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  İlk Giriş Güvenlik Doğrulaması
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mb-4 leading-relaxed">
+              Hesabınıza geçici şifreniz ile giriş yaptınız. Güvenliğiniz için sisteme devam etmeden önce lütfen yeni ve kalıcı bir şifre belirleyiniz.
+            </p>
+
+            {forcedPasswordError && (
+              <div className="p-3 mb-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 text-xs font-semibold">
+                {forcedPasswordError}
+              </div>
+            )}
+
+            <form onSubmit={handleForcedPasswordChange} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Yeni Şifre *
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={forcedNewPassword}
+                  onChange={(e) => setForcedNewPassword(e.target.value)}
+                  placeholder="En az 6 karakter"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:outline-hidden focus:border-[#0284C7] focus:ring-1 focus:ring-[#0284C7] min-h-[44px]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Yeni Şifre (Tekrar) *
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={forcedConfirmPassword}
+                  onChange={(e) => setForcedConfirmPassword(e.target.value)}
+                  placeholder="Yeni şifrenizi tekrar giriniz"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 text-sm focus:outline-hidden focus:border-[#0284C7] focus:ring-1 focus:ring-[#0284C7] min-h-[44px]"
+                />
+              </div>
+
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  type="submit"
+                  disabled={isForcedUpdating}
+                  className="w-full py-3 px-4 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold text-sm shadow-xs transition-colors cursor-pointer text-center min-h-[44px] flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isForcedUpdating ? "Kaydediliyor..." : "Yeni Şifremi Belirle ve Devam Et"}
+                </button>
+
+                {onLogout && (
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="w-full py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold text-xs transition-colors cursor-pointer text-center min-h-[44px]"
                   >
-                    {tab.icon}
-                  </span>
-                  {tab.badge !== undefined && tab.badge > 0 && (
-                    <span className="absolute -top-1 -right-2.5 w-4 h-4 rounded-full bg-rose-600 text-white text-[9px] font-black flex items-center justify-center shadow-xs">
-                      {tab.badge}
-                    </span>
-                  )}
-                </div>
-                <span className="text-[10.5px] mt-0.5 tracking-tight whitespace-nowrap">
-                  {tab.label}
-                </span>
-              </button>
-            );
-          })}
+                    Oturumu Kapat
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
         </div>
-      </nav>
+      )}
     </div>
   );
 }

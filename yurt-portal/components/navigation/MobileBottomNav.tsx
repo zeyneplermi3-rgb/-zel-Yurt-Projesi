@@ -19,7 +19,7 @@ export default function MobileBottomNav({
 }: MobileBottomNavProps) {
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#E2E8F0] shadow-lg px-2 py-1 pb-[max(0.4rem,env(safe-area-inset-bottom))]"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur-md border-t border-[#E2E8F0] dark:border-[#334155] shadow-lg px-2 py-1 pb-[max(0.4rem,env(safe-area-inset-bottom))]"
       aria-label="Mobil Alt Menü"
     >
       <div className="flex items-center justify-around gap-0.5 max-w-lg mx-auto">
@@ -32,8 +32,8 @@ export default function MobileBottomNav({
               onClick={() => onTabChange(tab.id)}
               className={`flex flex-col items-center justify-center flex-1 py-1.5 px-0.5 rounded-xl transition-all cursor-pointer relative min-h-[44px] ${
                 isActive
-                  ? "text-[#0284C7] font-bold bg-[#F1F5F9]"
-                  : "text-[#64748B] hover:text-[#0F172A] font-medium"
+                  ? "text-[#0284C7] dark:text-[#38BDF8] font-bold bg-[#F1F5F9] dark:bg-[#1E293B]"
+                  : "text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-[#F8FAFC] font-medium"
               }`}
             >
               <span className="text-[11px] truncate tracking-tight text-center">

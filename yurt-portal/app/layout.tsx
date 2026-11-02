@@ -13,15 +13,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Özel Yurt Yönetim & Öğrenci Portalı",
+  title: "Yurtify - Yurt Yönetim & Öğrenci Portalı",
   description: "Öğrenci konaklama, oda rezervasyonu, izin ve yurt yönetim otomasyonu",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
+  maximumScale: 1,
+  userScalable: false,
+  interactiveWidget: "resizes-content",
 };
+
+export const dynamic = "force-dynamic";
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

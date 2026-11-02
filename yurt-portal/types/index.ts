@@ -29,13 +29,15 @@ export interface Student {
   adSoyad: string;
   kullaniciAdi?: string;
   telefon?: string;
-  eposta: string;
+  eposta?: string;
   sifre?: string;
+  geciciSifreMi?: boolean;
   odaNo: string;
   yatakNo: string;
   veliAd?: string;
   veliTel?: string;
   kayitTarihi?: string;
+  yurtId?: string;
 }
 
 export interface Room {
@@ -47,6 +49,7 @@ export interface Room {
   doluYatak: number;
   odaTipi: string;
   durum: "Aktif" | "Bakımda";
+  yurtId?: string;
 }
 
 export interface MaintenanceTicket {
@@ -58,6 +61,7 @@ export interface MaintenanceTicket {
   durum: "Açık" | "İnceleniyor" | "Çözüldü";
   bildiren: string;
   tarih: string;
+  yurtId?: string;
 }
 
 export interface Announcement {
@@ -66,6 +70,7 @@ export interface Announcement {
   icerik: string;
   oncelik: "Normal" | "Önemli" | "Acil";
   tarih: string;
+  yurtId?: string;
 }
 
 export interface LaundrySlot {
@@ -78,6 +83,7 @@ export interface LaundrySlot {
   program: "Renkli & Karışık" | "Beyazlar & Pamuklu" | "Hızlı Yıkama (30 dk)" | "Kurutma & Havalandırma";
   durum: "Yıkanıyor" | "Sırada" | "Tamamlandı" | "İptal";
   not?: string;
+  yurtId?: string;
 }
 
 export interface LaundryMachine {
@@ -86,6 +92,7 @@ export interface LaundryMachine {
   tip: string;
   tur: "yikama" | "kurutma";
   kapasiteKg?: number;
+  yurtId?: string;
 }
 
 export type ManagerTab =
