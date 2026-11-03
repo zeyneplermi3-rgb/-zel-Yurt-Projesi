@@ -206,6 +206,8 @@ const DOM = {
   adminTabBtns: document.querySelectorAll('[data-admin-subtab]'),
   adminContentSubviews: document.querySelectorAll('.admin-content-subview'),
   btnToggleStudentPreview: document.getElementById('btn-toggle-student-preview'),
+  previewModeBar: document.getElementById('preview-mode-bar'),
+  btnExitPreview: document.getElementById('btn-exit-preview'),
 
   // Admin Student Management
   admStudentName: document.getElementById('adm-student-name'),
@@ -488,6 +490,8 @@ DOM.btnLogoutActions.forEach(btn => {
   btn.addEventListener('click', () => {
     AppState.previewModeActive = false;
     AppState.activeStudentUser = null;
+    const floatingIsland = document.getElementById('floating-preview-island');
+    if (floatingIsland) floatingIsland.classList.add('hidden');
     DOM.portalStudent.classList.remove('active');
     DOM.portalAdmin.classList.remove('active');
     DOM.viewForcePassword.classList.remove('active');
@@ -533,6 +537,9 @@ DOM.btnToggleStudentPreview.addEventListener('click', () => {
   DOM.portalAdmin.classList.remove('active');
   DOM.portalStudent.classList.add('active');
   
+  const floatingIsland = document.getElementById('floating-preview-island');
+  if (floatingIsland) floatingIsland.classList.remove('hidden');
+  
   // Default to Eda Etem for preview
   const previewStudent = AppState.students[0];
   DOM.studentProfileName.textContent = previewStudent.name;
@@ -540,8 +547,22 @@ DOM.btnToggleStudentPreview.addEventListener('click', () => {
   DOM.studentBedLabel.textContent = `${previewStudent.bed} • Önizleme Modu`;
 
   renderStudentViews();
-  showPushNotification('Canlı Önizleme Açıldı', 'Öğrenci portalını yönetici gözünden görüntülüyorsunuz.');
+  showPushNotification('Canlı Önizleme Aktif', 'Ekrandaki yüzen kapsül üzerinden dilediğiniz an yöneticiye dönebilirsiniz.');
 });
+
+// Exit Preview and Return to Admin Portal (Globally accessible function)
+window.exitStudentPreview = function() {
+  AppState.previewModeActive = false;
+  
+  const floatingIsland = document.getElementById('floating-preview-island');
+  if (floatingIsland) floatingIsland.classList.add('hidden');
+  
+  DOM.portalStudent.classList.remove('active');
+  DOM.portalAdmin.classList.add('active');
+
+  renderAdminViews();
+  showPushNotification('Yöneticiye Dönüldü', 'İdari Yönetim Masasına başarıyla geri döndünüz.');
+};
 
 // ================= ADMIN: STUDENT MANAGEMENT (ADD & DELETE) =================
 
