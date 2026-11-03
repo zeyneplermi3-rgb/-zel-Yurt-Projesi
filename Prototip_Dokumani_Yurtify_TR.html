@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Prototip Değerlendirme Dokümanı - Yurtify Uygulaması</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #1e293b;
+      background-color: #ffffff;
+      line-height: 1.6;
+      font-size: 13.5px;
+    }
+
+    .doc-page {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 36px 40px;
+    }
+
+    /* Üst Başlık */
+    .doc-header {
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 14px;
+      margin-bottom: 24px;
+    }
+
+    .doc-date {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+
+    .doc-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.3;
+    }
+
+    /* Başlıklar */
+    h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 24px;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #cbd5e1;
+      break-after: avoid;
+    }
+
+    h3 {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 20px;
+      margin-bottom: 8px;
+      break-after: avoid;
+    }
+
+    h4 {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #334155;
+      margin-top: 10px;
+      margin-bottom: 6px;
+      break-after: avoid;
+    }
+
+    p {
+      margin-bottom: 12px;
+      color: #334155;
+      text-align: justify;
+    }
+
+    ul {
+      margin-left: 22px;
+      margin-bottom: 14px;
+    }
+
+    li {
+      margin-bottom: 6px;
+      color: #334155;
+    }
+
+    /* Görsel Mimari Galerisi */
+    .visual-group {
+      margin: 20px 0 26px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .visual-group-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 10px;
+    }
+
+    .screen-row {
+      display: flex;
+      gap: 18px;
+      justify-content: center;
+      align-items: stretch;
+      margin-bottom: 12px;
+    }
+
+    .screen-card {
+      flex: 1;
+      max-width: 48%;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .screen-card img {
+      width: auto;
+      max-width: 96%;
+      height: 440px;
+      object-fit: contain;
+      border-radius: 6px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+      background: #ffffff;
+      margin-bottom: 8px;
+    }
+
+    .screen-caption {
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      margin-top: auto;
+    }
+
+    .admin-card {
+      width: 100%;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .admin-card img {
+      width: 100%;
+      max-height: 680px;
+      object-fit: contain;
+      border-radius: 6px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+      background: #ffffff;
+      margin-bottom: 10px;
+    }
+
+    /* Doğal / Elden Çıkmış Soru & Geri Bildirim Bölümleri */
+    .section-block {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      margin-bottom: 22px;
+    }
+
+    .section-subtitle {
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 10px;
+      margin-bottom: 6px;
+      display: block;
+      font-size: 13.5px;
+    }
+
+    .appendix-box {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #0f172a;
+      word-break: break-all;
+      margin-top: 8px;
+    }
+
+    /* Yazdırma ve PDF Ayarları */
+    @media print {
+      @page {
+        size: A4;
+        margin: 12mm 12mm 12mm 12mm;
+      }
+
+      body {
+        font-size: 10.5pt;
+        background: #ffffff;
+      }
+
+      .doc-page {
+        padding: 0;
+        max-width: 100%;
+      }
+
+      .visual-group, .section-block, .screen-card, .admin-card {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+
+      .admin-group {
+        break-before: page !important;
+        page-break-before: always !important;
+      }
+
+      .screen-card img {
+        height: 440px !important;
+      }
+
+      .admin-card img {
+        max-height: 680px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="doc-page">
+
+    <div class="doc-header">
+      <div class="doc-date">28.10.2026</div>
+      <h1 class="doc-title">Prototip Değerlendirme Dokümanı - Yurtify Uygulaması</h1>
+    </div>
+
+    <!-- Özet -->
+    <div style="break-inside: avoid; page-break-inside: avoid;">
+      <h2>Prototip Oluşturma ve Değerlendirme Özeti</h2>
+      <p>
+        Bu çalışma, özel öğrenci yurtlarının günlük yönetimini ve yurt içi iletişimi kolaylaştırmak amacıyla geliştirdiğimiz <strong>Yurtify</strong> uygulamasının prototip test sonuçlarını içermektedir. Daha önce yaptığımız kullanıcı görüşmelerinde tespit ettiğimiz sorunları çözmek için mobil öncelikli, çalışan bir arayüz prototipi hazırladık. Bu prototipi, <strong>özel yurtlarda kalan 6 öğrenci ve 1 yurt yöneticisiyle birlikte</strong> test ettik.
+      </p>
+      <p>
+        Testler sırasında uygulamanın tüm temel özellikleri incelendi: İdare tarafından tanımlanan öğrenci hesaplarına güvenli giriş adımları, gece/gündüz kullanımına uygun Açık ve Koyu tema seçenekleri, günlük yemek menüsü, yurt idaresinin duyuru panosu, adil kullanımlı çamaşırhane randevu sistemi ve arıza talebi takip süreci. Kullanıcılardan aldığımız tüm geri bildirimler, karşılaşılan zorluklar ve uygulamayı geliştirmek için planladığımız adımlar aşağıda detaylandırılmıştır.
+      </p>
+    </div>
+
+    <!-- Görsel Mimari -->
+    <div>
+      <h2>Prototip Görsel Mimarisi</h2>
+      <p style="font-size: 12.5px; color: #64748b; margin-bottom: 16px;">
+        <em>Aşağıda, uygulamanın temel işlevlerini ve çift tema (Koyu/Açık Mod) özelliklerini yansıtan arayüz ekranları yer almaktadır. Ekran üzerindeki metinlerin rahatça okunabilmesi için optimize edilmiştir.</em>
+      </p>
+
+      <!-- 1. Giriş Yap (Sign In) -->
+      <div class="visual-group">
+        <div class="visual-group-title">1. Öğrenci Giriş ve Kimlik Doğrulama (Koyu & Açık Tema)</div>
+        <div class="screen-row">
+          <div class="screen-card">
+            <img src="screenshots/screenshot_3.png" alt="Giriş Yap Koyu Mod">
+            <div class="screen-caption">Giriş Yap Ekranı (Koyu Mod)</div>
+          </div>
+          <div class="screen-card">
+            <img src="screenshots/screenshot_4.png" alt="Giriş Yap Açık Mod">
+            <div class="screen-caption">Giriş Yap Ekranı (Açık Mod)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Ana Sayfa -->
+      <div class="visual-group">
+        <div class="visual-group-title">2. Öğrenci Ana Sayfası: Günlük Yemek Menüsü ve İdari Duyuru Akışı</div>
+        <div class="screen-row">
+          <div class="screen-card">
+            <img src="screenshots/screenshot_5.png" alt="Ana Sayfa Koyu Mod">
+            <div class="screen-caption">Ana Sayfa ve Menü Paneli (Koyu Mod)</div>
+          </div>
+          <div class="screen-card">
+            <img src="screenshots/screenshot_6.png" alt="Ana Sayfa Açık Mod">
+            <div class="screen-caption">Ana Sayfa ve Menü Paneli (Açık Mod)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Çamaşır Randevusu -->
+      <div class="visual-group">
+        <div class="visual-group-title">3. Çamaşırhane Randevu Sistemi: Makine Seçimi ve Haftalık Kota Takibi</div>
+        <div class="screen-row">
+          <div class="screen-card">
+            <img src="screenshots/screenshot_7.png" alt="Çamaşırhane Koyu Mod">
+            <div class="screen-caption">Çamaşır Randevu Yönetimi (Koyu Mod)</div>
+          </div>
+          <div class="screen-card">
+            <img src="screenshots/screenshot_8.png" alt="Çamaşırhane Açık Mod">
+            <div class="screen-caption">Çamaşır Randevu Yönetimi (Açık Mod)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Arıza Talebi (Maintenance Request) -->
+      <div class="visual-group">
+        <div class="visual-group-title">4. Arıza Talebi ve Gerçek Zamanlı Takip</div>
+        <div class="screen-row">
+          <div class="screen-card">
+            <img src="screenshots/screenshot_9.png" alt="Arıza Bildirimi Koyu Mod">
+            <div class="screen-caption">Arıza Talep Formu ve Durum (Koyu Mod)</div>
+          </div>
+          <div class="screen-card">
+            <img src="screenshots/screenshot_10.png" alt="Arıza Bildirimi Açık Mod">
+            <div class="screen-caption">Arıza Talep Formu ve Durum (Açık Mod)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Yönetici Paneli -->
+      <div class="visual-group admin-group">
+        <div class="visual-group-title">5. İdari Yönetim Kontrol Paneli (Yemek Yayınlama, Çamaşırhane & Arıza Denetimi)</div>
+        <div class="admin-card">
+          <img src="screenshots/screenshot_11.png" alt="Yönetici Paneli Genel Bakış">
+          <div class="screen-caption">İdari Yönetim Sistemleri: Menü Dağıtımı, Çamaşırhane Gözetimi ve Arıza İş Emri Süreçleri (6 Farklı Yönetim Ekranı)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bölüm 1 -->
+    <div class="section-block">
+      <h3>1. Kullanıcı Kimlik Doğrulama ve Sisteme Giriş (Sign-In)</h3>
+      
+      <span class="section-subtitle">Değerlendirme Soruları:</span>
+      <ul>
+        <li>Yurt idaresi tarafından sisteme tanımlanan öğrencilerin ilk giriş (sign-in) yapma süreci ne kadar kolay ve anlaşılırdır?</li>
+        <li>Giriş formunda istenen bilgiler (Kullanıcı Adı ve Şifre) hızlı ve pratik erişim için yeterli mi?</li>
+        <li>Şifresini unutan veya giriş yaparken sorun yaşayan öğrenciler için yönlendirmeler açık ve anlaşılır mı?</li>
+      </ul>
+
+      <span class="section-subtitle">Kullanıcı Geri Bildirimleri:</span>
+      <ul>
+        <li><strong>İdari Kayıt Kolaylığı:</strong> Öğrenci kayıtlarının yurt idaresi tarafından sisteme doğrudan eklenmesi, öğrencilerin kayıt olmakla vakit kaybetmesini ve sisteme mükerrer veya yetkisiz hesap açılmasını tamamen engelledi.</li>
+        <li><strong>Hızlı Giriş Süreci:</strong> Yalnızca kullanıcı adı ve şifre ile sisteme erişilmesi arayüzü son derece sade ve pratik kıldı.</li>
+        <li><strong>Geliştirme Önerisi:</strong> Öğrencilerin her girişte tekrar şifre yazmakla uğraşmaması için giriş ekranına <strong>"Beni Hatırla"</strong> seçeneği ve parmak izi / yüz tanıma (biyometrik giriş) desteği eklenmesi önerildi.</li>
+      </ul>
+    </div>
+
+    <!-- Bölüm 2 -->
+    <div class="section-block">
+      <h3>2. Genel Arayüz, Okunabilirlik ve Açık / Koyu Tema</h3>
+      
+      <span class="section-subtitle">Değerlendirme Soruları:</span>
+      <ul>
+        <li>Menü yerleşimi, butonların büyüklüğü ve alt menü çubuğu rahat bir kullanım sunuyor mu?</li>
+        <li>Ekranlardaki yazı boyutları ve tipografi tüm kullanıcılar için rahatça okunabiliyor mu?</li>
+        <li>Açık ve Koyu tema seçenekleri gündüz ve gece ortamlarında gözü yormadan yeterli kontrastı sağlıyor mu?</li>
+      </ul>
+
+      <span class="section-subtitle">Kullanıcı Geri Bildirimleri:</span>
+      <ul>
+        <li><strong>Kolay Gezinme:</strong> Sade kart düzeni ve alt menü çubuğu sayesinde öğrencilerin aradıkları bölümlere en fazla 1-2 dokunuşla ulaşabilmesi kullanım kolaylığı sağladı.</li>
+        <li><strong>Yazı Boyutu Uyarısı:</strong> Katılımcılar bazı kartlardaki ve açıklamalardaki yazı boyutlarının küçük olduğunu, okurken zorlandıklarını belirttiler; arayüz font boyutlarının büyütülmesi veya ayarlanabilir yazı boyutu seçeneği sunulması talep edildi.</li>
+        <li><strong>Tema Seçenekleri:</strong> Koyu Mod gece odalarda gözü dinlendirdiği için büyük beğeni topladı; Açık Mod gündüz saatlerinde rahat okuma sundu. Ayrıca sistem temasına otomatik uyum sağlayan bir ayar önerildi.</li>
+      </ul>
+    </div>
+
+    <!-- Bölüm 3 -->
+    <div class="section-block">
+      <h3>3. Günlük Yemek Menüsü ve Duyurular</h3>
+      
+      <span class="section-subtitle">Değerlendirme Soruları:</span>
+      <ul>
+        <li>Sabah kahvaltısı ve akşam yemeği menüleri ile servis saatleri yeterince net gösteriliyor mu?</li>
+        <li>Ana sayfadaki Duyuru Panosu, yurt yönetiminin paylaştığı güncel kuralları ve duyuruları takip etmek için kullanışlı mı?</li>
+        <li>"Servis Açık" veya "Sıcak Servis" gibi yemek durumunu gösteren etiketler kolay anlaşılıyor mu?</li>
+      </ul>
+
+      <span class="section-subtitle">Kullanıcı Geri Bildirimleri:</span>
+      <ul>
+        <li><strong>Net Menü Kartları:</strong> Kahvaltı ve akşam yemeğinin ayrı kartlar halinde servis saatleriyle gösterilmesi, öğrencilerin yemek saatlerini karıştırmasını ve personelle yaşanan belirsizlikleri ortadan kaldırdı.</li>
+        <li><strong>Duyuru Panosu:</strong> Ana sayfadaki panonun son giriş saati, sıcak su ve kalorifer duyurularını tek yerde toplaması çok faydalı bulundu; dağınık WhatsApp mesajlarının yerini başarıyla aldı.</li>
+        <li><strong>Geliştirme Önerisi:</strong> Beklenmeyen menü değişikliklerinde veya acil yurt duyurularında (su/elektrik kesintisi gibi) öğrencilerin telefonlarına doğrudan <strong>anlık bildirim (push notification)</strong> gönderilmesi talep edildi.</li>
+      </ul>
+    </div>
+
+    <!-- Bölüm 4 -->
+    <div class="section-block">
+      <h3>4. Çamaşırhane Randevu Sistemi</h3>
+      
+      <span class="section-subtitle">Değerlendirme Soruları:</span>
+      <ul>
+        <li>Makine seçimi (Yıkama/Kurutma), tarih ve saat belirleyerek randevu alma adımları pratik mi?</li>
+        <li>Haftalık kullanım hakkı (öğrenci başı 2 randevu) ve alınan randevular ekranda net görünüyor mu?</li>
+        <li>Randevu alma ve gerektiğinde randevuyu iptal etme işlemleri kolayca yapılabiliyor mu?</li>
+      </ul>
+
+      <span class="section-subtitle">Kullanıcı Geri Bildirimleri:</span>
+      <ul>
+        <li><strong>Adil Kullanım Kotası:</strong> Yıkama ve kurutma makinelerinin ayrılması ve haftalık 2 randevu kotası, makinelerin adil kullanılmasını sağladığı için tam not aldı.</li>
+        <li><strong>Genel Doluluk İhtiyacı:</strong> Öğrenciler, randevu ekranına girmeden önce çamaşırhanenin genel durumunu göremediklerini belirtti; ekranda tek bakışta "Kaç makine boş, kaçı çalışıyor?" gibi genel bir durum özetinin yer almasını talep etti.</li>
+        <li><strong>Geliştirme Önerisi:</strong> Randevuya zamanında gidilmesi için <strong>başlangıçtan 10 dakika önce</strong> hatırlatma bildirimi; çamaşırların makinede bekletilmemesi için ise <strong>yıkama/kurutma işlemi tam bittiği anda</strong> boşaltma bildirimi gönderilmesi istendi.</li>
+      </ul>
+    </div>
+
+    <!-- Bölüm 5 -->
+    <div class="section-block">
+      <h3>5. Arıza Talebi ve Takip Süreci (Maintenance Request)</h3>
+      
+      <span class="section-subtitle">Değerlendirme Soruları:</span>
+      <ul>
+        <li>Belirlenen arıza kategorileri (Tesisat, Elektrik, İnternet, Mobilya vb.) yurtta karşılaşılan sorunları bildirmek için yeterli mi?</li>
+        <li>Bildirilen arızanın hangi aşamada olduğu ("Açık", "İnceleniyor", "Çözüldü") kolayca takip edilebiliyor mu?</li>
+        <li>Yönetici ekranı, arıza taleplerini incelemek ve durumunu güncellemek için personele kolaylık sağlıyor mu?</li>
+      </ul>
+
+      <span class="section-subtitle">Kullanıcı Geri Bildirimleri:</span>
+      <ul>
+        <li><strong>Hızlı Bildirim:</strong> Kategorilere ayrılmış form üzerinden talep iletmenin, danışmaya gidip sözlü yazdırmaya göre çok daha hızlı olduğu görüldü.</li>
+        <li><strong>Durum Şeffaflığı:</strong> Arızanın hangi aşamada olduğunu gösteren renkli rozetler ("Açık", "İnceleniyor", "Çözüldü"), talebin idarece görüldüğünü ve işleme alındığını doğrulayarak güven verdi.</li>
+        <li><strong>Geliştirme Önerisi:</strong> Arıza onarıldıktan sonra kaydın kapatılması sürecinde, teknik kontrolün ardından <strong>yalnızca yetkili yöneticinin onay vererek kaydı sonlandırması</strong> yeterli ve pratik bir iş akışı olarak belirlendi.</li>
+      </ul>
+    </div>
+
+    <!-- Önerilen İyileştirmeler -->
+    <div style="break-inside: avoid; page-break-inside: avoid; margin-top: 22px;">
+      <h2>Önerilen Mimari ve Arayüz İyileştirmeleri</h2>
+
+      <h4>1. Giriş İşlemleri ve Genel Deneyim:</h4>
+      <ul>
+        <li><strong>a.</strong> Giriş ekranına <strong>"Beni Hatırla"</strong> seçeneği ve parmak izi / yüz tanıma (biyometrik giriş) desteğinin eklenmesi.</li>
+        <li><strong>b.</strong> Arayüz genelindeki küçük yazı boyutlarının büyütülmesi ve okunabilirliği artıracak tipografi düzenlemelerinin yapılması.</li>
+        <li><strong>c.</strong> Cihazın işletim sistemi temasını otomatik takip eden "Sistem Temasıyla Eşle" seçeneğinin getirilmesi.</li>
+      </ul>
+
+      <h4>2. Yemekhane Yönetimi ve Duyurular:</h4>
+      <ul>
+        <li><strong>a.</strong> Beklenmeyen menü değişiklikleri ve acil yurt duyuruları (su/elektrik kesintileri vb.) için doğrudan telefonlara anlık bildirim (push notification) gönderilmesi.</li>
+      </ul>
+
+      <h4>3. Çamaşırhane Operasyonları ve Bildirimler:</h4>
+      <ul>
+        <li><strong>a.</strong> Öğrenci çamaşır ekranına anlık genel doluluk göstergelerinin (boşta ve çalışan makine sayıları) eklenmesi.</li>
+        <li><strong>b.</strong> Randevu saatinden 10 dakika önce hatırlatma bildirimi gönderilmesi.</li>
+        <li><strong>c.</strong> Yıkama veya kurutma programı <strong>tam bittiği anda</strong> çamaşırların makineden alınması için anlık bildirim iletilmesi.</li>
+      </ul>
+
+      <h4>4. Bakım Onarım ve Tesis Yönetimi:</h4>
+      <ul>
+        <li><strong>a.</strong> Arıza taleplerinin çözüm sürecinde, teknik kontrolün ardından yalnızca yetkili yöneticinin onayıyla kaydın güvenli ve hızlı şekilde kapatılması.</li>
+      </ul>
+    </div>
+
+    <!-- Ek -->
+    <div style="break-inside: avoid; page-break-inside: avoid; margin-top: 22px;">
+      <h2>Ek: Prototip Ses Kayıtları ve Değerlendirme Tutanakları</h2>
+      <p>
+        Yurtify Uygulaması için özel yurtta kalan üniversite öğrencileri ve yurt yöneticisi ile yürütülen test görüşmelerine ait dijital ses kayıtları, değerlendirme tutanakları ve kullanılabilirlik testi transkriptleri kurumsal dijital arşivde saklanmakta olup aşağıdaki bağlantıdan erişilebilir:
+      </p>
+      <div class="appendix-box">
+        [Google Drive Bağlantısı: Prototip Ses Kayıtları ve Değerlendirme Belgeleri]
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
