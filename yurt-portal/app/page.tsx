@@ -5098,14 +5098,6 @@ export default function Home() {
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => setIsManageMachinesModalOpen(true)}
-                              className="px-2.5 py-1 bg-[#F8FAFC] dark:bg-[#0F172A] hover:bg-[#F1F5F9] dark:hover:bg-[#162032] border border-[#E2E8F0] dark:border-[#334155] text-[#0F172A] dark:text-[#F1F5F9] hover:text-[#0284C7] font-bold text-xs rounded-xl transition-all cursor-pointer whitespace-nowrap min-h-[36px]"
-                              title="Makine sayısını ve limitleri ayarla"
-                            >
-                              Makine Ayarları
-                            </button>
-                            <button
-                              type="button"
                               onClick={() => {
                                 setNewLaundry((p) => ({ ...p, tarih: selectedLaundryDate, makineNo: laundryMachines[0]?.id || "Makine 1 (A-1)" }));
                                 setIsAddLaundryModalOpen(true);
