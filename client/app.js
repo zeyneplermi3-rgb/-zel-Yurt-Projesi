@@ -664,6 +664,9 @@ DOM.adminTabBtns.forEach(btn => {
     DOM.adminContentSubviews.forEach(view => {
       view.classList.toggle('active', view.id === targetSubtab);
     });
+
+    const scrollArea = DOM.portalAdmin.querySelector('.app-scroll-content');
+    if (scrollArea) scrollArea.scrollTop = 0;
   });
 });
 
@@ -708,8 +711,8 @@ function renderAdminStudents() {
   DOM.admStudentsList.innerHTML = AppState.students.map((s, index) => {
     const isSecret = !s.isFirstLogin;
     const statusText = isSecret 
-      ? '🔒 Öğrenci Kendi Şifresini Belirledi (Yöneticiye Gizli)' 
-      : `🔑 İlk Giriş Bekleniyor (Geçici Şifre: ${s.password})`;
+      ? 'Kendi Şifresini Belirledi (Gizli)' 
+      : `İlk Giriş Bekleniyor (Geçici Şifre: ${s.password})`;
     const statusClass = isSecret ? 'secret' : 'pending';
 
     return `
@@ -720,8 +723,8 @@ function renderAdminStudents() {
           <span class="adm-student-pass-status ${statusClass}">${statusText}</span>
         </div>
         <div>
-          <button class="btn btn-danger-ghost" onclick="deleteStudent(${index})" title="Öğrenciyi Sil">
-            🗑️ Sil
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteStudent(${index})" title="Öğrenciyi Sil">
+            Sil
           </button>
         </div>
       </div>
@@ -763,6 +766,7 @@ DOM.btnAdmAddStudent.addEventListener('click', async () => {
   };
 
   AppState.students.unshift(newStudent);
+  renderAdminStudents();
 
   // Sync with Supabase
   if (supabaseClient) {
@@ -780,6 +784,7 @@ DOM.btnAdmAddStudent.addEventListener('click', async () => {
       });
 
       if (error) console.error('Supabase add student error:', error);
+      await loadDataFromSupabase();
     } catch (err) {
       console.error('Insert error:', err);
     }
@@ -790,24 +795,24 @@ DOM.btnAdmAddStudent.addEventListener('click', async () => {
   DOM.admStudentRoom.value = '';
   DOM.admStudentBed.value = '';
 
-  renderAdminStudents();
   showPushNotification('Yeni Öğrenci Eklendi', `${name} başarıyla ${room} (${bed}) olarak Supabase veritabanına kaydedildi.`);
 });
 
 window.deleteStudent = async function(index) {
   const s = AppState.students[index];
-  if (confirm(`${s.name} isimli öğrencinin kaydını Supabase veritabanından kalıcı olarak silmek istediğinize emin misiniz?`)) {
+  if (confirm(`${s.name} isimli öğrencinin kaydını silmek istediğinize emin misiniz?`)) {
     AppState.students.splice(index, 1);
+    renderAdminStudents();
 
     if (supabaseClient && s.id) {
       try {
         await supabaseClient.from('ogrenciler').delete().eq('id', s.id);
+        await loadDataFromSupabase();
       } catch (err) {
         console.error('Supabase delete student error:', err);
       }
     }
 
-    renderAdminStudents();
     showPushNotification('Öğrenci Silindi', `${s.name} yurt sisteminden ve veritabanından kaldırıldı.`);
   }
 };
@@ -819,16 +824,16 @@ function renderAdminMachines() {
     <div class="admin-machine-row">
       <div>
         <strong>${m.name}</strong>
-        <div style="font-size:12px; color:var(--text-muted);">
-          Tür: ${m.type === 'washer' ? 'Yıkama Makinesi' : 'Kurutma Makinesi'} • Durum: <strong>${m.status === 'idle' ? 'Boşta (Müsait)' : (m.status === 'running' ? 'Çalışıyor' : 'Bakımda')}</strong>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+          Tür: ${m.type === 'washer' ? 'Yıkama Makinesi' : 'Kurutma Makinesi'} • Durum: <strong>${m.status === 'idle' ? 'Müsait' : (m.status === 'running' ? 'Çalışıyor' : 'Bakımda')}</strong>
         </div>
       </div>
       <div class="admin-machine-actions">
         <button class="btn btn-sm btn-ghost" onclick="toggleMachineStatus('${m.id}')">
           ${m.status === 'maintenance' ? 'Aktifleştir' : 'Bakıma Al'}
         </button>
-        <button class="btn btn-sm btn-danger-ghost" onclick="deleteMachine('${m.id}')" title="Cihazı Kaldır">
-          🗑️ Sil
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteMachine('${m.id}')" title="Cihazı Kaldır">
+          Sil
         </button>
       </div>
     </div>
@@ -857,6 +862,8 @@ DOM.btnAdmAddMachine.addEventListener('click', async () => {
   };
 
   AppState.laundry.machines.push(newMachine);
+  renderAdminMachines();
+  renderStudentLaundry();
 
   // Sync to Supabase
   if (supabaseClient) {
@@ -869,15 +876,13 @@ DOM.btnAdmAddMachine.addEventListener('click', async () => {
         tur: type === 'washer' ? 'yikama' : 'kurutma',
         kapasite_kg: type === 'washer' ? 9 : 10
       });
+      await loadDataFromSupabase();
     } catch (err) {
       console.error('Supabase add machine error:', err);
     }
   }
 
   DOM.admMachineName.value = '';
-
-  renderAdminMachines();
-  renderStudentLaundry();
   showPushNotification('Cihaz Eklendi', `${name} çamaşırhaneye başarıyla tanımlandı.`);
 });
 
@@ -887,17 +892,18 @@ window.deleteMachine = async function(machineId) {
 
   if (confirm(`${m.name} cihazını çamaşırhaneden silmek istediğinize emin misiniz?`)) {
     AppState.laundry.machines = AppState.laundry.machines.filter(item => item.id != machineId);
+    renderAdminMachines();
+    renderStudentLaundry();
 
     if (supabaseClient && m.id) {
       try {
         await supabaseClient.from('camasirhane_makineler').delete().eq('id', m.id);
+        await loadDataFromSupabase();
       } catch (err) {
         console.error('Supabase delete machine error:', err);
       }
     }
 
-    renderAdminMachines();
-    renderStudentLaundry();
     showPushNotification('Cihaz Silindi', `${m.name} sistemden kaldırıldı.`);
   }
 };
@@ -1203,11 +1209,11 @@ function renderAdminTickets() {
               İncelemeye Al
             </button>
             <button class="btn btn-sm btn-primary" onclick="updateTicketStatus('${t.id}', 'Çözüldü')">
-              ✓ Onayla ve Kapat
+              Onayla ve Kapat
             </button>
           ` : `
             <span style="font-size:12px; color:var(--success); font-weight:600;">
-              ✓ Yetkili idareci tarafından doğrulanarak arşivlenmiştir.
+              Yetkili idareci tarafından doğrulanarak arşivlenmiştir.
             </span>
           `}
         </div>
@@ -1228,17 +1234,18 @@ window.updateTicketStatus = async function(ticketId, newStatus) {
       showPushNotification('Talep Güncellendi', `${t.category} inceleniyor durumuna alındı.`);
     }
 
+    renderStudentTickets();
+    renderAdminTickets();
+
     // Sync to Supabase `arizalar`
     if (supabaseClient && t.id) {
       try {
         await supabaseClient.from('arizalar').update({ durum: newStatus }).eq('id', t.id);
+        await loadDataFromSupabase();
       } catch (err) {
         console.error('Supabase ticket status error:', err);
       }
     }
-
-    renderStudentTickets();
-    renderAdminTickets();
   }
 };
 
