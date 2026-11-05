@@ -49,6 +49,7 @@ interface StudentPortalViewProps {
   announcements: Announcement[];
   maintenanceTickets: MaintenanceTicket[];
   onAddMaintenanceTicket: (newTicket: MaintenanceTicket) => void;
+  onDeleteMaintenanceTicket?: (id: string) => void;
   showToast: (message: string) => void;
   rooms?: Room[];
   students?: Student[];
@@ -79,6 +80,7 @@ export default function StudentPortalView({
   announcements,
   maintenanceTickets,
   onAddMaintenanceTicket,
+  onDeleteMaintenanceTicket,
   showToast,
   rooms = [],
   students = [],
@@ -1267,9 +1269,27 @@ export default function StudentPortalView({
                           {t.durum}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-[11px] text-stone-500 pt-1 border-t border-[#E2E8F0]">
-                        <span>Kategori: {t.kategori}</span>
-                        <span>{t.tarih}</span>
+                      <div className="flex items-center justify-between text-[11px] text-stone-500 pt-2 border-t border-[#E2E8F0]">
+                        <div className="flex items-center gap-1.5">
+                          <span>Kategori: {t.kategori}</span>
+                          <span>•</span>
+                          <span>{t.tarih}</span>
+                        </div>
+                        {onDeleteMaintenanceTicket && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`"${t.baslik}" arıza kaydınızı silmek istediğinize emin misiniz?`)) {
+                                onDeleteMaintenanceTicket(t.id);
+                                showToast("Arıza bildirimi silindi.");
+                              }
+                            }}
+                            className="px-2.5 py-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer min-h-[30px] flex items-center justify-center active:scale-95"
+                            title="Arıza talebini sil"
+                          >
+                            Talebi Sil
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

@@ -90,11 +90,54 @@ export default function Home() {
     return () => clearTimeout(fallbackTimer);
   }, []);
 
-  const [activeRole, setActiveRole] = useState<Role>("superadmin");
+  const [activeRole, setActiveRole] = useState<Role>("ogrenci");
+  const [isSuperAdminLogin, setIsSuperAdminLogin] = useState<boolean>(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Süper Admin URL parametresi kontrolü (?role=superadmin veya ?superadmin=true)
+  useEffect(() => {
+    const checkRoleParam = () => {
+      if (typeof window !== "undefined") {
+        const searchParams = new URLSearchParams(window.location.search);
+        const roleParam = searchParams.get("role");
+        const isSuper = roleParam === "superadmin" || searchParams.get("superadmin") === "true";
+        if (isSuper) {
+          setIsSuperAdminLogin(true);
+          setActiveRole("superadmin");
+        } else if (roleParam === "yonetici") {
+          setIsSuperAdminLogin(false);
+          setActiveRole("yonetici");
+        } else if (roleParam === "ogrenci") {
+          setIsSuperAdminLogin(false);
+          setActiveRole("ogrenci");
+        }
+      }
+    };
+    checkRoleParam();
+    window.addEventListener("popstate", checkRoleParam);
+    return () => window.removeEventListener("popstate", checkRoleParam);
+  }, []);
+
+  // Eski/silinmiş yerel arıza önbelleğini temizleme
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        ["yurtify_maintenance", "yurtify_af81f031-1988-401e-84af-42ac75b4d409_maintenance"].forEach((key) => {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              const cleaned = parsed.filter((t: any) => t.id !== "mnt-1793774973088" && !t.baslik?.includes("lavabo"));
+              localStorage.setItem(key, JSON.stringify(cleaned));
+            }
+          }
+        });
+      } catch { }
+    }
+  }, []);
 
   // Karanlık / Aydınlık Mod State'i (Dark / Light Theme)
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -310,6 +353,12 @@ export default function Home() {
       ...prev,
       camasirhaneGunlukLimit: newLimit,
     }));
+    const targetYurtId = currentUser?.selectedYurtId || yurtlar[0]?.id || "af81f031-1988-401e-84af-42ac75b4d409";
+    try {
+      supabase.from("yurtlar").update({ camasirhane_gunluk_limit: newLimit }).eq("id", targetYurtId).then(({ error }) => {
+        if (error) console.warn("Supabase limit güncelleme:", error.message);
+      });
+    } catch (e) { }
   };
 
   const [dailyDormLaundryLimit, setDailyDormLaundryLimit] = useState<number>(() => {
@@ -344,6 +393,12 @@ export default function Home() {
       ...prev,
       camasirhaneYurtGunlukLimit: newLimit,
     }));
+    const targetYurtId = currentUser?.selectedYurtId || yurtlar[0]?.id || "af81f031-1988-401e-84af-42ac75b4d409";
+    try {
+      supabase.from("yurtlar").update({ camasirhane_yurt_gunluk_limit: newLimit }).eq("id", targetYurtId).then(({ error }) => {
+        if (error) console.warn("Supabase yurt limit güncelleme:", error.message);
+      });
+    } catch (e) { }
   };
 
   const [laundryLimitSaved, setLaundryLimitSaved] = useState(false);
@@ -751,9 +806,14 @@ export default function Home() {
         setMaintenanceTickets(mappedTickets);
         if (typeof window !== "undefined") {
           localStorage.setItem(`yurtify_${curYurtId}_maintenance`, JSON.stringify(mappedTickets));
+          localStorage.setItem("yurtify_maintenance", JSON.stringify(mappedTickets));
         }
       } else {
         setMaintenanceTickets([]);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`yurtify_${curYurtId}_maintenance`, JSON.stringify([]));
+          localStorage.setItem("yurtify_maintenance", JSON.stringify([]));
+        }
       }
 
       // 5. Duyuruları SADECE BU YURDA ÖZEL ÇEK
@@ -1264,13 +1324,17 @@ export default function Home() {
           setLaundryMachines([]);
         }
 
-        const fakeTicketIds = new Set(["mnt-1", "mnt-2", "mnt-3"]);
-        const savedMnt = localStorage.getItem("yurtify_maintenance");
+        const fakeTicketIds = new Set(["mnt-1", "mnt-2", "mnt-3", "mnt-1793774973088"]);
+        const defaultYurtId = "af81f031-1988-401e-84af-42ac75b4d409";
+        const savedMnt = localStorage.getItem(`yurtify_${defaultYurtId}_maintenance`) || localStorage.getItem("yurtify_maintenance");
         if (savedMnt) {
           try {
             const parsed = JSON.parse(savedMnt);
             if (Array.isArray(parsed)) {
-              setMaintenanceTickets(parsed.filter((t: any) => !fakeTicketIds.has(t.id)));
+              const clean = parsed.filter((t: any) => !fakeTicketIds.has(t.id) && t.id !== "mnt-1793774973088" && !t.baslik?.includes("lavabo"));
+              setMaintenanceTickets(clean);
+              localStorage.setItem("yurtify_maintenance", JSON.stringify(clean));
+              localStorage.setItem(`yurtify_${defaultYurtId}_maintenance`, JSON.stringify(clean));
             }
           } catch { }
         } else {
@@ -1460,10 +1524,14 @@ export default function Home() {
       } catch { }
 
       try {
-        const freshMnt = localStorage.getItem("yurtify_maintenance");
+        const targetId = currentUser?.selectedYurtId || yurtlar[0]?.id || "af81f031-1988-401e-84af-42ac75b4d409";
+        const freshMnt = localStorage.getItem(`yurtify_${targetId}_maintenance`) || localStorage.getItem("yurtify_maintenance");
         if (freshMnt) {
           const parsed = JSON.parse(freshMnt);
-          if (Array.isArray(parsed)) setMaintenanceTickets(parsed);
+          if (Array.isArray(parsed)) {
+            const clean = parsed.filter((t: any) => t.id !== "mnt-1793774973088" && !t.baslik?.includes("lavabo"));
+            setMaintenanceTickets(clean);
+          }
         }
       } catch { }
 
@@ -1903,6 +1971,8 @@ export default function Home() {
   const handleLogout = async () => {
     setCurrentUser(null);
     setIsAuthChecking(false);
+    setIsSuperAdminLogin(false);
+    setActiveRole("ogrenci");
     setUsername("");
     setPassword("");
     setErrorMessage("");
@@ -1910,6 +1980,9 @@ export default function Home() {
       sessionStorage.removeItem("yurtify_session");
       localStorage.removeItem("yurtify_session");
       document.documentElement.classList.remove("has-session");
+      if (window.location.search.includes("superadmin")) {
+        window.history.replaceState({}, "", "/");
+      }
     }
     try {
       await supabase.auth.signOut();
@@ -2280,6 +2353,7 @@ export default function Home() {
 
   // Makine Sayısı & Filo Yönetim Fonksiyonları
   const handleQuickSetCount = (type: "yikama" | "kurutma", delta: number) => {
+    const targetYurtId = currentUser?.selectedYurtId || yurtlar[0]?.id || "af81f031-1988-401e-84af-42ac75b4d409";
     const currentWashing = laundryMachines.filter((m) => m.tur === "yikama" || m.tip.toLowerCase().includes("yıkama") || m.id.includes("Makine"));
     const currentDryers = laundryMachines.filter((m) => m.tur === "kurutma" || m.tip.toLowerCase().includes("kurutma") || m.id.includes("Kurutma"));
 
@@ -2298,22 +2372,49 @@ export default function Home() {
       if (delta > 0) {
         const nextNum = updatedWashing.length + 1;
         const block = nextNum <= 3 ? "A Blok" : nextNum <= 6 ? "B Blok" : "C Blok";
-        const id = `Makine ${nextNum} (${block})`;
-        updatedWashing.push({
+        const id = `mach_wash_${Date.now()}_${nextNum}`;
+        const newMachine: LaundryMachine = {
           id,
           name: `Makine ${nextNum} (${block})`,
           tip: "Yıkama • 9 kg",
           tur: "yikama",
           kapasiteKg: 9,
-        });
+        };
+        updatedWashing.push(newMachine);
+
+        try {
+          supabase.from("camasirhane_makineler").insert({
+            id: newMachine.id,
+            yurt_id: targetYurtId,
+            name: newMachine.name,
+            tip: newMachine.tip,
+            tur: newMachine.tur,
+            kapasite_kg: newMachine.kapasiteKg,
+            blok: block,
+          }).then(({ error }) => {
+            if (error) console.warn("Makine ekleme Supabase hatası:", error.message);
+          });
+        } catch (err) {
+          console.warn("Makine ekleme hatası:", err);
+        }
       } else {
-        updatedWashing.pop();
+        const removed = updatedWashing.pop();
+        if (removed) {
+          try {
+            supabase.from("camasirhane_makineler").delete().eq("id", removed.id).then(({ error }) => {
+              if (error) console.warn("Makine silme Supabase hatası:", error.message);
+            });
+          } catch (err) {
+            console.warn("Makine silme hatası:", err);
+          }
+        }
       }
 
       const updatedAll = [...updatedWashing, ...currentDryers];
       setLaundryMachines(updatedAll);
       if (typeof window !== "undefined") {
         localStorage.setItem("yurtify_laundry_machines", JSON.stringify(updatedAll));
+        localStorage.setItem(`yurtify_${targetYurtId}_laundry_machines`, JSON.stringify(updatedAll));
       }
       showToast(`Çamaşır yıkama makinesi sayısı ${updatedWashing.length} olarak güncellendi.`);
     } else {
@@ -2327,22 +2428,49 @@ export default function Home() {
       let updatedDryers = [...currentDryers];
       if (delta > 0) {
         const nextNum = updatedDryers.length + 1;
-        const id = `Kurutma ${nextNum} (Merkez)`;
-        updatedDryers.push({
+        const id = `mach_dry_${Date.now()}_${nextNum}`;
+        const newMachine: LaundryMachine = {
           id,
           name: `Kurutma ${nextNum} (Merkez)`,
           tip: "Kurutma • 10 kg",
           tur: "kurutma",
           kapasiteKg: 10,
-        });
+        };
+        updatedDryers.push(newMachine);
+
+        try {
+          supabase.from("camasirhane_makineler").insert({
+            id: newMachine.id,
+            yurt_id: targetYurtId,
+            name: newMachine.name,
+            tip: newMachine.tip,
+            tur: newMachine.tur,
+            kapasite_kg: newMachine.kapasiteKg,
+            blok: "Merkez",
+          }).then(({ error }) => {
+            if (error) console.warn("Kurutma makinesi ekleme Supabase hatası:", error.message);
+          });
+        } catch (err) {
+          console.warn("Kurutma makinesi ekleme hatası:", err);
+        }
       } else {
-        updatedDryers.pop();
+        const removed = updatedDryers.pop();
+        if (removed) {
+          try {
+            supabase.from("camasirhane_makineler").delete().eq("id", removed.id).then(({ error }) => {
+              if (error) console.warn("Kurutma makinesi silme Supabase hatası:", error.message);
+            });
+          } catch (err) {
+            console.warn("Kurutma makinesi silme hatası:", err);
+          }
+        }
       }
 
       const updatedAll = [...currentWashing, ...updatedDryers];
       setLaundryMachines(updatedAll);
       if (typeof window !== "undefined") {
         localStorage.setItem("yurtify_laundry_machines", JSON.stringify(updatedAll));
+        localStorage.setItem(`yurtify_${targetYurtId}_laundry_machines`, JSON.stringify(updatedAll));
       }
       showToast(`Kurutma makinesi sayısı ${updatedDryers.length} olarak güncellendi.`);
     }
@@ -2785,6 +2913,31 @@ export default function Home() {
   // ==========================================
   // YEMEKHANE & YURT AYARLARI FONKSİYONLARI
   // ==========================================
+  const syncMenuToDb = async (menuToSync: DailyMenuType) => {
+    const todayKey = getTodayDateKey();
+    const targetYurtId = currentUser?.selectedYurtId || yurtlar[0]?.id || "af81f031-1988-401e-84af-42ac75b4d409";
+    try {
+      await supabase.from("yemekhane_menu").upsert({
+        id: `menu_${targetYurtId}_${todayKey}`,
+        yurt_id: targetYurtId,
+        tarih: todayKey,
+        gorunum_modu: menuToSync.gorunumModu,
+        aktif_ogun: menuToSync.aktifOgun,
+        kalori_goster: menuToSync.kaloriGoster,
+        gun_tipi: menuToSync.gunTipi,
+        kahvalti_menu: menuToSync.kahvalti,
+        kahvalti_saat: menuToSync.kahvaltiSaat,
+        kahvalti_kalori: menuToSync.kahvaltiKalori,
+        aksam_menu: menuToSync.aksam,
+        aksam_saat: menuToSync.aksamSaat,
+        aksam_kalori: menuToSync.aksamKalori,
+        saatler: menuToSync.saatler,
+      });
+    } catch (err) {
+      console.warn("Menü Supabase eşitleme hatası:", err);
+    }
+  };
+
   const handleSaveMenu = (e: React.FormEvent) => {
     e.preventDefault();
     setIsEditingMenu(false);
@@ -2797,31 +2950,10 @@ export default function Home() {
     setDailyMenu(updated);
     if (typeof window !== "undefined") {
       localStorage.setItem(`yurtify_${targetYurtId}_menu`, JSON.stringify(updated));
+      localStorage.setItem("yurtify_menu", JSON.stringify(updated));
     }
 
-    try {
-      supabase.from("yemekhane_menu").upsert({
-        id: `menu_${targetYurtId}_${todayKey}`,
-        yurt_id: targetYurtId,
-        tarih: todayKey,
-        gorunum_modu: updated.gorunumModu,
-        aktif_ogun: updated.aktifOgun,
-        kalori_goster: updated.kaloriGoster,
-        gun_tipi: updated.gunTipi,
-        kahvalti_menu: updated.kahvalti,
-        kahvalti_saat: updated.kahvaltiSaat,
-        kahvalti_kalori: updated.kahvaltiKalori,
-        aksam_menu: updated.aksam,
-        aksam_saat: updated.aksamSaat,
-        aksam_kalori: updated.aksamKalori,
-        saatler: updated.saatler,
-      }).then(({ error }) => {
-        if (error) console.warn("Menü kayıt hatası:", error.message);
-      });
-    } catch (err) {
-      console.warn("Menü kayıt hatası:", err);
-    }
-
+    syncMenuToDb(updated);
     showToast("Günün yemek menüsü güncellendi ve öğrencilere yayınlandı!");
   };
 
@@ -2832,6 +2964,7 @@ export default function Home() {
       if (typeof window !== "undefined") {
         localStorage.setItem("yurtify_menu", JSON.stringify(reset));
       }
+      syncMenuToDb(reset);
       showToast("Günün yemek menüsü sıfırlandı.");
     }
   };
@@ -2842,6 +2975,7 @@ export default function Home() {
     if (typeof window !== "undefined") {
       localStorage.setItem("yurtify_menu", JSON.stringify(updated));
     }
+    syncMenuToDb(updated);
     showToast(
       mode === "tek"
         ? " Menü modu: Sadece seçili tek öğün gösterilecek."
@@ -2856,6 +2990,7 @@ export default function Home() {
     if (typeof window !== "undefined") {
       localStorage.setItem("yurtify_menu", JSON.stringify(updated));
     }
+    syncMenuToDb(updated);
     showToast(`Tek öğün modunda "${meal === "kahvalti" ? "Sabah Kahvaltısı" : "Akşam Yemeği"}" seçildi.`);
   };
 
@@ -2939,6 +3074,7 @@ export default function Home() {
     if (typeof window !== "undefined") {
       localStorage.setItem("yurtify_menu", JSON.stringify(updated));
     }
+    syncMenuToDb(updated);
   };
 
   const handleToggleGunTipi = (tip: "haftaici" | "haftasonu" | "ozelgun") => {
@@ -2959,6 +3095,7 @@ export default function Home() {
     if (typeof window !== "undefined") {
       localStorage.setItem("yurtify_menu", JSON.stringify(updated));
     }
+    syncMenuToDb(updated);
     const tipLabels = {
       haftaici: "Hafta İçi",
       haftasonu: "Hafta Sonu",
@@ -2994,6 +3131,7 @@ export default function Home() {
     if (typeof window !== "undefined") {
       localStorage.setItem("yurtify_menu", JSON.stringify(updated));
     }
+    syncMenuToDb(updated);
   };
 
   const formatDisplayHours = (rangeStr: string) => {
@@ -3218,6 +3356,13 @@ export default function Home() {
             ad: settingsToSave.ad,
             yetkili_ad: settingsToSave.yetkiliAd,
             kapasite: finalKapasite,
+            sehir: settingsToSave.sehir || "Ankara",
+            ilce: settingsToSave.ilce || "Yenimahalle",
+            adres: settingsToSave.adres || "",
+            yetkili_tel: settingsToSave.yetkiliTel || "",
+            yetkili_eposta: settingsToSave.adminEposta || "mudur@gmail.com",
+            camasirhane_gunluk_limit: settingsToSave.camasirhaneGunlukLimit || 2,
+            camasirhane_yurt_gunluk_limit: settingsToSave.camasirhaneYurtGunlukLimit || 25,
           })
           .eq("id", targetYurtId);
 
@@ -3330,6 +3475,25 @@ export default function Home() {
       });
     } catch (err) {
       console.warn("Arıza durumu hatası:", err);
+    }
+  };
+
+  // 6.b. Arıza Talebini Sil (Öğrenci veya Yönetici)
+  const handleDeleteMaintenanceTicket = (id: string) => {
+    const targetYurtId = currentUser?.selectedYurtId || yurtlar[0]?.id || "af81f031-1988-401e-84af-42ac75b4d409";
+    const updated = maintenanceTickets.filter((m) => m.id !== id);
+    setMaintenanceTickets(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("yurtify_maintenance", JSON.stringify(updated));
+      localStorage.setItem(`yurtify_${targetYurtId}_maintenance`, JSON.stringify(updated));
+    }
+
+    try {
+      supabase.from("arizalar").delete().eq("id", id).then(({ error }) => {
+        if (error) console.warn("Arıza silme hatası:", error.message);
+      });
+    } catch (err) {
+      console.warn("Arıza silme hatası:", err);
     }
   };
 
@@ -3629,41 +3793,41 @@ export default function Home() {
           </div>
 
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs">
-            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4 border border-slate-200 dark:border-slate-700 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => handleRoleChange("superadmin")}
-                className={`flex-1 min-h-[44px] py-1.5 px-1 rounded-lg transition-all cursor-pointer flex items-center justify-center ${
-                  activeRole === "superadmin"
-                    ? "bg-[#0284C7] text-white shadow-xs font-bold"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                }`}
-              >
-                Süper Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRoleChange("yonetici")}
-                className={`flex-1 min-h-[44px] py-1.5 px-1 rounded-lg transition-all cursor-pointer flex items-center justify-center ${
-                  activeRole === "yonetici"
-                    ? "bg-[#0284C7] text-white shadow-xs font-bold"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                }`}
-              >
-                Yurt Müdürü
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRoleChange("ogrenci")}
-                className={`flex-1 min-h-[44px] py-1.5 px-1 rounded-lg transition-all cursor-pointer flex items-center justify-center ${
-                  activeRole === "ogrenci"
-                    ? "bg-[#0284C7] text-white shadow-xs font-bold"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                }`}
-              >
-                Öğrenci
-              </button>
-            </div>
+            {!isSuperAdminLogin ? (
+              <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4 border border-slate-200 dark:border-slate-700 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => handleRoleChange("ogrenci")}
+                  className={`flex-1 min-h-[44px] py-1.5 px-1 rounded-lg transition-all cursor-pointer flex items-center justify-center ${
+                    activeRole === "ogrenci"
+                      ? "bg-[#0284C7] text-white shadow-xs font-bold"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Öğrenci
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRoleChange("yonetici")}
+                  className={`flex-1 min-h-[44px] py-1.5 px-1 rounded-lg transition-all cursor-pointer flex items-center justify-center ${
+                    activeRole === "yonetici"
+                      ? "bg-[#0284C7] text-white shadow-xs font-bold"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Yurt Müdürü
+                </button>
+              </div>
+            ) : (
+              <div className="mb-4 text-center pb-3 border-b border-slate-100 dark:border-slate-800">
+                <span className="inline-block px-2.5 py-1 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[11px] font-bold rounded-lg border border-amber-500/20 mb-1.5">
+                  Sistem Yöneticisi Paneli
+                </span>
+                <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  Süper Admin Girişi
+                </h2>
+              </div>
+            )}
 
             <form onSubmit={handleLogin} className="space-y-3">
               <div>
@@ -3678,13 +3842,6 @@ export default function Home() {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder={
-                    activeRole === "superadmin"
-                      ? "superadmin veya e-posta"
-                      : activeRole === "yonetici"
-                        ? "mudur veya mudur@gmail.com"
-                        : "kullanıcı adı veya e-posta (örn: eda.etem)"
-                  }
                   autoComplete="username"
                   className="w-full min-h-[44px] bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-[#0284C7] focus:ring-1 focus:ring-[#0284C7]/30 transition-all font-medium"
                 />
@@ -3701,7 +3858,6 @@ export default function Home() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Şifreniz"
                   autoComplete="current-password"
                   className="w-full min-h-[44px] bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-[#0284C7] focus:ring-1 focus:ring-[#0284C7]/30 transition-all font-medium"
                 />
@@ -3721,6 +3877,24 @@ export default function Home() {
                 {isLoading ? "Giriş Yapılıyor..." : "Giriş Yap"}
               </button>
             </form>
+
+            {isSuperAdminLogin && (
+              <div className="mt-3.5 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSuperAdminLogin(false);
+                    handleRoleChange("ogrenci");
+                    if (typeof window !== "undefined") {
+                      window.history.replaceState({}, "", "/");
+                    }
+                  }}
+                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-[#0284C7] dark:hover:text-[#38BDF8] font-semibold transition-colors cursor-pointer py-1"
+                >
+                  ← Öğrenci & Müdür Girişine Dön
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -6089,7 +6263,6 @@ export default function Home() {
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
                                       <h4 className="font-bold text-[#0F172A] text-sm truncate">{std.adSoyad}</h4>
-                                      <p className="text-[11px] text-[#64748B] truncate mt-0.5">{std.eposta}</p>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0">
                                       <span className="px-2.5 py-1 rounded-lg bg-[#0284C7] text-white font-bold text-xs border border-[#0369A1]">
@@ -6938,6 +7111,7 @@ export default function Home() {
             dailyMenu={dailyMenu}
             announcements={announcements}
             maintenanceTickets={maintenanceTickets}
+            onDeleteMaintenanceTicket={handleDeleteMaintenanceTicket}
             rooms={rooms}
             students={students}
             mealAttendance={mealAttendance}
@@ -7091,6 +7265,7 @@ export default function Home() {
               setMaintenanceTickets(updated);
               if (typeof window !== "undefined") {
                 localStorage.setItem(`yurtify_${targetYurtId}_maintenance`, JSON.stringify(updated));
+                localStorage.setItem("yurtify_maintenance", JSON.stringify(updated));
               }
 
               try {
