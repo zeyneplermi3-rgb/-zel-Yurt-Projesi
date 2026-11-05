@@ -5355,28 +5355,8 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* Günün Menü Değerlendirmeleri ve Öğrenci Yorumları (Canlı Geri Bildirim) */}
-                    <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-5 sm:p-7 rounded-2xl sm:rounded-3xl space-y-5 shadow-xs transition-colors">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E8F0] dark:border-[#334155]">
-                        <div>
-                          <h3 className="text-base sm:text-lg font-bold text-[#0F172A] dark:text-[#F1F5F9] flex items-center gap-2">
-                            <svg className="w-5 h-5 text-amber-500 fill-amber-500" viewBox="0 0 24 24">
-                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                            </svg>
-                            Günün Yemek Değerlendirmeleri ve Öğrenci Yorumları
-                          </h3>
-                          <p className="text-xs text-[#64748B] dark:text-[#94A3B8] mt-0.5">
-                            Öğrencilerin günün menüsüne verdiği yıldız puanları ve anlık geri bildirimleri
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-sky-500/10 text-[#0284C7] dark:text-sky-400 border border-[#0284C7]/20">
-                            <span className="w-2 h-2 rounded-full bg-[#0284C7] animate-pulse" />
-                            Anlık Takip
-                          </span>
-                        </div>
-                      </div>
-
+                    {/* Günün Menü Değerlendirmeleri ve Öğrenci Yorumları (Sade & Kompakt) */}
+                    <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-4 sm:p-5 rounded-2xl space-y-3 shadow-xs transition-colors">
                       {(() => {
                         const todayKey = getTodayDateKey();
                         const todayRatings = mealRatings.filter((r) => r.date === todayKey);
@@ -5389,110 +5369,75 @@ export default function Home() {
                           : 0;
 
                         return (
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                              <div className="p-4 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between">
-                                <div>
-                                  <span className="text-[11px] font-semibold text-[#64748B] dark:text-[#94A3B8] block">Ortalama Puan</span>
-                                  <span className="text-2xl font-black text-[#0F172A] dark:text-[#F1F5F9] mt-0.5 block">
-                                    {avgScore} <span className="text-xs font-normal text-[#64748B]">/ 5.0</span>
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-0.5 text-amber-500">
-                                  {[1, 2, 3, 4, 5].map((s) => (
-                                    <svg
-                                      key={s}
-                                      className={`w-4 h-4 ${
-                                        s <= Math.round(Number(avgScore))
-                                          ? "fill-amber-400 text-amber-400"
-                                          : "fill-transparent stroke-slate-300 dark:stroke-slate-600"
-                                      }`}
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                                    </svg>
-                                  ))}
-                                </div>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0] dark:border-[#334155]">
+                              <div>
+                                <h4 className="text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                                  Yemek Değerlendirmeleri
+                                </h4>
+                                <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                                  Günün menüsüne ait öğrenci puan ve geri bildirimleri
+                                </p>
                               </div>
+                              {todayRatings.length > 0 && (
+                                <span className="text-[11px] font-semibold text-[#0284C7] dark:text-[#38BDF8] bg-sky-50 dark:bg-sky-950/40 px-2.5 py-1 rounded-lg border border-sky-200 dark:border-sky-800/40">
+                                  {todayRatings.length} Yorum
+                                </span>
+                              )}
+                            </div>
 
-                              <div className="p-4 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155]">
-                                <span className="text-[11px] font-semibold text-[#64748B] dark:text-[#94A3B8] block">Toplam Değerlendirme</span>
-                                <span className="text-2xl font-black text-[#0F172A] dark:text-[#F1F5F9] mt-0.5 block">
-                                  {todayRatings.length} <span className="text-xs font-normal text-[#64748B]">öğrenci</span>
+                            {/* Kompakt 3'lü İstatistik Şeridi (Mobilde dikey taşma yapmaz) */}
+                            <div className="grid grid-cols-3 gap-2 p-2.5 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-xl border border-[#E2E8F0] dark:border-[#334155] text-center">
+                              <div>
+                                <span className="text-[10.5px] font-medium text-[#64748B] dark:text-[#94A3B8] block">Ortalama</span>
+                                <span className="text-sm sm:text-base font-black text-[#0F172A] dark:text-[#F1F5F9]">
+                                  {avgScore} <span className="text-[10px] font-normal text-[#64748B]">/ 5</span>
                                 </span>
                               </div>
-
-                              <div className="p-4 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155]">
-                                <span className="text-[11px] font-semibold text-[#64748B] dark:text-[#94A3B8] block">Memnuniyet Oranı</span>
-                                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5 block">
-                                  %{satisfactionRate} <span className="text-xs font-normal text-[#64748B]">(4-5 Yıldız)</span>
+                              <div className="border-x border-[#E2E8F0] dark:border-[#334155]">
+                                <span className="text-[10.5px] font-medium text-[#64748B] dark:text-[#94A3B8] block">Katılım</span>
+                                <span className="text-sm sm:text-base font-black text-[#0F172A] dark:text-[#F1F5F9]">
+                                  {todayRatings.length} <span className="text-[10px] font-normal text-[#64748B]">öğrenci</span>
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[10.5px] font-medium text-[#64748B] dark:text-[#94A3B8] block">Memnuniyet</span>
+                                <span className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400">
+                                  %{satisfactionRate}
                                 </span>
                               </div>
                             </div>
 
-                            {/* Yorumlar Listesi */}
+                            {/* Yorumlar Listesi veya Sade Bilgi Metni */}
                             {todayRatings.length === 0 ? (
-                              <div className="p-8 text-center text-xs text-stone-500 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155] space-y-1">
-                                <div className="font-bold text-stone-700 dark:text-stone-300">Henüz Değerlendirme Yok</div>
-                                <div>Öğrenciler bugünün yemeklerini puanlayıp yorum yaptığında anlık olarak burada listelenecektir.</div>
-                              </div>
+                              <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic text-center py-2">
+                                Bugün için henüz değerlendirme yapılmadı.
+                              </p>
                             ) : (
-                              <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                              <div className="space-y-2 max-h-72 overflow-y-auto pr-0.5">
                                 {todayRatings.map((r) => (
                                   <div
                                     key={r.id}
-                                    className="p-3.5 rounded-2xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] space-y-2"
+                                    className="p-2.5 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] space-y-1 text-xs"
                                   >
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <span className="font-bold text-xs text-[#0F172A] dark:text-[#F1F5F9] truncate">
-                                          {r.studentName}
-                                        </span>
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-1.5 font-semibold text-[#0F172A] dark:text-[#F1F5F9]">
+                                        <span>{r.studentName}</span>
                                         {r.odaNo && (
-                                          <span className="text-[10px] px-2 py-0.5 rounded-md bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] text-stone-600 dark:text-stone-400 font-semibold shrink-0">
-                                            Oda {r.odaNo}
+                                          <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">
+                                            (Oda {r.odaNo})
                                           </span>
                                         )}
                                       </div>
-                                      <div className="flex items-center gap-1 shrink-0">
-                                        <div className="flex items-center text-amber-500">
-                                          {[1, 2, 3, 4, 5].map((star) => (
-                                            <svg
-                                              key={star}
-                                              className={`w-3.5 h-3.5 ${
-                                                star <= r.rating
-                                                  ? "fill-amber-400 text-amber-400"
-                                                  : "fill-transparent stroke-slate-300 dark:stroke-slate-600"
-                                              }`}
-                                              viewBox="0 0 24 24"
-                                            >
-                                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                                            </svg>
-                                          ))}
-                                        </div>
-                                        <span className="text-xs font-bold text-stone-700 dark:text-stone-300 ml-1">
-                                          {r.rating}/5
-                                        </span>
-                                      </div>
+                                      <span className="font-bold text-amber-600 dark:text-amber-400 text-xs">
+                                        {r.rating} / 5
+                                      </span>
                                     </div>
-
                                     {r.comment && (
-                                      <p className="text-xs text-stone-700 dark:text-stone-300 font-medium leading-relaxed bg-white dark:bg-[#1E293B] p-2.5 rounded-xl border border-[#E2E8F0] dark:border-[#334155]">
+                                      <p className="text-stone-700 dark:text-stone-300 text-[11.5px] leading-relaxed pt-0.5">
                                         "{r.comment}"
                                       </p>
                                     )}
-
-                                    <div className="text-[10px] text-[#64748B] dark:text-[#94A3B8] flex items-center justify-between pt-1">
-                                      <span>
-                                        {new Date(r.createdAt).toLocaleTimeString("tr-TR", {
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                        })}
-                                      </span>
-                                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                                        Doğrulanmış Öğrenci
-                                      </span>
-                                    </div>
                                   </div>
                                 ))}
                               </div>
