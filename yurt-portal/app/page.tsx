@@ -13,6 +13,8 @@ import type {
   LaundrySlot,
   LaundryMachine,
   MealAttendanceRecord,
+  MealRatingRecord,
+  AppNotification,
 } from "../types";
 import { defaultDailyMenu } from "../lib/initialData";
 import {
@@ -94,8 +96,28 @@ export default function Home() {
   const [isSuperAdminLogin, setIsSuperAdminLogin] = useState<boolean>(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Beni Hatırla: Kayıtlı kullanıcı adı ve rolü geri yükle
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedRemember = localStorage.getItem("yurtify_remember_me") === "true";
+      const savedUser = localStorage.getItem("yurtify_remembered_username");
+      const savedRole = localStorage.getItem("yurtify_remembered_role") as Role;
+      if (savedRemember && savedUser) {
+        setRememberMe(true);
+        setUsername(savedUser);
+        if (savedRole && (savedRole === "ogrenci" || savedRole === "yonetici" || savedRole === "superadmin")) {
+          setActiveRole(savedRole);
+          if (savedRole === "superadmin") {
+            setIsSuperAdminLogin(true);
+          }
+        }
+      }
+    }
+  }, []);
 
   // Süper Admin URL parametresi kontrolü (?role=superadmin veya ?superadmin=true)
   useEffect(() => {
@@ -139,46 +161,76 @@ export default function Home() {
     }
   }, []);
 
-  // Karanlık / Aydınlık Mod State'i (Dark / Light Theme)
+  // Tema State'leri (Kullanıcı Seçimi: light | dark | system, Efektif Görünüm: light | dark)
+  const [themeMode, setThemeMode] = useState<"light" | "dark" | "system">("system");
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("yurtify_theme") as "light" | "dark" | null;
-      if (saved === "dark" || saved === "light") {
-        setTheme(saved);
-        if (saved === "dark") {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
-        }
-      } else if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-        setTheme("dark");
-        document.documentElement.classList.add("dark");
-      }
-    } catch {
-      // localStorage erişim güvenliği
+  const getSystemTheme = (): "light" | "dark" => {
+    if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      return "dark";
     }
-  }, []);
+    return "light";
+  };
 
-  const selectTheme = (selectedTheme: "light" | "dark", _notify: boolean = false) => {
-    const applyThemeChange = () => {
-      setTheme(selectedTheme);
-      try {
-        localStorage.setItem("yurtify_theme", selectedTheme);
-      } catch {
-        // localStorage güvenliği
-      }
-
-      if (selectedTheme === "dark") {
+  const applyDomTheme = (effectiveTheme: "light" | "dark") => {
+    setTheme(effectiveTheme);
+    if (typeof document !== "undefined") {
+      if (effectiveTheme === "dark") {
         document.documentElement.classList.add("dark");
       } else {
         document.documentElement.classList.remove("dark");
       }
+    }
+  };
+
+  useEffect(() => {
+    try {
+      const savedMode = (localStorage.getItem("yurtify_theme_mode") || localStorage.getItem("yurtify_theme")) as "light" | "dark" | "system" | null;
+      const initialMode: "light" | "dark" | "system" =
+        savedMode === "dark" || savedMode === "light" || savedMode === "system" ? savedMode : "system";
+      setThemeMode(initialMode);
+
+      const resolved = initialMode === "system" ? getSystemTheme() : initialMode;
+      applyDomTheme(resolved);
+    } catch {
+      applyDomTheme("light");
+    }
+  }, []);
+
+  // Sistem teması değişikliklerini anlık dinleme (OS karanlık/aydınlık mod değişirse)
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (themeMode === "system") {
+        applyDomTheme(e.matches ? "dark" : "light");
+      }
+    };
+    try {
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    } catch {
+      mediaQuery.addListener(handleChange);
+      return () => mediaQuery.removeListener(handleChange);
+    }
+  }, [themeMode]);
+
+  const selectTheme = (selectedMode: "light" | "dark" | "system", notify: boolean = false) => {
+    setThemeMode(selectedMode);
+    try {
+      localStorage.setItem("yurtify_theme_mode", selectedMode);
+      localStorage.setItem("yurtify_theme", selectedMode);
+    } catch {
+      // localStorage güvenliği
+    }
+
+    const resolved = selectedMode === "system" ? getSystemTheme() : selectedMode;
+
+    const applyThemeChange = () => {
+      applyDomTheme(resolved);
     };
 
     if (typeof document !== "undefined") {
-      // Kutucukların farklı zamanlamalarla değişmesini önlemek için per-element transitionları kapat
       document.documentElement.classList.add("theme-switching");
 
       if ("startViewTransition" in document) {
@@ -189,28 +241,26 @@ export default function Home() {
           transition.finished.finally(() => {
             document.documentElement.classList.remove("theme-switching");
           });
-          return;
         } catch {
-          // View transition desteği hata verirse standart geçişe devam et
-        }
-      }
-
-      applyThemeChange();
-      if (typeof window !== "undefined") {
-        window.getComputedStyle(document.body).opacity;
-      }
-      setTimeout(() => {
-        if (typeof document !== "undefined") {
+          applyThemeChange();
           document.documentElement.classList.remove("theme-switching");
         }
-      }, 50);
+      } else {
+        applyThemeChange();
+        setTimeout(() => {
+          if (typeof document !== "undefined") {
+            document.documentElement.classList.remove("theme-switching");
+          }
+        }, 50);
+      }
     } else {
       applyThemeChange();
     }
   };
 
   const toggleTheme = () => {
-    selectTheme(theme === "dark" ? "light" : "dark", false);
+    const nextMode = theme === "dark" ? "light" : "dark";
+    selectTheme(nextMode, false);
   };
 
   // Veritabanı ve Realtime Durumu
@@ -488,6 +538,9 @@ export default function Home() {
   // Günlük Yemek Katılım Bildirimi State'i (Öğrenci Varım / Yokum tercihleri)
   const [mealAttendance, setMealAttendance] = useState<MealAttendanceRecord[]>([]);
   const [isAttendanceListOpen, setIsAttendanceListOpen] = useState(false);
+
+  // Günlük Yemek Menüsü Değerlendirme & Yorum State'i (Öğrenci 1-5 Yıldız ve Geri Bildirimleri)
+  const [mealRatings, setMealRatings] = useState<MealRatingRecord[]>([]);
 
   // Günün yemek katılım hesaplamaları (Müdürün göreceği sayılar)
   const todayMealDateKey = getTodayDateKey();
@@ -792,17 +845,33 @@ export default function Home() {
         .order("created_at", { ascending: false });
 
       if (!mntError && mntData) {
-        const mappedTickets: MaintenanceTicket[] = mntData.map((m: any) => ({
-          id: m.id,
-          odaNo: m.oda_no,
-          baslik: m.baslik,
-          kategori: m.kategori as any,
-          oncelik: m.oncelik as any,
-          durum: m.durum as any,
-          bildiren: m.bildiren || "Öğrenci",
-          tarih: m.tarih || new Date(m.created_at || Date.now()).toLocaleDateString("tr-TR"),
-          yurtId: m.yurt_id,
-        }));
+        const mappedTickets: MaintenanceTicket[] = mntData.map((m: any) => {
+          const rawDurum = (m.durum || "Açık").toString();
+          let memnuniyet: "evet" | "hayir" | undefined = undefined;
+          if (rawDurum.includes("Memnuniyet: Evet") || m.memnuniyet === "evet") {
+            memnuniyet = "evet";
+          } else if (rawDurum.includes("Memnuniyet: Hayır") || m.memnuniyet === "hayir") {
+            memnuniyet = "hayir";
+          }
+          const baseDurum = rawDurum.startsWith("Çözüldü")
+            ? "Çözüldü"
+            : rawDurum.startsWith("İnceleniyor")
+              ? "İnceleniyor"
+              : "Açık";
+
+          return {
+            id: m.id,
+            odaNo: m.oda_no,
+            baslik: m.baslik,
+            kategori: m.kategori as any,
+            oncelik: m.oncelik as any,
+            durum: baseDurum as any,
+            bildiren: m.bildiren || "Öğrenci",
+            tarih: m.tarih || new Date(m.created_at || Date.now()).toLocaleDateString("tr-TR"),
+            yurtId: m.yurt_id,
+            memnuniyet,
+          };
+        });
         setMaintenanceTickets(mappedTickets);
         if (typeof window !== "undefined") {
           localStorage.setItem(`yurtify_${curYurtId}_maintenance`, JSON.stringify(mappedTickets));
@@ -932,11 +1001,42 @@ export default function Home() {
         if (typeof window !== "undefined") {
           localStorage.setItem(`yurtify_${curYurtId}_menu`, JSON.stringify(mappedMenu));
         }
+
+        // Günün yemek değerlendirmelerini saatler.ratings içinden veya yerel hafızadan yükle
+        let loadedRatings: MealRatingRecord[] = [];
+        if (mRow.saatler && Array.isArray(mRow.saatler.ratings)) {
+          loadedRatings = mRow.saatler.ratings;
+        } else if (typeof window !== "undefined") {
+          try {
+            const raw =
+              localStorage.getItem(`yurtify_${curYurtId}_meal_ratings`) ||
+              localStorage.getItem("yurtify_meal_ratings");
+            if (raw) {
+              const p = JSON.parse(raw);
+              if (Array.isArray(p)) loadedRatings = p;
+            }
+          } catch { }
+        }
+        setMealRatings(loadedRatings);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`yurtify_${curYurtId}_meal_ratings`, JSON.stringify(loadedRatings));
+        }
       } else {
         setDailyMenu({
           ...defaultDailyMenu,
           tarih: todayKey,
         });
+        if (typeof window !== "undefined") {
+          try {
+            const raw =
+              localStorage.getItem(`yurtify_${curYurtId}_meal_ratings`) ||
+              localStorage.getItem("yurtify_meal_ratings");
+            if (raw) {
+              const p = JSON.parse(raw);
+              if (Array.isArray(p)) setMealRatings(p);
+            }
+          } catch { }
+        }
       }
 
       // 9. Yemek Katılım Tercihlerini SADECE BU YURDA ÖZEL ÇEK
@@ -1664,6 +1764,15 @@ export default function Home() {
     if (typeof window !== "undefined") {
       sessionStorage.setItem("yurtify_session", JSON.stringify(userObj));
       document.documentElement.classList.add("has-session");
+      if (rememberMe) {
+        localStorage.setItem("yurtify_remember_me", "true");
+        localStorage.setItem("yurtify_remembered_username", username.trim());
+        localStorage.setItem("yurtify_remembered_role", role);
+      } else {
+        localStorage.removeItem("yurtify_remember_me");
+        localStorage.removeItem("yurtify_remembered_username");
+        localStorage.removeItem("yurtify_remembered_role");
+      }
     }
     fetchDbData(chosenYurtId);
   };
@@ -2310,7 +2419,8 @@ export default function Home() {
     showToast(`Çamaşır durumu güncellendi: ${newStatus}`);
   };
 
-  const handleDeleteLaundry = (id: string) => {
+  // Çamaşırhane Randevu İptali ve Yedek Bekleme Sırasındaki İlk Öğrenciyi Asil Randevuya Yükseltme
+  const cancelAndPromoteLaundrySlot = (slotId: string, customYurtId?: string) => {
     let currentSlots = laundrySlots;
     if (typeof window !== "undefined") {
       try {
@@ -2321,20 +2431,116 @@ export default function Home() {
         }
       } catch { }
     }
-    const updated = currentSlots.filter((s) => s.id !== id);
-    setLaundrySlots(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("yurtify_laundry", JSON.stringify(updated));
-      localStorage.setItem("yurtify_laundry_slots", JSON.stringify(updated));
+
+    const cancelledSlot = currentSlots.find((s) => s.id === slotId);
+    if (!cancelledSlot) return;
+
+    const remainingSlots = currentSlots.filter((s) => s.id !== slotId);
+    const resolvedYurtId = customYurtId || cancelledSlot.yurtId || currentUser?.selectedYurtId || yurtlar[0]?.id || "af81f031-1988-401e-84af-42ac75b4d409";
+
+    // İptal edilen randevu asil randevu muydu?
+    const isCancelledAsil = !cancelledSlot.not || !cancelledSlot.not.includes("Yedek");
+
+    // Aynı makine, aynı tarih ve aynı saat dilimindeki diğer bekleme sırası randevularını bul
+    const sameSlotWaitlist = remainingSlots
+      .filter((s) =>
+        cleanMachineName(s.makineNo) === cleanMachineName(cancelledSlot.makineNo) &&
+        normalizeDateStr(s.tarih) === normalizeDateStr(cancelledSlot.tarih) &&
+        s.saatAraligi === cancelledSlot.saatAraligi &&
+        s.durum !== "İptal" &&
+        s.durum !== "Tamamlandı"
+      )
+      .sort((a, b) => {
+        const numA = parseInt(a.not?.match(/#(\d+)/)?.[1] || "999");
+        const numB = parseInt(b.not?.match(/#(\d+)/)?.[1] || "999");
+        return numA - numB;
+      });
+
+    let updatedSlots = remainingSlots;
+
+    if (isCancelledAsil && sameSlotWaitlist.length > 0) {
+      // 1. Sıradaki bekleyen öğrenciyi asil randevuya yükselt!
+      const promotedSlot = sameSlotWaitlist[0];
+      const dynamicStatus = getDynamicSlotStatus({
+        tarih: promotedSlot.tarih,
+        saatAraligi: promotedSlot.saatAraligi,
+        durum: "Sırada",
+      });
+
+      updatedSlots = updatedSlots.map((s) => {
+        if (s.id === promotedSlot.id) {
+          return {
+            ...s,
+            durum: dynamicStatus,
+            not: "Asil Randevuya Yükseltildi (Yedekten Onaylandı)",
+          };
+        }
+        if (
+          cleanMachineName(s.makineNo) === cleanMachineName(cancelledSlot.makineNo) &&
+          normalizeDateStr(s.tarih) === normalizeDateStr(cancelledSlot.tarih) &&
+          s.saatAraligi === cancelledSlot.saatAraligi &&
+          s.not?.includes("Yedek")
+        ) {
+          const currentNum = parseInt(s.not.match(/#(\d+)/)?.[1] || "2");
+          const newNum = Math.max(1, currentNum - 1);
+          return {
+            ...s,
+            not: `Yedek Sıra (#${newNum})`,
+          };
+        }
+        return s;
+      });
+
+      try {
+        supabase
+          .from("camasirhane_randevular")
+          .update({
+            durum: dynamicStatus,
+            not_bilgisi: "Asil Randevuya Yükseltildi (Yedekten Onaylandı)",
+          })
+          .eq("id", promotedSlot.id)
+          .then(({ error }) => {
+            if (error) console.warn("Supabase asil yükseltme uyarısı:", error.message);
+          });
+
+        sameSlotWaitlist.slice(1).forEach((otherWait, idx) => {
+          const newNum = idx + 1;
+          supabase
+            .from("camasirhane_randevular")
+            .update({
+              not_bilgisi: `Yedek Sıra (#${newNum})`,
+            })
+            .eq("id", otherWait.id)
+            .then(() => {});
+        });
+      } catch (err) {
+        console.warn("Supabase waitlist güncelleme hatası:", err);
+      }
+
+      showToast(`Randevu silindi. Bekleme sırasındaki 1. öğrenci (${promotedSlot.ogrenciAd}) asil randevuya yükseltildi!`);
+    } else {
+      showToast("Çamaşır sırası silindi.");
     }
+
     try {
-      supabase.from("camasirhane_randevular").delete().eq("id", id).then(({ error }) => {
+      supabase.from("camasirhane_randevular").delete().eq("id", slotId).then(({ error }) => {
         if (error) console.warn("Çamaşır silme hatası:", error.message);
       });
     } catch (err) {
       console.warn("Çamaşır silme hatası:", err);
     }
-    showToast("Çamaşır sırası silindi.");
+
+    setLaundrySlots(updatedSlots);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`yurtify_${resolvedYurtId}_laundry`, JSON.stringify(updatedSlots));
+      localStorage.setItem(`yurtify_${resolvedYurtId}_laundry_slots`, JSON.stringify(updatedSlots));
+      localStorage.setItem("yurtify_laundry", JSON.stringify(updatedSlots));
+      localStorage.setItem("yurtify_laundry_slots", JSON.stringify(updatedSlots));
+    }
+  };
+
+  const handleDeleteLaundry = (id: string) => {
+    cancelAndPromoteLaundrySlot(id);
   };
 
   const openQuickAddLaundry = (machine: string, timeSlot: string, date: string) => {
@@ -2562,6 +2768,21 @@ export default function Home() {
       return;
     }
 
+    const targetRoom = (newStudent.odaNo || "").trim();
+    const targetBed = (newStudent.yatakNo || "").trim();
+
+    // Aynı oda ve aynı yatak kontrolü: Aynı yatağa birden fazla kişi yerleştirilemez
+    const existingOccupant = students.find(
+      (s) =>
+        (s.odaNo || "").trim().toLowerCase() === targetRoom.toLowerCase() &&
+        (s.yatakNo || "").trim().toLowerCase() === targetBed.toLowerCase()
+    );
+
+    if (existingOccupant) {
+      showToast(`HATA: Oda ${targetRoom}, ${targetBed}. yatakta zaten "${existingOccupant.adSoyad}" kayıtlıdır! Aynı yatağa birden fazla kişi atanamaz.`);
+      return;
+    }
+
     const rawName = newStudent.adSoyad.trim();
     // Yönetim e-posta belirlemez; sadece isim ve kullanıcı adı belirler
     const cleanUsername = (
@@ -2669,6 +2890,22 @@ export default function Home() {
   const handleEditStudent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStudent) return;
+
+    const targetRoom = (editingStudent.odaNo || "").trim();
+    const targetBed = (editingStudent.yatakNo || "").trim();
+
+    // Aynı oda ve aynı yatak kontrolü (düzenlenen öğrenci hariç)
+    const existingOccupant = students.find(
+      (s) =>
+        s.id !== editingStudent.id &&
+        (s.odaNo || "").trim().toLowerCase() === targetRoom.toLowerCase() &&
+        (s.yatakNo || "").trim().toLowerCase() === targetBed.toLowerCase()
+    );
+
+    if (existingOccupant) {
+      showToast(`HATA: Oda ${targetRoom}, ${targetBed}. yatakta zaten "${existingOccupant.adSoyad}" kayıtlıdır! Aynı yatağa birden fazla kişi atanamaz.`);
+      return;
+    }
 
     const oldStudent = students.find((s) => s.id === editingStudent.id);
     // Yönetim öğrenci şifresini belirleyemez veya değiştiremez; mevcut şifre korunur
@@ -3058,6 +3295,61 @@ export default function Home() {
       });
     } catch (err) {
       console.warn("Yemek katılım hatası:", err);
+    }
+  };
+
+  // Günün Yemek Menüsünü Puanlama & Yorum Kaydetme (Öğrenci)
+  const handleSaveMealRating = async (rating: number, comment: string) => {
+    const targetYurtId = currentUser?.selectedYurtId || yurtlar[0]?.id || "af81f031-1988-401e-84af-42ac75b4d409";
+    const today = getTodayDateKey();
+    const sName = currentUser?.name || "Öğrenci";
+    const currentStudent = students.find((s) => s.adSoyad.trim().toLowerCase() === sName.trim().toLowerCase());
+
+    const newRatingRecord: MealRatingRecord = {
+      id: `rating-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      studentName: sName,
+      odaNo: currentStudent?.odaNo || "",
+      rating,
+      comment: comment.trim(),
+      date: today,
+      createdAt: new Date().toISOString(),
+      yurtId: targetYurtId,
+    };
+
+    const currentRatings = mealRatings.filter(
+      (r) => !(r.date === today && r.studentName.trim().toLowerCase() === sName.trim().toLowerCase())
+    );
+    const updatedRatings = [newRatingRecord, ...currentRatings];
+    setMealRatings(updatedRatings);
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`yurtify_${targetYurtId}_meal_ratings`, JSON.stringify(updatedRatings));
+      localStorage.setItem("yurtify_meal_ratings", JSON.stringify(updatedRatings));
+    }
+
+    try {
+      const updatedSaatler = {
+        ...(dailyMenu.saatler || {}),
+        ratings: updatedRatings,
+      };
+      await supabase.from("yemekhane_menu").upsert({
+        id: `menu_${targetYurtId}_${today}`,
+        yurt_id: targetYurtId,
+        tarih: today,
+        gorunum_modu: dailyMenu.gorunumModu,
+        aktif_ogun: dailyMenu.aktifOgun,
+        kalori_goster: dailyMenu.kaloriGoster,
+        gun_tipi: dailyMenu.gunTipi,
+        kahvalti_menu: dailyMenu.kahvalti,
+        kahvalti_saat: dailyMenu.kahvaltiSaat,
+        kahvalti_kalori: dailyMenu.kahvaltiKalori,
+        aksam_menu: dailyMenu.aksam,
+        aksam_saat: dailyMenu.aksamSaat,
+        aksam_kalori: dailyMenu.aksamKalori,
+        saatler: updatedSaatler,
+      });
+    } catch (err) {
+      console.warn("Yemek puanı eşitleme hatası:", err);
     }
   };
 
@@ -3497,6 +3789,31 @@ export default function Home() {
     }
   };
 
+// 6.c. Arıza Hizmet Memnuniyeti Belirtme (Öğrenci)
+  const handleRateMaintenanceTicket = (id: string, satisfaction: "evet" | "hayir") => {
+    const targetYurtId = currentUser?.selectedYurtId || yurtlar[0]?.id || "af81f031-1988-401e-84af-42ac75b4d409";
+    const updated = maintenanceTickets.map((m) =>
+      m.id === id ? { ...m, memnuniyet: satisfaction } : m
+    );
+    setMaintenanceTickets(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("yurtify_maintenance", JSON.stringify(updated));
+      localStorage.setItem(`yurtify_${targetYurtId}_maintenance`, JSON.stringify(updated));
+    }
+
+    try {
+      const statusWithFeedback = `Çözüldü (Memnuniyet: ${satisfaction === "evet" ? "Evet" : "Hayır"})`;
+      supabase
+        .from("arizalar")
+        .update({ durum: statusWithFeedback })
+        .eq("id", id)
+        .then(({ error }) => {
+          if (error) console.warn("Arıza memnuniyet güncelleme uyarısı:", error.message);
+        });
+    } catch (err) {
+      console.warn("Arıza memnuniyet hatası:", err);
+    }
+  };
   // 7. Yeni Arıza Talebi Ekle
   const handleAddMaintenance = (e: React.FormEvent) => {
     e.preventDefault();
@@ -3793,41 +4110,51 @@ export default function Home() {
           </div>
 
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs">
-            {!isSuperAdminLogin ? (
-              <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4 border border-slate-200 dark:border-slate-700 text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => handleRoleChange("ogrenci")}
-                  className={`flex-1 min-h-[44px] py-1.5 px-1 rounded-lg transition-all cursor-pointer flex items-center justify-center ${
-                    activeRole === "ogrenci"
-                      ? "bg-[#0284C7] text-white shadow-xs font-bold"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                  }`}
-                >
-                  Öğrenci
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleRoleChange("yonetici")}
-                  className={`flex-1 min-h-[44px] py-1.5 px-1 rounded-lg transition-all cursor-pointer flex items-center justify-center ${
-                    activeRole === "yonetici"
-                      ? "bg-[#0284C7] text-white shadow-xs font-bold"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                  }`}
-                >
-                  Yurt Müdürü
-                </button>
-              </div>
-            ) : (
-              <div className="mb-4 text-center pb-3 border-b border-slate-100 dark:border-slate-800">
-                <span className="inline-block px-2.5 py-1 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[11px] font-bold rounded-lg border border-amber-500/20 mb-1.5">
-                  Sistem Yöneticisi Paneli
-                </span>
-                <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                  Süper Admin Girişi
-                </h2>
-              </div>
-            )}
+{/* 3 Seçenekli Giriş Rolü Seçici: Öğrenci, Yurt Müdürü, Süper Admin */}
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4 border border-slate-200 dark:border-slate-700 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSuperAdminLogin(false);
+                  handleRoleChange("ogrenci");
+                }}
+                className={`flex-1 min-h-[44px] py-1.5 px-1 rounded-lg transition-all cursor-pointer flex items-center justify-center text-center ${
+                  activeRole === "ogrenci"
+                    ? "bg-[#0284C7] text-white shadow-xs font-bold"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                }`}
+              >
+                Öğrenci
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSuperAdminLogin(false);
+                  handleRoleChange("yonetici");
+                }}
+                className={`flex-1 min-h-[44px] py-1.5 px-1 rounded-lg transition-all cursor-pointer flex items-center justify-center text-center ${
+                  activeRole === "yonetici"
+                    ? "bg-[#0284C7] text-white shadow-xs font-bold"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                }`}
+              >
+                Yurt Müdürü
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSuperAdminLogin(true);
+                  handleRoleChange("superadmin");
+                }}
+                className={`flex-1 min-h-[44px] py-1.5 px-1 rounded-lg transition-all cursor-pointer flex items-center justify-center text-center ${
+                  activeRole === "superadmin"
+                    ? "bg-[#0284C7] text-white shadow-xs font-bold"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                }`}
+              >
+                Süper Admin
+              </button>
+            </div>
 
             <form onSubmit={handleLogin} className="space-y-3">
               <div>
@@ -3861,6 +4188,19 @@ export default function Home() {
                   autoComplete="current-password"
                   className="w-full min-h-[44px] bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-[#0284C7] focus:ring-1 focus:ring-[#0284C7]/30 transition-all font-medium"
                 />
+              </div>
+
+              {/* Beni Hatırla Seçeneği */}
+              <div className="flex items-center justify-between pt-0.5">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-slate-700 dark:text-slate-300 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 rounded text-[#0284C7] focus:ring-[#0284C7] border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/60 cursor-pointer"
+                  />
+                  <span className="font-medium text-[11px] sm:text-xs">Beni Hatırla</span>
+                </label>
               </div>
 
               {errorMessage && (
@@ -5014,6 +5354,153 @@ export default function Home() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Günün Menü Değerlendirmeleri ve Öğrenci Yorumları (Canlı Geri Bildirim) */}
+                    <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-5 sm:p-7 rounded-2xl sm:rounded-3xl space-y-5 shadow-xs transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E8F0] dark:border-[#334155]">
+                        <div>
+                          <h3 className="text-base sm:text-lg font-bold text-[#0F172A] dark:text-[#F1F5F9] flex items-center gap-2">
+                            <svg className="w-5 h-5 text-amber-500 fill-amber-500" viewBox="0 0 24 24">
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                            </svg>
+                            Günün Yemek Değerlendirmeleri ve Öğrenci Yorumları
+                          </h3>
+                          <p className="text-xs text-[#64748B] dark:text-[#94A3B8] mt-0.5">
+                            Öğrencilerin günün menüsüne verdiği yıldız puanları ve anlık geri bildirimleri
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-sky-500/10 text-[#0284C7] dark:text-sky-400 border border-[#0284C7]/20">
+                            <span className="w-2 h-2 rounded-full bg-[#0284C7] animate-pulse" />
+                            Anlık Takip
+                          </span>
+                        </div>
+                      </div>
+
+                      {(() => {
+                        const todayKey = getTodayDateKey();
+                        const todayRatings = mealRatings.filter((r) => r.date === todayKey);
+                        const avgScore = todayRatings.length > 0
+                          ? (todayRatings.reduce((acc, r) => acc + r.rating, 0) / todayRatings.length).toFixed(1)
+                          : "0.0";
+                        const satisfiedCount = todayRatings.filter((r) => r.rating >= 4).length;
+                        const satisfactionRate = todayRatings.length > 0
+                          ? Math.round((satisfiedCount / todayRatings.length) * 100)
+                          : 0;
+
+                        return (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div className="p-4 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between">
+                                <div>
+                                  <span className="text-[11px] font-semibold text-[#64748B] dark:text-[#94A3B8] block">Ortalama Puan</span>
+                                  <span className="text-2xl font-black text-[#0F172A] dark:text-[#F1F5F9] mt-0.5 block">
+                                    {avgScore} <span className="text-xs font-normal text-[#64748B]">/ 5.0</span>
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-0.5 text-amber-500">
+                                  {[1, 2, 3, 4, 5].map((s) => (
+                                    <svg
+                                      key={s}
+                                      className={`w-4 h-4 ${
+                                        s <= Math.round(Number(avgScore))
+                                          ? "fill-amber-400 text-amber-400"
+                                          : "fill-transparent stroke-slate-300 dark:stroke-slate-600"
+                                      }`}
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                                    </svg>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="p-4 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155]">
+                                <span className="text-[11px] font-semibold text-[#64748B] dark:text-[#94A3B8] block">Toplam Değerlendirme</span>
+                                <span className="text-2xl font-black text-[#0F172A] dark:text-[#F1F5F9] mt-0.5 block">
+                                  {todayRatings.length} <span className="text-xs font-normal text-[#64748B]">öğrenci</span>
+                                </span>
+                              </div>
+
+                              <div className="p-4 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155]">
+                                <span className="text-[11px] font-semibold text-[#64748B] dark:text-[#94A3B8] block">Memnuniyet Oranı</span>
+                                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5 block">
+                                  %{satisfactionRate} <span className="text-xs font-normal text-[#64748B]">(4-5 Yıldız)</span>
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Yorumlar Listesi */}
+                            {todayRatings.length === 0 ? (
+                              <div className="p-8 text-center text-xs text-stone-500 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155] space-y-1">
+                                <div className="font-bold text-stone-700 dark:text-stone-300">Henüz Değerlendirme Yok</div>
+                                <div>Öğrenciler bugünün yemeklerini puanlayıp yorum yaptığında anlık olarak burada listelenecektir.</div>
+                              </div>
+                            ) : (
+                              <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                                {todayRatings.map((r) => (
+                                  <div
+                                    key={r.id}
+                                    className="p-3.5 rounded-2xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] space-y-2"
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className="font-bold text-xs text-[#0F172A] dark:text-[#F1F5F9] truncate">
+                                          {r.studentName}
+                                        </span>
+                                        {r.odaNo && (
+                                          <span className="text-[10px] px-2 py-0.5 rounded-md bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] text-stone-600 dark:text-stone-400 font-semibold shrink-0">
+                                            Oda {r.odaNo}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <div className="flex items-center text-amber-500">
+                                          {[1, 2, 3, 4, 5].map((star) => (
+                                            <svg
+                                              key={star}
+                                              className={`w-3.5 h-3.5 ${
+                                                star <= r.rating
+                                                  ? "fill-amber-400 text-amber-400"
+                                                  : "fill-transparent stroke-slate-300 dark:stroke-slate-600"
+                                              }`}
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                                            </svg>
+                                          ))}
+                                        </div>
+                                        <span className="text-xs font-bold text-stone-700 dark:text-stone-300 ml-1">
+                                          {r.rating}/5
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {r.comment && (
+                                      <p className="text-xs text-stone-700 dark:text-stone-300 font-medium leading-relaxed bg-white dark:bg-[#1E293B] p-2.5 rounded-xl border border-[#E2E8F0] dark:border-[#334155]">
+                                        "{r.comment}"
+                                      </p>
+                                    )}
+
+                                    <div className="text-[10px] text-[#64748B] dark:text-[#94A3B8] flex items-center justify-between pt-1">
+                                      <span>
+                                        {new Date(r.createdAt).toLocaleTimeString("tr-TR", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })}
+                                      </span>
+                                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                                        Doğrulanmış Öğrenci
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                 )}
 
@@ -5891,6 +6378,33 @@ export default function Home() {
                                 Durumu İlerlet →
                               </button>
                             </div>
+
+                            {/* Öğrenci Onarım Memnuniyet Durumu */}
+                            {m.durum === "Çözüldü" && (
+                              <div className="pt-2 border-t border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between text-xs">
+                                <span className="text-[#64748B] dark:text-[#94A3B8] font-medium">Öğrenci Memnuniyeti:</span>
+                                {m.memnuniyet === "evet" ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                    <svg className="w-3 h-3 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                      <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                    Memnun Kaldı
+                                  </span>
+                                ) : m.memnuniyet === "hayir" ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                                    <svg className="w-3 h-3 text-rose-600 dark:text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                      <line x1="18" y1="6" x2="6" y2="18" />
+                                      <line x1="6" y1="6" x2="18" y2="18" />
+                                    </svg>
+                                    Sorun Devam Ediyor
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 border border-stone-200 dark:border-stone-700">
+                                    Değerlendirme Bekleniyor
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )))}
                     </div>
@@ -6922,18 +7436,18 @@ export default function Home() {
                         </h3>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                         {/* Aydınlık Mod Seçeneği */}
                         <button
                           type="button"
                           onClick={() => selectTheme("light", true)}
-                          className={`p-3 rounded-xl sm:rounded-2xl border text-left transition-colors cursor-pointer flex items-center justify-between gap-3 min-h-[48px] active:scale-[0.99] ${theme === "light"
+                          className={`p-3 rounded-xl sm:rounded-2xl border text-left transition-colors cursor-pointer flex items-center justify-between gap-3 min-h-[48px] active:scale-[0.99] ${themeMode === "light"
                               ? "border-[#0284C7] bg-[#F1F5F9] dark:bg-[#162032]"
                               : "border-[#E2E8F0] dark:border-[#334155] bg-[#F8FAFC] dark:bg-[#0F172A] hover:border-[#CBD5E1] dark:hover:border-[#475569] hover:bg-white dark:hover:bg-[#1E293B]"
                             }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${theme === "light"
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${themeMode === "light"
                                 ? "bg-[#0284C7] text-white"
                                 : "bg-white dark:bg-[#1E293B] text-[#64748B] dark:text-[#94A3B8] border border-[#E2E8F0] dark:border-[#334155]"
                               }`}>
@@ -6949,10 +7463,10 @@ export default function Home() {
                                 <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
                               </svg>
                             </div>
-                            <span className="text-xs sm:text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">Aydınlık Mod</span>
+                            <span className="text-xs sm:text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">Aydınlık</span>
                           </div>
 
-                          {theme === "light" ? (
+                          {themeMode === "light" ? (
                             <span className="w-5 h-5 rounded-full bg-[#0284C7] text-white flex items-center justify-center shrink-0">
                               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -6967,13 +7481,13 @@ export default function Home() {
                         <button
                           type="button"
                           onClick={() => selectTheme("dark", true)}
-                          className={`p-3 rounded-xl sm:rounded-2xl border text-left transition-colors cursor-pointer flex items-center justify-between gap-3 min-h-[48px] active:scale-[0.99] ${theme === "dark"
+                          className={`p-3 rounded-xl sm:rounded-2xl border text-left transition-colors cursor-pointer flex items-center justify-between gap-3 min-h-[48px] active:scale-[0.99] ${themeMode === "dark"
                               ? "border-[#0284C7] bg-[#F1F5F9] dark:bg-[#162032]"
                               : "border-[#E2E8F0] dark:border-[#334155] bg-[#F8FAFC] dark:bg-[#0F172A] hover:border-[#CBD5E1] dark:hover:border-[#475569] hover:bg-white dark:hover:bg-[#1E293B]"
                             }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${theme === "dark"
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${themeMode === "dark"
                                 ? "bg-[#0284C7] text-white"
                                 : "bg-white dark:bg-[#1E293B] text-[#64748B] dark:text-[#94A3B8] border border-[#E2E8F0] dark:border-[#334155]"
                               }`}>
@@ -6981,10 +7495,47 @@ export default function Home() {
                                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                               </svg>
                             </div>
-                            <span className="text-xs sm:text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">Karanlık Mod</span>
+                            <span className="text-xs sm:text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">Karanlık</span>
                           </div>
 
-                          {theme === "dark" ? (
+                          {themeMode === "dark" ? (
+                            <span className="w-5 h-5 rounded-full bg-[#0284C7] text-white flex items-center justify-center shrink-0">
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </span>
+                          ) : (
+                            <span className="w-5 h-5 rounded-full border-2 border-[#CBD5E1] dark:border-[#475569] shrink-0" />
+                          )}
+                        </button>
+
+                        {/* Sistem Varsayılanı Seçeneği */}
+                        <button
+                          type="button"
+                          onClick={() => selectTheme("system", true)}
+                          className={`p-3 rounded-xl sm:rounded-2xl border text-left transition-colors cursor-pointer flex items-center justify-between gap-3 min-h-[48px] active:scale-[0.99] ${themeMode === "system"
+                              ? "border-[#0284C7] bg-[#F1F5F9] dark:bg-[#162032]"
+                              : "border-[#E2E8F0] dark:border-[#334155] bg-[#F8FAFC] dark:bg-[#0F172A] hover:border-[#CBD5E1] dark:hover:border-[#475569] hover:bg-white dark:hover:bg-[#1E293B]"
+                            }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${themeMode === "system"
+                                ? "bg-[#0284C7] text-white"
+                                : "bg-white dark:bg-[#1E293B] text-[#64748B] dark:text-[#94A3B8] border border-[#E2E8F0] dark:border-[#334155]"
+                              }`}>
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                                <line x1="8" y1="21" x2="16" y2="21" />
+                                <line x1="12" y1="17" x2="12" y2="21" />
+                              </svg>
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-xs sm:text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9] block truncate">Sistem</span>
+                              <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8] block truncate">Varsayılan</span>
+                            </div>
+                          </div>
+
+                          {themeMode === "system" ? (
                             <span className="w-5 h-5 rounded-full bg-[#0284C7] text-white flex items-center justify-center shrink-0">
                               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -7116,6 +7667,9 @@ export default function Home() {
             students={students}
             mealAttendance={mealAttendance}
             onSaveMealAttendance={handleSaveMealAttendance}
+            mealRatings={mealRatings}
+            onSaveMealRating={handleSaveMealRating}
+            onRateMaintenanceTicket={handleRateMaintenanceTicket}
             laundrySlots={liveLaundrySlots}
             laundryMachines={laundryMachines}
             onAddLaundrySlot={(slot) => {
@@ -7172,30 +7726,8 @@ export default function Home() {
               }
             }}
             onCancelLaundrySlot={(slotId) => {
-              let currentSlots = laundrySlots;
-              if (typeof window !== "undefined") {
-                try {
-                  const raw = localStorage.getItem("yurtify_laundry") || localStorage.getItem("yurtify_laundry_slots");
-                  if (raw) {
-                    const parsed = JSON.parse(raw);
-                    if (Array.isArray(parsed)) currentSlots = parsed;
-                  }
-                } catch { }
-              }
-              const updated = currentSlots.filter((s) => s.id !== slotId);
-              setLaundrySlots(updated);
-              if (typeof window !== "undefined") {
-                localStorage.setItem("yurtify_laundry", JSON.stringify(updated));
-                localStorage.setItem("yurtify_laundry_slots", JSON.stringify(updated));
-              }
-
-              try {
-                supabase.from("camasirhane_randevular").delete().eq("id", slotId).then(({ error }) => {
-                  if (error) console.warn("Öğrenci randevu iptal uyarısı:", error.message);
-                });
-              } catch (err) {
-                console.warn("Öğrenci randevu iptal hatası:", err);
-              }
+              const targetYurtId = currentUser?.selectedYurtId || yurtlar[0]?.id || "af81f031-1988-401e-84af-42ac75b4d409";
+              cancelAndPromoteLaundrySlot(slotId, targetYurtId);
             }}
             onUpdateStudentPassword={(studentName, newPass) => {
               const updated = students.map((s) =>
@@ -7245,6 +7777,7 @@ export default function Home() {
               } catch (err) { }
             }}
             theme={theme}
+            themeMode={themeMode}
             onToggleTheme={toggleTheme}
             onSelectTheme={(selectedTheme) => selectTheme(selectedTheme, true)}
             onLogout={handleLogout}

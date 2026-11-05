@@ -17,3 +17,9 @@ Kullanıcının kesin talimatı gereği, **kodlarda, arayüz metinlerinde, başl
 - İkon gerekirse sadece CSS, SVG veya düz metin göstergeleri kullanılabilir.
 - Asistan yanıtlarında da kesinlikle hiçbir emojiye yer verilmeyecektir.
 
+## 3. Yerel Yedek Senkronizasyon ve Onay Kuralı (ZORUNLU KURAL)
+Kullanıcının kesin talimatı gereği, `C:\Users\PC\Desktop\yurt-portal-yedek` yerel yedek klasörü için şu kurallar istisnasız uygulanacaktır:
+- **Kullanıcının Değişiklikleri:** Kullanıcı `yurt-portal` sistemi üzerinde herhangi bir geliştirme veya değişiklik yaptığında/istediğinde, ilgili değişiklikler eşzamanlı olarak yerel yedek klasörüne (`C:\Users\PC\Desktop\yurt-portal-yedek`) de yansıtılacak; yedek her zaman güncel tutulacaktır.
+- **Arkadaşının / Uzak Deponun (Git) Değişiklikleri:** Proje ortağından (arkadaşından) gelen veya GitHub üzerinden çekilen (git pull / fetch / merge vb.) hiçbir değişiklik KULLANICIYA ÖNCEDEN SORULMADAN ve AÇIK ONAYI ALINMADAN bu yedek klasörüne AKTARILMAYACAK ve yedek güncellenmeyecektir.
+
+

@@ -115,9 +115,10 @@ export function AddStudentModal({
               />
             </div>
             <div>
-              <label className="text-stone-600 dark:text-stone-300 block mb-1 font-semibold">Kat</label>
+              <label className="text-stone-600 dark:text-stone-300 block mb-1 font-semibold">Yatak No *</label>
               <input
                 type="text"
+                required
                 value={newStudent.yatakNo}
                 onChange={(e) => setNewStudent({ ...newStudent, yatakNo: e.target.value })}
                 placeholder="Örn: 1"
@@ -228,9 +229,10 @@ export function EditStudentModal({
                 />
               </div>
               <div>
-                <label className="text-stone-500 dark:text-stone-400 block mb-1">Kat:</label>
+                <label className="text-stone-500 dark:text-stone-400 block mb-1">Yatak No:</label>
                 <input
                   type="text"
+                  required
                   value={editingStudent.yatakNo}
                   onChange={(e) => setEditingStudent({ ...editingStudent, yatakNo: e.target.value })}
                   placeholder="Örn: 1"
