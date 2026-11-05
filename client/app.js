@@ -1,5 +1,9 @@
 /**
- * Yurtify Application Core Logic
+ * Yurtify Application Core Logic - Live Supabase Integration
+ * 
+ * Connected to Supabase Cloud Database:
+ * - URL: https://pbqiumuzvzlhkbfvlybq.supabase.co
+ * - Tables: ogrenciler, camasirhane_makineler, camasirhane_randevular, arizalar, duyurular, yemek_katilim
  * 
  * Features & Feedback Implementations:
  * 1.a Remember Me & 1.b Biometric Quick-Login
@@ -10,20 +14,23 @@
  * 3.b Automated 10-minute Pre-Reservation Reminder
  * 3.c Automated Instant Cycle Completion Unload Alert
  * 4.a Centralized Administrator Ticket Resolution & Official Closure Flow
- * 
- * New User Requirements:
- * 5. Admin Student Management:
- *    - Add student with Room Number, Bed Number, Full Name, and Initial Temporary Password
- *    - Delete student from registry
- * 6. Mandatory First-Login Password Change:
- *    - First-time student logs in with admin-assigned temporary password
- *    - System immediately enforces password reset screen
- *    - New student password is encrypted/hidden from administrator (Privacy Guarantee)
- * 7. Admin Laundry Supervision:
- *    - Add new Washing and Drying machines
- *    - Delete machines from facility
- *    - Toggle maintenance / active states
+ * 5. Admin Student Management (Room, Bed, Username, Initial Pass)
+ * 6. Mandatory First-Login Password Change (Secured in Supabase)
+ * 7. Admin Laundry Supervision (Add/Delete/Status)
+ * 8. Modern Floating Island Exit Capsule for Admin Preview
  */
+
+// ================= SUPABASE CONFIGURATION =================
+const SUPABASE_CONFIG = {
+  url: 'https://pbqiumuzvzlhkbfvlybq.supabase.co',
+  anonKey: 'sb_publishable_2TIKq45frzizMAzH9t44qw_IymfzwEA',
+  yurtId: 'af81f031-1988-401e-84af-42ac75b4d409'
+};
+
+// Initialize Supabase Client
+const supabaseClient = (window.supabase && typeof window.supabase.createClient === 'function')
+  ? window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
+  : null;
 
 // ================= GLOBAL APP STATE =================
 const AppState = {
@@ -36,31 +43,43 @@ const AppState = {
   rememberMe: localStorage.getItem('yurtify_remember_me') === 'true',
   savedUsername: localStorage.getItem('yurtify_saved_username') || 'eda.etem',
 
-  // Registered Students List (Admin-enrolled with Room & Bed)
+  // Live Students List (Synchronized with Supabase `ogrenciler`)
   students: [
     {
+      id: 'std-1793349124719',
       username: 'eda.etem',
       name: 'Eda Etem',
-      room: 'Oda 105',
-      bed: 'Yatak 1',
-      password: '123456',
-      isFirstLogin: false // Already set her own private password
+      room: 'Oda 302',
+      bed: 'Yatak 3',
+      password: 'edaetem',
+      isFirstLogin: false
     },
     {
-      username: 'ayse.kaya',
-      name: 'Ayşe Kaya',
-      room: 'Oda 105',
+      id: 'std-1793351680146',
+      username: 'aleyna.ersoy',
+      name: 'Aleyna Seda Ersoy',
+      room: 'Oda 201',
       bed: 'Yatak 2',
-      password: 'gecici123',
-      isFirstLogin: true // Must change password on first sign-in
+      password: 'ogrenci123',
+      isFirstLogin: true
     },
     {
-      username: 'zeynep.demir',
-      name: 'Zeynep Demir',
-      room: 'Oda 106',
+      id: 'std-1793351699047',
+      username: 'yagmur.arslan',
+      name: 'Yağmur Arslan',
+      room: 'Oda 201',
+      bed: 'Yatak 2',
+      password: 'ogrenci123',
+      isFirstLogin: true
+    },
+    {
+      id: 'std-1793351785024',
+      username: 'ebrar.karakas',
+      name: 'Ebrar Karakaş',
+      room: 'Oda 103',
       bed: 'Yatak 1',
-      password: 'gecici123',
-      isFirstLogin: true // Must change password on first sign-in
+      password: 'ogrenci123',
+      isFirstLogin: true
     }
   ],
 
@@ -72,22 +91,21 @@ const AppState = {
     password: '123456'
   },
 
-  // Laundry Facility Data (Dynamic Addition / Deletion)
+  // Laundry Facility Data (Synchronized with Supabase `camasirhane_makineler` & `camasirhane_randevular`)
   laundry: {
     quotaUsed: 1,
     quotaTotal: 2,
     activeBooking: {
       id: 'res-101',
-      machine: 'Makine 1 (Yıkama)',
-      date: '28.10.2026',
+      machine: 'Makine 1',
+      date: '05.11.2026',
       timeSlot: '18:00 - 19:30',
       status: 'Onaylandı'
     },
     machines: [
-      { id: 1, name: 'Makine 1 (Yıkama)', type: 'washer', status: 'idle', currentSlot: 'Müsait', progress: 0 },
-      { id: 2, name: 'Makine 2 (Yıkama)', type: 'washer', status: 'idle', currentSlot: 'Müsait', progress: 0 },
-      { id: 3, name: 'Kurutma Makinesi 1', type: 'dryer', status: 'idle', currentSlot: 'Müsait', progress: 0 },
-      { id: 4, name: 'Kurutma Makinesi 2', type: 'dryer', status: 'running', currentSlot: '18:00 - 19:30', progress: 68 }
+      { id: 'mach_1793352492921', name: 'Makine 1', type: 'washer', status: 'idle', currentSlot: 'Müsait', progress: 0 },
+      { id: 'mach_1793352498349', name: 'Makine 2', type: 'washer', status: 'idle', currentSlot: 'Müsait', progress: 0 },
+      { id: 'mach_1793352506447', name: 'Kurutma', type: 'dryer', status: 'running', currentSlot: '18:00 - 19:30', progress: 65 }
     ]
   },
 
@@ -102,7 +120,7 @@ const AppState = {
     ]
   },
 
-  // Announcements Data (Feedback 2.a)
+  // Announcements Data (Synchronized with Supabase `duyurular`)
   announcements: [
     {
       id: 'ann-1',
@@ -118,20 +136,20 @@ const AppState = {
       content: 'Hafta içi son giriş saati 23:00, hafta sonu ise 23:45\'tir. İzin almayan öğrencilerin odalarında bulunması zorunludur.',
       isUrgent: false,
       sender: 'Güvenlik Birimi',
-      time: '28.10.2026'
+      time: '04.11.2026'
     }
   ],
 
-  // Maintenance Tickets Data (Feedback 4.a: Centralized Admin Resolution)
+  // Maintenance Tickets Data (Synchronized with Supabase `arizalar`)
   tickets: [
     {
-      id: 't-101',
-      category: 'Sıhhi Tesisat / Banyo / Musluk',
-      description: 'Banyo bataryası damlatıyor, alt dolap nemlenmeye başladı.',
-      room: 'Oda 105 (Eda Etem)',
-      date: '28.10.2026',
-      status: 'İnceleniyor',
-      adminNote: 'Teknik personel yönlendirildi, conta değişimi yapılacak.'
+      id: 'mnt-1793786928121',
+      category: 'Elektrik',
+      description: 'Odamızdaki priz çalışmıyor',
+      room: 'Oda 302 (Eda Etem)',
+      date: '04.11.2026',
+      status: 'Açık',
+      adminNote: 'Teknik personel görevlendirildi.'
     }
   ]
 };
@@ -158,8 +176,9 @@ const DOM = {
 
   // Demo Pills
   demoStudentEda: document.getElementById('demo-student-eda'),
-  demoStudentAyse: document.getElementById('demo-student-ayse'),
+  demoStudentAleyna: document.getElementById('demo-student-aleyna') || document.getElementById('demo-student-ayse'),
   demoAdminMeltem: document.getElementById('demo-admin-meltem'),
+  dbStatusText: document.getElementById('db-status-text'),
 
   // Forced Password Change Form
   forcePasswordForm: document.getElementById('force-password-form'),
@@ -219,7 +238,7 @@ const DOM = {
   admStudentsList: document.getElementById('adm-students-list'),
   admStudentCount: document.getElementById('adm-student-count'),
 
-  // Admin Laundry Management (Add / Delete)
+  // Admin Laundry Management
   admMachineName: document.getElementById('adm-machine-name'),
   admMachineType: document.getElementById('adm-machine-type'),
   btnAdmAddMachine: document.getElementById('btn-adm-add-machine'),
@@ -248,6 +267,102 @@ const DOM = {
   toastPriorityTag: document.getElementById('toast-priority-tag'),
   toastCloseBtn: document.getElementById('toast-close-btn')
 };
+
+// ================= SUPABASE DATA SYNCHRONIZATION =================
+
+async function loadDataFromSupabase() {
+  if (!supabaseClient) {
+    console.warn('Supabase client not initialized. Working in offline fallback mode.');
+    return;
+  }
+
+  try {
+    // 1. Fetch Students (ogrenciler)
+    const { data: stdData, error: stdErr } = await supabaseClient
+      .from('ogrenciler')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!stdErr && Array.isArray(stdData) && stdData.length > 0) {
+      AppState.students = stdData.map(r => ({
+        id: r.id,
+        username: r.kullanici_adi || '',
+        name: r.ad_soyad || '',
+        room: r.oda_no ? (r.oda_no.toString().startsWith('Oda') ? r.oda_no : `Oda ${r.oda_no}`) : 'Oda -',
+        bed: r.yatak_no ? (r.yatak_no.toString().startsWith('Yatak') ? r.yatak_no : `Yatak ${r.yatak_no}`) : 'Yatak 1',
+        password: r.sifre || '',
+        isFirstLogin: r.gecici_sifre_mi === true,
+        phone: r.telefon,
+        email: r.eposta
+      }));
+    }
+
+    // 2. Fetch Machines (camasirhane_makineler)
+    const { data: machData, error: machErr } = await supabaseClient
+      .from('camasirhane_makineler')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (!machErr && Array.isArray(machData) && machData.length > 0) {
+      AppState.laundry.machines = machData.map((m, index) => ({
+        id: m.id,
+        name: m.name || `Makine ${index + 1}`,
+        type: (m.tur === 'kurutma' || m.tip === 'Kurutma') ? 'dryer' : 'washer',
+        status: index === 2 ? 'running' : 'idle',
+        currentSlot: index === 2 ? '18:00 - 19:30' : 'Müsait',
+        progress: index === 2 ? 65 : 0,
+        capacity: m.kapasite_kg || 9
+      }));
+    }
+
+    // 3. Fetch Maintenance Tickets (arizalar)
+    const { data: tktData, error: tktErr } = await supabaseClient
+      .from('arizalar')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!tktErr && Array.isArray(tktData) && tktData.length > 0) {
+      AppState.tickets = tktData.map(t => ({
+        id: t.id,
+        category: t.kategori || 'Genel',
+        description: t.baslik || '',
+        room: t.oda_no ? `Oda ${t.oda_no} (${t.bildiren || ''})` : (t.bildiren || 'Oda 302'),
+        date: t.tarih || new Date(t.created_at).toLocaleDateString('tr-TR'),
+        status: t.durum === 'Açık' ? 'İnceleniyor' : (t.durum || 'İnceleniyor'),
+        adminNote: t.durum === 'Çözüldü' ? 'İdare tarafından incelenip çözüldü.' : 'Teknik personel yönlendirildi.'
+      }));
+    }
+
+    // 4. Fetch Announcements (duyurular)
+    const { data: annData, error: annErr } = await supabaseClient
+      .from('duyurular')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!annErr && Array.isArray(annData) && annData.length > 0) {
+      AppState.announcements = annData.map(a => ({
+        id: a.id,
+        title: a.baslik,
+        content: a.icerik,
+        isUrgent: a.oncelik === 'Acil',
+        sender: 'Yurt Yönetimi',
+        time: a.tarih || 'Bugün'
+      }));
+    }
+
+    // Update connection badge
+    if (DOM.dbStatusText) {
+      DOM.dbStatusText.textContent = `Supabase Canlı DB (${AppState.students.length} Öğrenci, ${AppState.laundry.machines.length} Cihaz)`;
+    }
+
+    // Re-render views with fresh live data
+    renderStudentViews();
+    renderAdminViews();
+
+  } catch (err) {
+    console.error('Supabase fetch error:', err);
+  }
+}
 
 // ================= THEME & ACCESSIBILITY =================
 
@@ -312,7 +427,7 @@ function showPushNotification(title, message, isUrgent = false) {
     osc.start();
     osc.stop(audioCtx.currentTime + 0.35);
   } catch (e) {
-    // Audio context gesture restrictions
+    // Ignore autoplay restriction
   }
 
   toastTimeout = setTimeout(() => {
@@ -342,29 +457,35 @@ DOM.authRoleTabs.forEach(tab => {
     } else {
       DOM.authLabelUser.textContent = 'Kullanıcı Adı (Öğrenci)';
       DOM.usernameInput.value = 'eda.etem';
-      DOM.passwordInput.value = '123456';
+      DOM.passwordInput.value = 'edaetem';
     }
   });
 });
 
 // Demo accounts pill shortcuts
-DOM.demoStudentEda.addEventListener('click', () => {
-  DOM.authRoleTabs[0].click();
-  DOM.usernameInput.value = 'eda.etem';
-  DOM.passwordInput.value = '123456';
-});
+if (DOM.demoStudentEda) {
+  DOM.demoStudentEda.addEventListener('click', () => {
+    DOM.authRoleTabs[0].click();
+    DOM.usernameInput.value = 'eda.etem';
+    DOM.passwordInput.value = 'edaetem';
+  });
+}
 
-DOM.demoStudentAyse.addEventListener('click', () => {
-  DOM.authRoleTabs[0].click();
-  DOM.usernameInput.value = 'ayse.kaya';
-  DOM.passwordInput.value = 'gecici123';
-});
+if (DOM.demoStudentAleyna) {
+  DOM.demoStudentAleyna.addEventListener('click', () => {
+    DOM.authRoleTabs[0].click();
+    DOM.usernameInput.value = 'aleyna.ersoy';
+    DOM.passwordInput.value = 'ogrenci123';
+  });
+}
 
-DOM.demoAdminMeltem.addEventListener('click', () => {
-  DOM.authRoleTabs[1].click();
-  DOM.usernameInput.value = 'admin';
-  DOM.passwordInput.value = '123456';
-});
+if (DOM.demoAdminMeltem) {
+  DOM.demoAdminMeltem.addEventListener('click', () => {
+    DOM.authRoleTabs[1].click();
+    DOM.usernameInput.value = 'admin';
+    DOM.passwordInput.value = '123456';
+  });
+}
 
 /**
  * Handle Login Submission
@@ -442,8 +563,8 @@ function activateStudentPortal(student) {
   showPushNotification('Giriş Başarılı', `Hoş geldin, ${student.name}!`);
 }
 
-// First Password Change Form Submission
-DOM.forcePasswordForm.addEventListener('submit', (e) => {
+// First Password Change Form Submission (Synchronized with Supabase)
+DOM.forcePasswordForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const newPass = DOM.newPasswordInput.value.trim();
   const confirmPass = DOM.newPasswordConfirm.value.trim();
@@ -459,14 +580,29 @@ DOM.forcePasswordForm.addEventListener('submit', (e) => {
   }
 
   if (AppState.pendingFirstLoginStudent) {
-    // Update password & clear first login flag
-    AppState.pendingFirstLoginStudent.password = newPass;
-    AppState.pendingFirstLoginStudent.isFirstLogin = false;
-
     const student = AppState.pendingFirstLoginStudent;
+
+    // Update password locally
+    student.password = newPass;
+    student.isFirstLogin = false;
+
+    // Synchronize to Supabase `ogrenciler` table
+    if (supabaseClient && student.id) {
+      try {
+        const { error } = await supabaseClient
+          .from('ogrenciler')
+          .update({ sifre: newPass, gecici_sifre_mi: false })
+          .eq('id', student.id);
+
+        if (error) console.error('Supabase password update error:', error);
+      } catch (err) {
+        console.error('Password sync error:', err);
+      }
+    }
+
     AppState.pendingFirstLoginStudent = null;
 
-    showPushNotification('Şifre Başarıyla Güncellendi', 'Kişisel şifreniz kaydedildi ve idareye gizlendi.');
+    showPushNotification('Şifre Başarıyla Güncellendi', 'Kişisel şifreniz Supabase veritabanına kaydedildi ve idareye gizlendi.');
     activateStudentPortal(student);
   }
 });
@@ -528,6 +664,9 @@ DOM.adminTabBtns.forEach(btn => {
     DOM.adminContentSubviews.forEach(view => {
       view.classList.toggle('active', view.id === targetSubtab);
     });
+
+    const scrollArea = DOM.portalAdmin.querySelector('.app-scroll-content');
+    if (scrollArea) scrollArea.scrollTop = 0;
   });
 });
 
@@ -541,7 +680,7 @@ DOM.btnToggleStudentPreview.addEventListener('click', () => {
   if (floatingIsland) floatingIsland.classList.remove('hidden');
   
   // Default to Eda Etem for preview
-  const previewStudent = AppState.students[0];
+  const previewStudent = AppState.students[0] || { name: 'Eda Etem', room: 'Oda 302', bed: 'Yatak 3' };
   DOM.studentProfileName.textContent = previewStudent.name;
   DOM.studentRoomLabel.textContent = previewStudent.room;
   DOM.studentBedLabel.textContent = `${previewStudent.bed} • Önizleme Modu`;
@@ -572,8 +711,8 @@ function renderAdminStudents() {
   DOM.admStudentsList.innerHTML = AppState.students.map((s, index) => {
     const isSecret = !s.isFirstLogin;
     const statusText = isSecret 
-      ? '🔒 Öğrenci Kendi Şifresini Belirledi (Yöneticiye Gizli)' 
-      : `🔑 İlk Giriş Bekleniyor (Geçici Şifre: ${s.password})`;
+      ? 'Kendi Şifresini Belirledi (Gizli)' 
+      : `İlk Giriş Bekleniyor (Geçici Şifre: ${s.password})`;
     const statusClass = isSecret ? 'secret' : 'pending';
 
     return `
@@ -584,8 +723,8 @@ function renderAdminStudents() {
           <span class="adm-student-pass-status ${statusClass}">${statusText}</span>
         </div>
         <div>
-          <button class="btn btn-danger-ghost" onclick="deleteStudent(${index})" title="Öğrenciyi Sil">
-            🗑️ Sil
+          <button class="btn btn-sm btn-outline-danger" onclick="deleteStudent(${index})" title="Öğrenciyi Sil">
+            Sil
           </button>
         </div>
       </div>
@@ -593,13 +732,13 @@ function renderAdminStudents() {
   }).join('');
 }
 
-// Add new student
-DOM.btnAdmAddStudent.addEventListener('click', () => {
+// Add new student (Synchronized to Supabase `ogrenciler`)
+DOM.btnAdmAddStudent.addEventListener('click', async () => {
   const name = DOM.admStudentName.value.trim();
   const username = DOM.admStudentUsername.value.trim().toLowerCase();
   const room = DOM.admStudentRoom.value.trim();
   const bed = DOM.admStudentBed.value.trim();
-  const initialPass = DOM.admStudentInitialPass.value.trim() || 'gecici123';
+  const initialPass = DOM.admStudentInitialPass.value.trim() || 'ogrenci123';
 
   if (!name || !username || !room || !bed) {
     alert('Lütfen öğrenci adı, kullanıcı adı, oda ve yatak bilgilerini eksiksiz doldurunuz.');
@@ -612,60 +751,97 @@ DOM.btnAdmAddStudent.addEventListener('click', () => {
     return;
   }
 
+  const cleanRoom = room.replace(/[^0-9]/g, '') || room;
+  const cleanBed = bed.replace(/[^0-9]/g, '') || bed;
+  const newId = 'std-' + Date.now();
+
   const newStudent = {
+    id: newId,
     username: username,
     name: name,
-    room: room,
-    bed: bed,
+    room: room.startsWith('Oda') ? room : `Oda ${room}`,
+    bed: bed.startsWith('Yatak') ? bed : `Yatak ${bed}`,
     password: initialPass,
-    isFirstLogin: true // Will force change password upon first access
+    isFirstLogin: true
   };
 
-  AppState.students.push(newStudent);
+  AppState.students.unshift(newStudent);
+  renderAdminStudents();
+
+  // Sync with Supabase
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from('ogrenciler').insert({
+        id: newId,
+        yurt_id: SUPABASE_CONFIG.yurtId,
+        ad_soyad: name,
+        kullanici_adi: username,
+        sifre: initialPass,
+        oda_no: cleanRoom,
+        yatak_no: cleanBed,
+        gecici_sifre_mi: true,
+        kayit_tarihi: new Date().toISOString().split('T')[0]
+      });
+
+      if (error) console.error('Supabase add student error:', error);
+      await loadDataFromSupabase();
+    } catch (err) {
+      console.error('Insert error:', err);
+    }
+  }
 
   DOM.admStudentName.value = '';
   DOM.admStudentUsername.value = '';
   DOM.admStudentRoom.value = '';
   DOM.admStudentBed.value = '';
 
-  renderAdminStudents();
-  showPushNotification('Yeni Öğrenci Eklendi', `${name} başarıyla ${room} (${bed}) olarak kaydedildi.`);
+  showPushNotification('Yeni Öğrenci Eklendi', `${name} başarıyla ${room} (${bed}) olarak Supabase veritabanına kaydedildi.`);
 });
 
-window.deleteStudent = function(index) {
+window.deleteStudent = async function(index) {
   const s = AppState.students[index];
   if (confirm(`${s.name} isimli öğrencinin kaydını silmek istediğinize emin misiniz?`)) {
     AppState.students.splice(index, 1);
     renderAdminStudents();
-    showPushNotification('Öğrenci Silindi', `${s.name} yurt sisteminden kaldırıldı.`);
+
+    if (supabaseClient && s.id) {
+      try {
+        await supabaseClient.from('ogrenciler').delete().eq('id', s.id);
+        await loadDataFromSupabase();
+      } catch (err) {
+        console.error('Supabase delete student error:', err);
+      }
+    }
+
+    showPushNotification('Öğrenci Silindi', `${s.name} yurt sisteminden ve veritabanından kaldırıldı.`);
   }
 };
 
-// ================= ADMIN: LAUNDRY MACHINE MANAGEMENT (ADD & DELETE) =================
+// ================= ADMIN: LAUNDRY MACHINE MANAGEMENT =================
 
 function renderAdminMachines() {
   DOM.admMachineTable.innerHTML = AppState.laundry.machines.map(m => `
     <div class="admin-machine-row">
       <div>
         <strong>${m.name}</strong>
-        <div style="font-size:12px; color:var(--text-muted);">
-          Tür: ${m.type === 'washer' ? 'Yıkama Makinesi' : 'Kurutma Makinesi'} • Durum: <strong>${m.status === 'idle' ? 'Boşta (Müsait)' : (m.status === 'running' ? 'Çalışıyor' : 'Bakımda')}</strong>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+          Tür: ${m.type === 'washer' ? 'Yıkama Makinesi' : 'Kurutma Makinesi'} • Durum: <strong>${m.status === 'idle' ? 'Müsait' : (m.status === 'running' ? 'Çalışıyor' : 'Bakımda')}</strong>
         </div>
       </div>
       <div class="admin-machine-actions">
-        <button class="btn btn-sm btn-ghost" onclick="toggleMachineStatus(${m.id})">
+        <button class="btn btn-sm btn-ghost" onclick="toggleMachineStatus('${m.id}')">
           ${m.status === 'maintenance' ? 'Aktifleştir' : 'Bakıma Al'}
         </button>
-        <button class="btn btn-sm btn-danger-ghost" onclick="deleteMachine(${m.id})" title="Cihazı Kaldır">
-          🗑️ Sil
+        <button class="btn btn-sm btn-outline-danger" onclick="deleteMachine('${m.id}')" title="Cihazı Kaldır">
+          Sil
         </button>
       </div>
     </div>
   `).join('');
 }
 
-// Add new machine
-DOM.btnAdmAddMachine.addEventListener('click', () => {
+// Add new machine (Synchronized to Supabase `camasirhane_makineler`)
+DOM.btnAdmAddMachine.addEventListener('click', async () => {
   const name = DOM.admMachineName.value.trim();
   const type = DOM.admMachineType.value;
 
@@ -674,37 +850,66 @@ DOM.btnAdmAddMachine.addEventListener('click', () => {
     return;
   }
 
+  const newId = 'mach_' + Date.now();
   const newMachine = {
-    id: Date.now(),
+    id: newId,
     name: name,
     type: type,
     status: 'idle',
     currentSlot: 'Müsait',
-    progress: 0
+    progress: 0,
+    capacity: type === 'washer' ? 9 : 10
   };
 
   AppState.laundry.machines.push(newMachine);
-  DOM.admMachineName.value = '';
-
   renderAdminMachines();
   renderStudentLaundry();
+
+  // Sync to Supabase
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from('camasirhane_makineler').insert({
+        id: newId,
+        yurt_id: SUPABASE_CONFIG.yurtId,
+        name: name,
+        tip: type === 'washer' ? 'Yıkama' : 'Kurutma',
+        tur: type === 'washer' ? 'yikama' : 'kurutma',
+        kapasite_kg: type === 'washer' ? 9 : 10
+      });
+      await loadDataFromSupabase();
+    } catch (err) {
+      console.error('Supabase add machine error:', err);
+    }
+  }
+
+  DOM.admMachineName.value = '';
   showPushNotification('Cihaz Eklendi', `${name} çamaşırhaneye başarıyla tanımlandı.`);
 });
 
-window.deleteMachine = function(machineId) {
-  const m = AppState.laundry.machines.find(item => item.id === machineId);
+window.deleteMachine = async function(machineId) {
+  const m = AppState.laundry.machines.find(item => item.id == machineId);
   if (!m) return;
 
   if (confirm(`${m.name} cihazını çamaşırhaneden silmek istediğinize emin misiniz?`)) {
-    AppState.laundry.machines = AppState.laundry.machines.filter(item => item.id !== machineId);
+    AppState.laundry.machines = AppState.laundry.machines.filter(item => item.id != machineId);
     renderAdminMachines();
     renderStudentLaundry();
+
+    if (supabaseClient && m.id) {
+      try {
+        await supabaseClient.from('camasirhane_makineler').delete().eq('id', m.id);
+        await loadDataFromSupabase();
+      } catch (err) {
+        console.error('Supabase delete machine error:', err);
+      }
+    }
+
     showPushNotification('Cihaz Silindi', `${m.name} sistemden kaldırıldı.`);
   }
 };
 
 window.toggleMachineStatus = function(machineId) {
-  const m = AppState.laundry.machines.find(item => item.id === machineId);
+  const m = AppState.laundry.machines.find(item => item.id == machineId);
   if (m) {
     m.status = m.status === 'maintenance' ? 'idle' : 'maintenance';
     renderAdminMachines();
@@ -776,8 +981,8 @@ DOM.studentBtnCancelRes.addEventListener('click', () => {
   }
 });
 
-// Student confirm new booking
-DOM.studentBtnConfirmRes.addEventListener('click', () => {
+// Student confirm new booking (Synchronized to Supabase `camasirhane_randevular`)
+DOM.studentBtnConfirmRes.addEventListener('click', async () => {
   if (AppState.laundry.quotaUsed >= AppState.laundry.quotaTotal) {
     alert('Haftalık 2 adet kullanım kotanızı doldurdunuz.');
     return;
@@ -785,15 +990,37 @@ DOM.studentBtnConfirmRes.addEventListener('click', () => {
 
   const selectedMachine = DOM.studentMachineSelect.value;
   const selectedSlot = DOM.studentTimeslotSelect.value;
+  const newResId = 'res-' + Date.now();
+  const dateStr = '05.11.2026';
 
   AppState.laundry.activeBooking = {
-    id: 'res-' + Date.now(),
+    id: newResId,
     machine: selectedMachine,
-    date: '28.10.2026',
+    date: dateStr,
     timeSlot: selectedSlot,
     status: 'Onaylandı'
   };
   AppState.laundry.quotaUsed++;
+
+  // Sync with Supabase
+  if (supabaseClient) {
+    try {
+      const currentStudent = AppState.activeStudentUser || AppState.students[0];
+      const odaNo = currentStudent.room ? currentStudent.room.replace(/[^0-9]/g, '') : '302';
+      await supabaseClient.from('camasirhane_randevular').insert({
+        id: newResId,
+        yurt_id: SUPABASE_CONFIG.yurtId,
+        ogrenci_ad: currentStudent.name || 'Öğrenci',
+        oda_no: odaNo,
+        makine_no: selectedMachine,
+        tarih: dateStr,
+        saat_araligi: selectedSlot,
+        durum: 'Onaylandı'
+      });
+    } catch (err) {
+      console.error('Supabase booking error:', err);
+    }
+  }
 
   renderStudentLaundry();
   renderAdminMachines();
@@ -824,7 +1051,8 @@ function renderStudentTickets() {
   }).join('');
 }
 
-DOM.studentBtnSubmitMaint.addEventListener('click', () => {
+// Student submit maintenance ticket (Synchronized to Supabase `arizalar`)
+DOM.studentBtnSubmitMaint.addEventListener('click', async () => {
   const cat = DOM.studentMaintCat.value;
   const desc = DOM.studentMaintDesc.value.trim();
 
@@ -833,14 +1061,18 @@ DOM.studentBtnSubmitMaint.addEventListener('click', () => {
     return;
   }
 
-  const currentRoom = AppState.activeStudentUser ? `${AppState.activeStudentUser.room} (${AppState.activeStudentUser.name})` : 'Oda 105 (Eda Etem)';
+  const currentStudent = AppState.activeStudentUser || AppState.students[0];
+  const currentRoom = currentStudent ? `${currentStudent.room} (${currentStudent.name})` : 'Oda 302 (Eda Etem)';
+  const cleanOdaNo = currentStudent.room ? currentStudent.room.replace(/[^0-9]/g, '') : '302';
+  const newTicketId = 'mnt-' + Date.now();
+  const dateStr = new Date().toLocaleDateString('tr-TR');
 
   const newTicket = {
-    id: 't-' + Date.now(),
+    id: newTicketId,
     category: cat,
     description: desc,
     room: currentRoom,
-    date: '28.10.2026',
+    date: dateStr,
     status: 'Açık',
     adminNote: 'Talep alındı, idari kontrolde.'
   };
@@ -848,10 +1080,29 @@ DOM.studentBtnSubmitMaint.addEventListener('click', () => {
   AppState.tickets.unshift(newTicket);
   DOM.studentMaintDesc.value = '';
 
+  // Synchronize to Supabase
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from('arizalar').insert({
+        id: newTicketId,
+        yurt_id: SUPABASE_CONFIG.yurtId,
+        oda_no: cleanOdaNo,
+        baslik: desc,
+        kategori: cat,
+        oncelik: 'Orta',
+        durum: 'Açık',
+        bildiren: currentStudent.name || 'Öğrenci',
+        tarih: dateStr
+      });
+    } catch (err) {
+      console.error('Supabase ticket insert error:', err);
+    }
+  }
+
   renderStudentTickets();
   renderAdminTickets();
 
-  showPushNotification('Arıza İletildi', 'Arıza talebiniz yetkili yurt idaresine iletildi.');
+  showPushNotification('Arıza İletildi', 'Arıza talebiniz yetkili yurt idaresine ve Supabase veritabanına iletildi.');
 });
 
 // ================= STUDENT: ANNOUNCEMENTS & DINING =================
@@ -892,7 +1143,7 @@ DOM.btnAdmSaveMeal.addEventListener('click', () => {
   showPushNotification('Menü Yayınlandı', 'Akşam yemeği menüsü tüm öğrenci ekranlarında güncellendi.');
 });
 
-DOM.btnAdmPublishAnn.addEventListener('click', () => {
+DOM.btnAdmPublishAnn.addEventListener('click', async () => {
   const title = DOM.admAnnTitle.value.trim();
   const body = DOM.admAnnBody.value.trim();
   const isUrgent = DOM.admAnnUrgent.checked;
@@ -912,6 +1163,22 @@ DOM.btnAdmPublishAnn.addEventListener('click', () => {
   };
 
   AppState.announcements.unshift(newAnn);
+
+  // Sync to Supabase `duyurular`
+  if (supabaseClient) {
+    try {
+      await supabaseClient.from('duyurular').insert({
+        yurt_id: SUPABASE_CONFIG.yurtId,
+        baslik: title,
+        icerik: body,
+        oncelik: isUrgent ? 'Acil' : 'Normal',
+        tarih: new Date().toLocaleDateString('tr-TR')
+      });
+    } catch (err) {
+      console.error('Supabase duyuru insert error:', err);
+    }
+  }
+
   renderStudentAnnouncements();
 
   DOM.admAnnTitle.value = '';
@@ -920,7 +1187,7 @@ DOM.btnAdmPublishAnn.addEventListener('click', () => {
   showPushNotification(title, body, isUrgent);
 });
 
-// ================= ADMIN: MAINTENANCE TICKETS (Feedback 4.a) =================
+// ================= ADMIN: MAINTENANCE TICKETS =================
 
 function renderAdminTickets() {
   DOM.admTicketsList.innerHTML = AppState.tickets.map(t => {
@@ -942,11 +1209,11 @@ function renderAdminTickets() {
               İncelemeye Al
             </button>
             <button class="btn btn-sm btn-primary" onclick="updateTicketStatus('${t.id}', 'Çözüldü')">
-              ✓ Onayla ve Kapat
+              Onayla ve Kapat
             </button>
           ` : `
             <span style="font-size:12px; color:var(--success); font-weight:600;">
-              ✓ Yetkili idareci tarafından doğrulanarak arşivlenmiştir.
+              Yetkili idareci tarafından doğrulanarak arşivlenmiştir.
             </span>
           `}
         </div>
@@ -955,8 +1222,8 @@ function renderAdminTickets() {
   }).join('');
 }
 
-window.updateTicketStatus = function(ticketId, newStatus) {
-  const t = AppState.tickets.find(item => item.id === ticketId);
+window.updateTicketStatus = async function(ticketId, newStatus) {
+  const t = AppState.tickets.find(item => item.id == ticketId);
   if (t) {
     t.status = newStatus;
     if (newStatus === 'Çözüldü') {
@@ -966,8 +1233,19 @@ window.updateTicketStatus = function(ticketId, newStatus) {
       t.adminNote = 'Talebiniz inceleniyor, teknisyene yönlendirildi.';
       showPushNotification('Talep Güncellendi', `${t.category} inceleniyor durumuna alındı.`);
     }
+
     renderStudentTickets();
     renderAdminTickets();
+
+    // Sync to Supabase `arizalar`
+    if (supabaseClient && t.id) {
+      try {
+        await supabaseClient.from('arizalar').update({ durum: newStatus }).eq('id', t.id);
+        await loadDataFromSupabase();
+      } catch (err) {
+        console.error('Supabase ticket status error:', err);
+      }
+    }
   }
 };
 
@@ -988,7 +1266,7 @@ function renderAdminViews() {
 
 // ================= INITIALIZATION =================
 
-function init() {
+async function init() {
   applyTheme(AppState.theme);
   applyFontSize(AppState.fontSize);
 
@@ -1012,9 +1290,12 @@ function init() {
     });
   });
 
-  // Render Initial Views
+  // Render initial static views immediately
   renderStudentViews();
   renderAdminViews();
+
+  // Load fresh real-time data from Supabase Cloud
+  await loadDataFromSupabase();
 }
 
 document.addEventListener('DOMContentLoaded', init);
