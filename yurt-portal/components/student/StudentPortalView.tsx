@@ -154,6 +154,8 @@ export default function StudentPortalView({
   const [laundryViewYear, setLaundryViewYear] = useState<number>(() => new Date().getFullYear());
   const [laundryViewMonth, setLaundryViewMonth] = useState<number>(() => new Date().getMonth());
   const [laundryCalendarView, setLaundryCalendarView] = useState<"month" | "day">("month");
+  const [myAppointmentsViewMode, setMyAppointmentsViewMode] = useState<"liste" | "takvim">("liste");
+  const [selectedMyCalendarDate, setSelectedMyCalendarDate] = useState<string>(() => getTodayDateKey());
   const [laundryMachineFilter, setLaundryMachineFilter] = useState<string>("all");
   const [cancelConfirmSlot, setCancelConfirmSlot] = useState<LaundrySlot | null>(null);
 
@@ -1268,105 +1270,371 @@ export default function StudentPortalView({
             </form>
           </div>
 
-          {/* Öğrencinin Aktif ve Geçmiş Randevuları */}
+          {/* Öğrencinin Aktif ve Geçmiş Randevuları (Liste & Takvim Görünümü) */}
           <div className="bg-white dark:bg-[#1E293B] p-5 sm:p-6 rounded-2xl sm:rounded-3xl border border-[#E2E8F0] dark:border-[#334155] space-y-4 shadow-xs">
-            <div className="flex items-center justify-between border-b border-[#E2E8F0] dark:border-[#334155] pb-3">
-              <h4 className="text-sm font-bold text-stone-900 dark:text-[#F1F5F9]">Randevularım</h4>
-              <span className="text-[11px] font-bold text-[#64748B] dark:text-[#94A3B8]">
-                {myLaundrySlots.length} Randevu
-              </span>
+            {/* Üst Başlık & Liste/Takvim Seçici */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-[#E2E8F0] dark:border-[#334155] pb-3">
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-bold text-stone-900 dark:text-[#F1F5F9]">Randevularım</h4>
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[#64748B] dark:text-[#94A3B8]">
+                  {myLaundrySlots.length} Kayıt
+                </span>
+              </div>
+
+              {/* Görünüm Geçiş Butonları: Liste & Takvim */}
+              <div className="flex bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-xl p-0.5 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setMyAppointmentsViewMode("liste")}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                    myAppointmentsViewMode === "liste"
+                      ? "bg-[#0284C7] text-white shadow-xs"
+                      : "text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-[#F1F5F9]"
+                  }`}
+                >
+                  Liste
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMyAppointmentsViewMode("takvim")}
+                  className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                    myAppointmentsViewMode === "takvim"
+                      ? "bg-[#0284C7] text-white shadow-xs"
+                      : "text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-[#F1F5F9]"
+                  }`}
+                >
+                  Takvim
+                </button>
+              </div>
             </div>
 
-            {myLaundrySlots.length === 0 ? (
-              <div className="p-6 text-center text-xs text-[#64748B] dark:text-[#94A3B8] bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155]">
-                Henüz bir çamaşırhane randevunuz bulunmuyor. Yukarıdaki formdan dilediğiniz gün ve saate randevu oluşturabilirsiniz.
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {myLaundrySlots.map((slot) => {
-                  const currentStatus = getDynamicSlotStatus(slot);
-                  const isWaitlist = slot.not?.includes("Yedek");
-                  const isPromoted = slot.not?.includes("Yükseltildi");
+            {/* GÖRÜNÜM 1: LİSTE GÖRÜNÜMÜ */}
+            {myAppointmentsViewMode === "liste" && (
+              <>
+                {myLaundrySlots.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-[#64748B] dark:text-[#94A3B8] bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155]">
+                    Henüz bir çamaşırhane randevunuz bulunmuyor. Yukarıdaki formdan dilediğiniz gün ve saate randevu oluşturabilirsiniz.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {myLaundrySlots.map((slot) => {
+                      const currentStatus = getDynamicSlotStatus(slot);
+                      const isWaitlist = slot.not?.includes("Yedek");
+                      const isPromoted = slot.not?.includes("Yükseltildi");
 
-                  return (
-                    <div
-                      key={slot.id}
-                      className="p-3.5 sm:p-4 rounded-2xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold text-xs sm:text-sm text-[#0F172A] dark:text-[#F1F5F9]">
-                            {cleanMachineName(slot.makineNo)}
-                          </span>
+                      return (
+                        <div
+                          key={slot.id}
+                          className="p-3.5 sm:p-4 rounded-2xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-xs sm:text-sm text-[#0F172A] dark:text-[#F1F5F9]">
+                                {cleanMachineName(slot.makineNo)}
+                              </span>
 
-                          {isWaitlist ? (
-                            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700 flex items-center gap-1.5">
-                              <svg className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <circle cx="12" cy="12" r="10" />
-                                <polyline points="12 6 12 12 16 14" />
-                              </svg>
-                              <span>{slot.not?.split(" - ")[0] || "Yedek Sıra"}</span>
-                            </span>
-                          ) : isPromoted ? (
-                            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-700 flex items-center gap-1.5">
-                              <svg className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                              <span>Asil Randevuya Yükseltildi</span>
-                            </span>
-                          ) : (
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${currentStatus === "Yıkanıyor"
-                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                                  : currentStatus === "Sırada"
-                                    ? "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800"
-                                    : currentStatus === "İptal"
-                                      ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
-                                      : "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
-                                }`}
+                              {isWaitlist ? (
+                                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700 flex items-center gap-1.5">
+                                  <svg className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <polyline points="12 6 12 12 16 14" />
+                                  </svg>
+                                  <span>{slot.not?.split(" - ")[0] || "Yedek Sıra"}</span>
+                                </span>
+                              ) : isPromoted ? (
+                                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-700 flex items-center gap-1.5">
+                                  <svg className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                  <span>Asil Randevuya Yükseltildi</span>
+                                </span>
+                              ) : (
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                    currentStatus === "Yıkanıyor"
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                                      : currentStatus === "Sırada"
+                                        ? "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800"
+                                        : currentStatus === "İptal"
+                                          ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
+                                          : "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+                                  }`}
+                                >
+                                  {currentStatus} (Asil)
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                              Tarih: <strong className="text-[#0F172A] dark:text-[#F1F5F9]">{slot.tarih}</strong> • Saat: <strong className="text-[#0F172A] dark:text-[#F1F5F9]">{slot.saatAraligi}</strong>
+                            </p>
+                            {isWaitlist && (
+                              <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5 text-amber-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <circle cx="12" cy="12" r="10" />
+                                  <line x1="12" y1="8" x2="12" y2="12" />
+                                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg>
+                                <span>Asil randevu iptal edilirse sıranız otomatik olarak onaylanacaktır.</span>
+                              </p>
+                            )}
+                            {isPromoted && (
+                              <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                  <polyline points="22 4 12 14.01 9 11.01" />
+                                </svg>
+                                <span>Önceki randevu iptal edildiği için sıranız asil randevuya dönüştürüldü.</span>
+                              </p>
+                            )}
+                          </div>
+
+                          {onCancelLaundrySlot && currentStatus !== "Tamamlandı" && currentStatus !== "İptal" && (
+                            <button
+                              type="button"
+                              onClick={() => setCancelConfirmSlot(slot)}
+                              className="self-end sm:self-center px-3 py-1.5 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:text-rose-300 rounded-xl border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer min-h-[36px]"
                             >
-                              {currentStatus} (Asil)
-                            </span>
+                              İptal Et
+                            </button>
                           )}
                         </div>
-                        <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-                          Tarih: <strong className="text-[#0F172A] dark:text-[#F1F5F9]">{slot.tarih}</strong> • Saat: <strong className="text-[#0F172A] dark:text-[#F1F5F9]">{slot.saatAraligi}</strong>
-                        </p>
-                        {isWaitlist && (
-                          <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5 text-amber-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <circle cx="12" cy="12" r="10" />
-                              <line x1="12" y1="8" x2="12" y2="12" />
-                              <line x1="12" y1="16" x2="12.01" y2="16" />
-                            </svg>
-                            <span>Asil randevu iptal edilirse sıranız otomatik olarak onaylanacaktır.</span>
-                          </p>
-                        )}
-                        {isPromoted && (
-                          <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                              <polyline points="22 4 12 14.01 9 11.01" />
-                            </svg>
-                            <span>Önceki randevu iptal edildiği için sıranız asil randevuya dönüştürüldü.</span>
-                          </p>
-                        )}
-                      </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
 
-                      {onCancelLaundrySlot && currentStatus !== "Tamamlandı" && currentStatus !== "İptal" && (
+            {/* GÖRÜNÜM 2: TAKVİM GÖRÜNÜMÜ (Admin Paneli Tarzı - Yalnızca Öğrencinin Kendi Randevuları) */}
+            {myAppointmentsViewMode === "takvim" && (() => {
+              const turkishMonthNames = [
+                "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+                "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
+              ];
+              const currentMonthLabel = `${turkishMonthNames[laundryViewMonth]} ${laundryViewYear}`;
+
+              const daysInCurrentMonth = new Date(laundryViewYear, laundryViewMonth + 1, 0).getDate();
+              const firstDayWeekday = (new Date(laundryViewYear, laundryViewMonth, 1).getDay() + 6) % 7;
+              const daysInPreviousMonth = new Date(laundryViewYear, laundryViewMonth, 0).getDate();
+
+              const prevM = laundryViewMonth === 0 ? 11 : laundryViewMonth - 1;
+              const prevY = laundryViewMonth === 0 ? laundryViewYear - 1 : laundryViewYear;
+              const prevMonthDays = [];
+              for (let i = firstDayWeekday - 1; i >= 0; i--) {
+                const dayNum = daysInPreviousMonth - i;
+                const dateStr = `${prevY}-${String(prevM + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+                prevMonthDays.push({ dateStr, dayNum, isCurrentMonth: false, year: prevY, month: prevM });
+              }
+
+              const currentMonthDays = [];
+              for (let d = 1; d <= daysInCurrentMonth; d++) {
+                const dateStr = `${laundryViewYear}-${String(laundryViewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                currentMonthDays.push({ dateStr, dayNum: d, isCurrentMonth: true, year: laundryViewYear, month: laundryViewMonth });
+              }
+
+              const totalSoFar = prevMonthDays.length + currentMonthDays.length;
+              const trailingDaysNeeded = (7 - (totalSoFar % 7)) % 7;
+              const nextM = laundryViewMonth === 11 ? 0 : laundryViewMonth + 1;
+              const nextY = laundryViewMonth === 11 ? laundryViewYear + 1 : laundryViewYear;
+              const nextMonthDays = [];
+              for (let d = 1; d <= trailingDaysNeeded; d++) {
+                const dateStr = `${nextY}-${String(nextM + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+                nextMonthDays.push({ dateStr, dayNum: d, isCurrentMonth: false, year: nextY, month: nextM });
+              }
+
+              const cells = [...prevMonthDays, ...currentMonthDays, ...nextMonthDays];
+
+              const todayObj = new Date();
+              const todayDateStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, "0")}-${String(todayObj.getDate()).padStart(2, "0")}`;
+
+              const goToPrevMonth = () => {
+                if (laundryViewMonth === 0) {
+                  setLaundryViewYear((y) => y - 1);
+                  setLaundryViewMonth(11);
+                } else {
+                  setLaundryViewMonth((m) => m - 1);
+                }
+              };
+
+              const goToNextMonth = () => {
+                if (laundryViewMonth === 11) {
+                  setLaundryViewYear((y) => y + 1);
+                  setLaundryViewMonth(0);
+                } else {
+                  setLaundryViewMonth((m) => m + 1);
+                }
+              };
+
+              const goToToday = () => {
+                const now = new Date();
+                setLaundryViewYear(now.getFullYear());
+                setLaundryViewMonth(now.getMonth());
+                setSelectedMyCalendarDate(todayDateStr);
+              };
+
+              const selectedDayMySlots = myLaundrySlots.filter(
+                (s) => normalizeDateStr(s.tarih) === selectedMyCalendarDate
+              );
+
+              return (
+                <div className="space-y-3.5">
+                  {/* Takvim Üst Navigasyon Çubuğu */}
+                  <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0] dark:border-[#334155]">
+                    <div className="flex items-center gap-2">
+                      <h5 className="text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                        {currentMonthLabel}
+                      </h5>
+                      <div className="flex items-center gap-0.5 bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-lg p-0.5">
                         <button
                           type="button"
-                          onClick={() => setCancelConfirmSlot(slot)}
-                          className="self-end sm:self-center px-3 py-1.5 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:text-rose-300 rounded-xl border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer min-h-[36px]"
+                          onClick={goToPrevMonth}
+                          className="w-6 h-6 flex items-center justify-center text-[#64748B] hover:text-[#0F172A] dark:hover:text-[#F1F5F9] text-xs font-bold cursor-pointer"
+                          title="Önceki Ay"
                         >
-                          İptal Et
+                          &lt;
                         </button>
-                      )}
+                        <button
+                          type="button"
+                          onClick={goToNextMonth}
+                          className="w-6 h-6 flex items-center justify-center text-[#64748B] hover:text-[#0F172A] dark:hover:text-[#F1F5F9] text-xs font-bold cursor-pointer"
+                          title="Sonraki Ay"
+                        >
+                          &gt;
+                        </button>
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
+
+                    <button
+                      type="button"
+                      onClick={goToToday}
+                      className="px-2.5 py-1 text-xs font-semibold text-[#64748B] dark:text-[#94A3B8] bg-[#F8FAFC] dark:bg-[#0F172A] hover:bg-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] rounded-lg transition-colors cursor-pointer"
+                    >
+                      Bugün
+                    </button>
+                  </div>
+
+                  {/* Hafta Günleri Başlıkları */}
+                  <div className="grid grid-cols-7 text-center border-b border-[#E2E8F0] dark:border-[#334155] pb-1.5">
+                    {["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((dName) => (
+                      <span key={dName} className="text-[10.5px] font-bold text-[#64748B] dark:text-[#94A3B8] uppercase">
+                        {dName}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Günler Izgarası */}
+                  <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+                    {cells.map((cell) => {
+                      const slotsForDay = myLaundrySlots.filter(
+                        (s) => normalizeDateStr(s.tarih) === cell.dateStr
+                      );
+                      const isToday = cell.dateStr === todayDateStr;
+                      const isSelected = selectedMyCalendarDate === cell.dateStr;
+
+                      return (
+                        <button
+                          key={cell.dateStr}
+                          type="button"
+                          onClick={() => {
+                            setSelectedMyCalendarDate(cell.dateStr);
+                            if (!cell.isCurrentMonth) {
+                              setLaundryViewYear(cell.year);
+                              setLaundryViewMonth(cell.month);
+                            }
+                          }}
+                          className={`p-1.5 rounded-xl flex flex-col items-center justify-center min-h-[46px] transition-all cursor-pointer ${
+                            isSelected
+                              ? "bg-[#0284C7] text-white shadow-xs font-bold"
+                              : isToday
+                                ? "bg-sky-50 dark:bg-sky-950/40 text-[#0284C7] dark:text-sky-300 font-bold border border-sky-300 dark:border-sky-800"
+                                : cell.isCurrentMonth
+                                  ? "bg-[#F8FAFC] dark:bg-[#0F172A] text-stone-900 dark:text-[#F1F5F9] hover:bg-slate-100 dark:hover:bg-slate-800"
+                                  : "text-slate-400 dark:text-slate-600 bg-transparent"
+                          }`}
+                        >
+                          <span className="text-xs">{cell.dayNum}</span>
+                          {slotsForDay.length > 0 && (
+                            <span
+                              className={`mt-1 text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                                isSelected
+                                  ? "bg-white text-[#0284C7]"
+                                  : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                              }`}
+                            >
+                              {slotsForDay.length} Randevu
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Seçili Günün Randevu Detayları */}
+                  <div className="pt-3 border-t border-[#E2E8F0] dark:border-[#334155] space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-stone-900 dark:text-[#F1F5F9]">
+                        {selectedMyCalendarDate} Tarihli Randevularınız
+                      </span>
+                      <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                        {selectedDayMySlots.length} Kayıt
+                      </span>
+                    </div>
+
+                    {selectedDayMySlots.length === 0 ? (
+                      <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic py-2.5 text-center bg-[#F8FAFC] dark:bg-[#0F172A] rounded-xl border border-[#E2E8F0] dark:border-[#334155]">
+                        Bu tarihte herhangi bir randevunuz bulunmuyor.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {selectedDayMySlots.map((slot) => {
+                          const currentStatus = getDynamicSlotStatus(slot);
+                          return (
+                            <div
+                              key={slot.id}
+                              className="p-3 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                            >
+                              <div className="space-y-0.5 text-xs">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                                    {cleanMachineName(slot.makineNo)}
+                                  </span>
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                      currentStatus === "Yıkanıyor"
+                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                        : currentStatus === "Sırada"
+                                          ? "bg-sky-50 text-sky-700 border-sky-200"
+                                          : currentStatus === "İptal"
+                                            ? "bg-rose-50 text-rose-700 border-rose-200"
+                                            : "bg-slate-100 text-slate-700 border-slate-200"
+                                    }`}
+                                  >
+                                    {currentStatus}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                                  Saat: <strong>{slot.saatAraligi}</strong>
+                                </p>
+                              </div>
+
+                              {onCancelLaundrySlot && currentStatus !== "Tamamlandı" && currentStatus !== "İptal" && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCancelConfirmSlot(slot)}
+                                  className="self-end sm:self-center px-2.5 py-1 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 rounded-lg border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
+                                >
+                                  İptal Et
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Randevu İptal Onay Modalı */}
             {cancelConfirmSlot && (
@@ -1422,420 +1690,6 @@ export default function StudentPortalView({
               </div>
             )}
           </div>
-
-          {/* ======================================================== */}
-          {/* ÇAMAŞIRHANE REZERVASYON VE DOLULUK TAKVİMİ               */}
-          {/* ======================================================== */}
-          {(() => {
-            const turkishMonthNames = [
-              "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-              "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
-            ];
-            const currentMonthLabel = `${turkishMonthNames[laundryViewMonth]} ${laundryViewYear}`;
-
-            const daysInCurrentMonth = new Date(laundryViewYear, laundryViewMonth + 1, 0).getDate();
-            const firstDayWeekday = (new Date(laundryViewYear, laundryViewMonth, 1).getDay() + 6) % 7;
-            const daysInPreviousMonth = new Date(laundryViewYear, laundryViewMonth, 0).getDate();
-
-            const prevM = laundryViewMonth === 0 ? 11 : laundryViewMonth - 1;
-            const prevY = laundryViewMonth === 0 ? laundryViewYear - 1 : laundryViewYear;
-            const prevMonthDays = [];
-            for (let i = firstDayWeekday - 1; i >= 0; i--) {
-              const dayNum = daysInPreviousMonth - i;
-              const dateStr = `${prevY}-${String(prevM + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
-              prevMonthDays.push({
-                dateStr,
-                dayNum,
-                isCurrentMonth: false,
-                year: prevY,
-                month: prevM,
-              });
-            }
-
-            const currentMonthDays = [];
-            for (let d = 1; d <= daysInCurrentMonth; d++) {
-              const dateStr = `${laundryViewYear}-${String(laundryViewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-              currentMonthDays.push({
-                dateStr,
-                dayNum: d,
-                isCurrentMonth: true,
-                year: laundryViewYear,
-                month: laundryViewMonth,
-              });
-            }
-
-            const totalSoFar = prevMonthDays.length + currentMonthDays.length;
-            const trailingDaysNeeded = (7 - (totalSoFar % 7)) % 7;
-            const nextM = laundryViewMonth === 11 ? 0 : laundryViewMonth + 1;
-            const nextY = laundryViewMonth === 11 ? laundryViewYear + 1 : laundryViewYear;
-            const nextMonthDays = [];
-            for (let d = 1; d <= trailingDaysNeeded; d++) {
-              const dateStr = `${nextY}-${String(nextM + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-              nextMonthDays.push({
-                dateStr,
-                dayNum: d,
-                isCurrentMonth: false,
-                year: nextY,
-                month: nextM,
-              });
-            }
-
-            const calendarCells = [...prevMonthDays, ...currentMonthDays, ...nextMonthDays];
-
-            const todayObj = new Date();
-            const todayDateStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, "0")}-${String(todayObj.getDate()).padStart(2, "0")}`;
-
-            const goToPrevMonth = () => {
-              if (laundryViewMonth === 0) {
-                setLaundryViewYear((y) => y - 1);
-                setLaundryViewMonth(11);
-              } else {
-                setLaundryViewMonth((m) => m - 1);
-              }
-            };
-
-            const goToNextMonth = () => {
-              if (laundryViewMonth === 11) {
-                setLaundryViewYear((y) => y + 1);
-                setLaundryViewMonth(0);
-              } else {
-                setLaundryViewMonth((m) => m + 1);
-              }
-            };
-
-            const goToToday = () => {
-              const now = new Date();
-              setLaundryViewYear(now.getFullYear());
-              setLaundryViewMonth(now.getMonth());
-              const nowStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-              setSelectedLaundryDate(nowStr);
-            };
-
-            const activeDate = selectedLaundryDate || todayDateStr;
-            const daySlots = laundrySlots.filter((s) => normalizeDateStr(s.tarih) === activeDate);
-            const filteredSlots = daySlots.filter((s) => {
-              if (laundryMachineFilter === "all") return true;
-              if (laundryMachineFilter === "yikama") return s.makineNo.includes("Makine") || laundryMachines.find(m => m.id === s.makineNo)?.tur === "yikama";
-              if (laundryMachineFilter === "kurutma") return s.makineNo.includes("Kurutma") || laundryMachines.find(m => m.id === s.makineNo)?.tur === "kurutma";
-              return s.makineNo === laundryMachineFilter;
-            });
-
-            // Seçili günün haftalık gün şeridi
-            const [selY, selM, selD] = activeDate.split("-").map(Number);
-            const selectedDateObj = new Date(selY || todayObj.getFullYear(), (selM ? selM - 1 : todayObj.getMonth()), selD || todayObj.getDate());
-            const dayOfWeekIdx = (selectedDateObj.getDay() + 6) % 7;
-            const mondayDateObj = new Date(selectedDateObj.getFullYear(), selectedDateObj.getMonth(), selectedDateObj.getDate() - dayOfWeekIdx);
-
-            const weekStripDays = [];
-            const shortDayNames = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
-            for (let i = 0; i < 7; i++) {
-              const dObj = new Date(mondayDateObj.getFullYear(), mondayDateObj.getMonth(), mondayDateObj.getDate() + i);
-              const dateStr = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, "0")}-${String(dObj.getDate()).padStart(2, "0")}`;
-              const slotsCount = laundrySlots.filter(s => normalizeDateStr(s.tarih) === dateStr && s.durum !== "İptal").length;
-              const activeCount = laundrySlots.filter(s => normalizeDateStr(s.tarih) === dateStr && s.durum === "Yıkanıyor").length;
-              weekStripDays.push({
-                dateStr,
-                dayNum: dObj.getDate(),
-                dayName: shortDayNames[i],
-                isToday: dateStr === todayDateStr,
-                isSelected: dateStr === activeDate,
-                slotsCount,
-                activeCount,
-              });
-            }
-
-            const timelineSlots = [
-              "08:00 - 09:30",
-              "09:30 - 11:00",
-              "11:00 - 12:30",
-              "13:00 - 14:30",
-              "14:30 - 16:00",
-              "16:00 - 17:30",
-              "17:30 - 19:00",
-              "19:00 - 20:30",
-              "20:30 - 22:00",
-            ];
-
-            const formatLaundryTurkishDate = (dateStr: string) => {
-              if (!dateStr) return "";
-              const parts = dateStr.split("-").map(Number);
-              if (parts.length !== 3) return dateStr;
-              const [y, m, d] = parts;
-              const dateObj = new Date(y, m - 1, d);
-              const dayNames = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
-              const monthNames = [
-                "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-                "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"
-              ];
-              return `${d} ${monthNames[m - 1] || ""} ${y} – ${dayNames[dateObj.getDay()] || ""}`;
-            };
-
-            return (
-              <div className="bg-white dark:bg-[#1E293B] p-5 sm:p-6 rounded-2xl sm:rounded-3xl border border-[#E2E8F0] dark:border-[#334155] shadow-xs space-y-4">
-                {/* Takvim Üst Başlığı */}
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E2E8F0] dark:border-[#334155] pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-sky-50 dark:bg-sky-950/40 text-[#0284C7] flex items-center justify-center shrink-0">
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                        <line x1="16" y1="2" x2="16" y2="6" />
-                        <line x1="8" y1="2" x2="8" y2="6" />
-                        <line x1="3" y1="10" x2="21" y2="10" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h4 className="text-sm sm:text-base font-bold text-stone-900 dark:text-[#F1F5F9]">
-                        Çamaşırhane Doluluk & Randevu Takvimi
-                      </h4>
-                      <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-                        Günü seçerek dolu ve müsait saatleri inceleyebilirsiniz.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="flex bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-xl p-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setLaundryCalendarView("month")}
-                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
-                          laundryCalendarView === "month"
-                            ? "bg-[#0284C7] text-white shadow-xs"
-                            : "text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-[#F1F5F9]"
-                        }`}
-                      >
-                        Aylık
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setLaundryCalendarView("day")}
-                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
-                          laundryCalendarView === "day"
-                            ? "bg-[#0284C7] text-white shadow-xs"
-                            : "text-[#64748B] dark:text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-[#F1F5F9]"
-                        }`}
-                      >
-                        Günlük Çizelge
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* GÖRÜNÜM 1: AYLIK TAKVİM */}
-                {laundryCalendarView === "month" && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <h5 className="text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">
-                          {currentMonthLabel}
-                        </h5>
-                        <div className="flex items-center gap-1 bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-lg p-0.5">
-                          <button
-                            type="button"
-                            onClick={goToPrevMonth}
-                            className="w-6 h-6 flex items-center justify-center text-[#64748B] hover:text-[#0F172A] dark:hover:text-[#F1F5F9] text-xs font-bold cursor-pointer"
-                          >
-                            &lt;
-                          </button>
-                          <button
-                            type="button"
-                            onClick={goToNextMonth}
-                            className="w-6 h-6 flex items-center justify-center text-[#64748B] hover:text-[#0F172A] dark:hover:text-[#F1F5F9] text-xs font-bold cursor-pointer"
-                          >
-                            &gt;
-                          </button>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={goToToday}
-                        className="px-2.5 py-1 text-xs font-semibold text-[#64748B] dark:text-[#94A3B8] bg-[#F8FAFC] dark:bg-[#0F172A] hover:bg-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] rounded-lg transition-colors cursor-pointer"
-                      >
-                        Bugün
-                      </button>
-                    </div>
-
-                    {/* Hafta Günleri Başlıkları */}
-                    <div className="grid grid-cols-7 text-center border-b border-[#E2E8F0] dark:border-[#334155] pb-2">
-                      {["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((dName) => (
-                        <span key={dName} className="text-[11px] font-bold text-[#64748B] dark:text-[#94A3B8] uppercase">
-                          {dName}
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* Günler Izgarası */}
-                    <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-                      {calendarCells.map((cell) => {
-                        const slotsForDay = laundrySlots.filter(
-                          (s) => normalizeDateStr(s.tarih) === cell.dateStr && s.durum !== "İptal"
-                        );
-                        const isToday = cell.dateStr === todayDateStr;
-                        const isSelected = activeDate === cell.dateStr;
-
-                        return (
-                          <button
-                            key={cell.dateStr}
-                            type="button"
-                            onClick={() => {
-                              setSelectedLaundryDate(cell.dateStr);
-                              if (!cell.isCurrentMonth) {
-                                setLaundryViewYear(cell.year);
-                                setLaundryViewMonth(cell.month);
-                              }
-                              setLaundryCalendarView("day");
-                            }}
-                            className={`p-2 rounded-xl flex flex-col items-center justify-center min-h-[50px] transition-all cursor-pointer ${
-                              isSelected
-                                ? "bg-[#0284C7] text-white shadow-xs font-bold"
-                                : isToday
-                                  ? "bg-sky-50 dark:bg-sky-950/40 text-[#0284C7] dark:text-sky-300 font-bold border border-sky-300 dark:border-sky-800"
-                                  : cell.isCurrentMonth
-                                    ? "bg-[#F8FAFC] dark:bg-[#0F172A] text-stone-900 dark:text-[#F1F5F9] hover:bg-slate-100 dark:hover:bg-slate-800"
-                                    : "text-slate-400 dark:text-slate-600 bg-transparent"
-                            }`}
-                          >
-                            <span className="text-xs">{cell.dayNum}</span>
-                            {slotsForDay.length > 0 && (
-                              <span
-                                className={`mt-1 text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
-                                  isSelected
-                                    ? "bg-white text-[#0284C7]"
-                                    : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                                }`}
-                              >
-                                {slotsForDay.length} Randevu
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* GÖRÜNÜM 2: GÜNLÜK ÇİZELGE */}
-                {laundryCalendarView === "day" && (
-                  <div className="space-y-4">
-                    {/* Hafta Şeridi */}
-                    <div className="grid grid-cols-7 gap-1 text-center bg-[#F8FAFC] dark:bg-[#0F172A] p-2 rounded-xl border border-[#E2E8F0] dark:border-[#334155]">
-                      {weekStripDays.map((wd) => (
-                        <button
-                          key={wd.dateStr}
-                          type="button"
-                          onClick={() => setSelectedLaundryDate(wd.dateStr)}
-                          className={`flex flex-col items-center py-1.5 rounded-lg cursor-pointer transition-all ${
-                            wd.isSelected
-                              ? "bg-[#0284C7] text-white font-bold"
-                              : wd.isToday
-                                ? "bg-sky-100 dark:bg-sky-950/60 text-[#0284C7] font-semibold"
-                                : "text-stone-700 dark:text-stone-300 hover:bg-slate-200 dark:hover:bg-slate-800"
-                          }`}
-                        >
-                          <span className="text-[10px] uppercase">{wd.dayName}</span>
-                          <span className="text-xs font-bold mt-0.5">{wd.dayNum}</span>
-                          {wd.slotsCount > 0 && (
-                            <span className={`w-1.5 h-1.5 rounded-full mt-1 ${wd.isSelected ? "bg-white" : "bg-[#0284C7]"}`} />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E2E8F0] dark:border-[#334155] pb-2">
-                      <span className="text-xs font-bold text-stone-900 dark:text-[#F1F5F9]">
-                        {formatLaundryTurkishDate(activeDate)}
-                      </span>
-                      <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-                        Bu gün için {daySlots.length} randevu mevcut
-                      </span>
-                    </div>
-
-                    {/* Saat Dilimleri Listesi */}
-                    <div className="space-y-2">
-                      {timelineSlots.map((slotRange) => {
-                        const matchingBookings = filteredSlots.filter((b) => b.saatAraligi === slotRange && b.durum !== "İptal");
-                        const asilBookings = matchingBookings.filter((b) => !b.not?.includes("Yedek"));
-                        const waitlistBookings = matchingBookings.filter((b) => b.not?.includes("Yedek"));
-                        const isSlotOccupied = asilBookings.length >= laundryMachines.length && laundryMachines.length > 0;
-
-                        return (
-                          <div
-                            key={slotRange}
-                            className={`p-3 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
-                              isSlotOccupied
-                                ? "bg-amber-50/40 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40"
-                                : matchingBookings.length > 0
-                                  ? "bg-sky-50/40 dark:bg-sky-950/20 border-sky-200 dark:border-sky-900/40"
-                                  : "bg-[#F8FAFC] dark:bg-[#0F172A] border-[#E2E8F0] dark:border-[#334155]"
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0">
-                              <span className="font-mono text-xs font-bold text-stone-800 dark:text-stone-200 min-w-[105px] shrink-0 flex items-center gap-1.5">
-                                <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <circle cx="12" cy="12" r="10" />
-                                  <polyline points="12 6 12 12 16 14" />
-                                </svg>
-                                <span>{slotRange}</span>
-                              </span>
-                              <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-                                {matchingBookings.length === 0 ? (
-                                  <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                                    Tüm makineler müsait
-                                  </span>
-                                ) : (
-                                  <>
-                                    {asilBookings.map((bk) => (
-                                      <span
-                                        key={bk.id}
-                                        className="text-[10px] px-2 py-0.5 rounded-md bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] text-stone-800 dark:text-stone-200 font-medium flex items-center gap-1.5"
-                                      >
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                                        <span>{cleanMachineName(bk.makineNo)}: {bk.ogrenciAd}</span>
-                                      </span>
-                                    ))}
-                                    {waitlistBookings.map((bk) => (
-                                      <span
-                                        key={bk.id}
-                                        className="text-[10px] px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 font-semibold flex items-center gap-1.5"
-                                      >
-                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 animate-pulse" />
-                                        <span>{cleanMachineName(bk.makineNo)}: {bk.ogrenciAd} ({bk.not?.split(" - ")[0] || "Yedek"})</span>
-                                      </span>
-                                    ))}
-                                  </>
-                                )}
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedStartTime(slotRange.split(" - ")[0]);
-                                window.scrollTo({ top: 300, behavior: "smooth" });
-                                if (isSlotOccupied) {
-                                  showToast(`${slotRange} saati dolu; randevu formuna aktarıldı, Yedek Sıraya girebilirsiniz.`);
-                                } else {
-                                  showToast(`${slotRange} saati randevu formuna aktarıldı.`);
-                                }
-                              }}
-                              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors cursor-pointer self-end sm:self-center shrink-0 ${
-                                isSlotOccupied
-                                  ? "text-amber-700 dark:text-amber-300 hover:text-white hover:bg-amber-600 bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700"
-                                  : "text-[#0284C7] hover:text-white hover:bg-[#0284C7] bg-sky-50 dark:bg-sky-950/40 border border-[#0284C7]/30"
-                              }`}
-                            >
-                              {isSlotOccupied ? `Yedek Sıraya Gir (#${waitlistBookings.length + 1})` : "Bu Saati Seç"}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
         </div>
       )}
 
