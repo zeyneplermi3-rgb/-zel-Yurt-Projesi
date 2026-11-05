@@ -155,6 +155,7 @@ export default function StudentPortalView({
   const [laundryViewMonth, setLaundryViewMonth] = useState<number>(() => new Date().getMonth());
   const [laundryCalendarView, setLaundryCalendarView] = useState<"month" | "day">("month");
   const [myAppointmentsViewMode, setMyAppointmentsViewMode] = useState<"liste" | "takvim">("liste");
+  const [myLaundryMachineFilter, setMyLaundryMachineFilter] = useState<string>("all");
   const [selectedMyCalendarDate, setSelectedMyCalendarDate] = useState<string>(() => getTodayDateKey());
   const [laundryMachineFilter, setLaundryMachineFilter] = useState<string>("all");
   const [cancelConfirmSlot, setCancelConfirmSlot] = useState<LaundrySlot | null>(null);
@@ -1472,23 +1473,34 @@ export default function StudentPortalView({
                 setSelectedMyCalendarDate(todayDateStr);
               };
 
-              const selectedDayMySlots = myLaundrySlots.filter(
+              const filteredMySlots = myLaundrySlots.filter((s) => {
+                if (myLaundryMachineFilter === "all") return true;
+                if (myLaundryMachineFilter === "yikama") {
+                  return s.makineNo.includes("Makine") || laundryMachines.find(m => m.id === s.makineNo)?.tur === "yikama";
+                }
+                if (myLaundryMachineFilter === "kurutma") {
+                  return s.makineNo.includes("Kurutma") || laundryMachines.find(m => m.id === s.makineNo)?.tur === "kurutma";
+                }
+                return s.makineNo === myLaundryMachineFilter;
+              });
+
+              const selectedDayMySlots = filteredMySlots.filter(
                 (s) => normalizeDateStr(s.tarih) === selectedMyCalendarDate
               );
 
               return (
-                <div className="space-y-3.5">
-                  {/* Takvim Üst Navigasyon Çubuğu */}
-                  <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0] dark:border-[#334155]">
-                    <div className="flex items-center gap-2">
-                      <h5 className="text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                <div className="space-y-4 pt-1">
+                  {/* Takvim Üst Navigasyon Çubuğu (Admin Paneli ile Birebir) */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#E2E8F0] dark:border-[#334155]">
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl sm:text-2xl font-black text-[#0F172A] dark:text-[#F1F5F9] tracking-tight">
                         {currentMonthLabel}
-                      </h5>
-                      <div className="flex items-center gap-0.5 bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-lg p-0.5">
+                      </h2>
+                      <div className="flex items-center gap-1 bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-xl p-0.5 shadow-xs">
                         <button
                           type="button"
                           onClick={goToPrevMonth}
-                          className="w-6 h-6 flex items-center justify-center text-[#64748B] hover:text-[#0F172A] dark:hover:text-[#F1F5F9] text-xs font-bold cursor-pointer"
+                          className="w-7 h-7 flex items-center justify-center text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer text-xs font-bold active:scale-90"
                           title="Önceki Ay"
                         >
                           &lt;
@@ -1496,7 +1508,7 @@ export default function StudentPortalView({
                         <button
                           type="button"
                           onClick={goToNextMonth}
-                          className="w-6 h-6 flex items-center justify-center text-[#64748B] hover:text-[#0F172A] dark:hover:text-[#F1F5F9] text-xs font-bold cursor-pointer"
+                          className="w-7 h-7 flex items-center justify-center text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer text-xs font-bold active:scale-90"
                           title="Sonraki Ay"
                         >
                           &gt;
@@ -1504,28 +1516,43 @@ export default function StudentPortalView({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={goToToday}
-                      className="px-2.5 py-1 text-xs font-semibold text-[#64748B] dark:text-[#94A3B8] bg-[#F8FAFC] dark:bg-[#0F172A] hover:bg-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] rounded-lg transition-colors cursor-pointer"
-                    >
-                      Bugün
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={goToToday}
+                        className="px-3 py-1.5 text-xs font-bold text-[#64748B] dark:text-[#94A3B8] bg-[#F8FAFC] dark:bg-[#0F172A] hover:bg-[#F1F5F9] dark:hover:bg-slate-800 border border-[#E2E8F0] dark:border-[#334155] rounded-xl transition-colors cursor-pointer active:scale-95"
+                      >
+                        Bugün
+                      </button>
+
+                      <select
+                        value={myLaundryMachineFilter}
+                        onChange={(e) => setMyLaundryMachineFilter(e.target.value)}
+                        className="bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-xl px-2.5 py-1.5 text-xs text-[#0F172A] dark:text-[#F1F5F9] focus:outline-none font-bold cursor-pointer transition-colors"
+                      >
+                        <option value="all">Tüm Makineler</option>
+                        <option value="yikama">Sadece Çamaşır</option>
+                        <option value="kurutma">Sadece Kurutma</option>
+                      </select>
+                    </div>
                   </div>
 
-                  {/* Hafta Günleri Başlıkları */}
-                  <div className="grid grid-cols-7 text-center border-b border-[#E2E8F0] dark:border-[#334155] pb-1.5">
+                  {/* Hafta Günleri Başlıkları (PZT SAL ÇAR PER CUM CMT PAZ) */}
+                  <div className="grid grid-cols-7 text-center pt-2 pb-2 border-b border-[#E2E8F0]/60 dark:border-[#334155]/60">
                     {["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((dName) => (
-                      <span key={dName} className="text-[10.5px] font-bold text-[#64748B] dark:text-[#94A3B8] uppercase">
+                      <div
+                        key={dName}
+                        className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#64748B] dark:text-[#94A3B8]"
+                      >
                         {dName}
-                      </span>
+                      </div>
                     ))}
                   </div>
 
-                  {/* Günler Izgarası */}
-                  <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+                  {/* Günler Izgarası (Admin Paneli Tarzı Açık & Dairesel Rozetler) */}
+                  <div className="grid grid-cols-7 gap-y-2 pt-2">
                     {cells.map((cell) => {
-                      const slotsForDay = myLaundrySlots.filter(
+                      const slotsForDay = filteredMySlots.filter(
                         (s) => normalizeDateStr(s.tarih) === cell.dateStr
                       );
                       const isToday = cell.dateStr === todayDateStr;
@@ -1542,78 +1569,106 @@ export default function StudentPortalView({
                               setLaundryViewMonth(cell.month);
                             }
                           }}
-                          className={`p-1.5 rounded-xl flex flex-col items-center justify-center min-h-[46px] transition-all cursor-pointer ${
-                            isSelected
-                              ? "bg-[#0284C7] text-white shadow-xs font-bold"
-                              : isToday
-                                ? "bg-sky-50 dark:bg-sky-950/40 text-[#0284C7] dark:text-sky-300 font-bold border border-sky-300 dark:border-sky-800"
-                                : cell.isCurrentMonth
-                                  ? "bg-[#F8FAFC] dark:bg-[#0F172A] text-stone-900 dark:text-[#F1F5F9] hover:bg-slate-100 dark:hover:bg-slate-800"
-                                  : "text-slate-400 dark:text-slate-600 bg-transparent"
-                          }`}
+                          className="group flex flex-col items-center justify-center py-1.5 sm:py-2 rounded-2xl cursor-pointer transition-transform duration-150 active:scale-90"
                         >
-                          <span className="text-xs">{cell.dayNum}</span>
-                          {slotsForDay.length > 0 && (
-                            <span
-                              className={`mt-1 text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
-                                isSelected
-                                  ? "bg-white text-[#0284C7]"
-                                  : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                              }`}
-                            >
-                              {slotsForDay.length} Randevu
-                            </span>
-                          )}
+                          {/* Gün Yuvarlak Rozeti (Görseldeki ile Birebir) */}
+                          <div
+                            className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-sm transition-all duration-200 select-none ${
+                              isSelected
+                                ? "bg-[#0284C7] text-white font-black shadow-md ring-4 ring-[#0284C7]/40"
+                                : isToday
+                                  ? "bg-sky-100 dark:bg-sky-950/60 text-[#0284C7] dark:text-sky-300 font-black border-2 border-[#0284C7] shadow-xs"
+                                  : cell.isCurrentMonth
+                                    ? "text-[#0F172A] dark:text-[#F1F5F9] font-bold group-hover:bg-[#F1F5F9] dark:group-hover:bg-slate-800"
+                                    : "text-[#94A3B8] dark:text-slate-600 font-normal"
+                            }`}
+                          >
+                            {cell.dayNum}
+                          </div>
+
+                          {/* Randevu Gösterge Noktası */}
+                          <div className="h-2 flex items-center justify-center gap-1 mt-1">
+                            {slotsForDay.length > 0 ? (
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  isSelected ? "bg-white" : "bg-[#0284C7] dark:bg-sky-400"
+                                }`}
+                              />
+                            ) : (
+                              <span className="w-1.5 h-1.5 opacity-0" />
+                            )}
+                          </div>
                         </button>
                       );
                     })}
                   </div>
 
                   {/* Seçili Günün Randevu Detayları */}
-                  <div className="pt-3 border-t border-[#E2E8F0] dark:border-[#334155] space-y-2">
+                  <div className="pt-4 border-t border-[#E2E8F0] dark:border-[#334155] space-y-2.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-bold text-stone-900 dark:text-[#F1F5F9]">
                         {selectedMyCalendarDate} Tarihli Randevularınız
                       </span>
-                      <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                      <span className="text-[11px] font-bold text-[#64748B] dark:text-[#94A3B8]">
                         {selectedDayMySlots.length} Kayıt
                       </span>
                     </div>
 
                     {selectedDayMySlots.length === 0 ? (
-                      <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic py-2.5 text-center bg-[#F8FAFC] dark:bg-[#0F172A] rounded-xl border border-[#E2E8F0] dark:border-[#334155]">
+                      <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic py-3 text-center bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155]">
                         Bu tarihte herhangi bir randevunuz bulunmuyor.
                       </p>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-2.5">
                         {selectedDayMySlots.map((slot) => {
                           const currentStatus = getDynamicSlotStatus(slot);
+                          const isWaitlist = slot.not?.includes("Yedek");
+                          const isPromoted = slot.not?.includes("Yükseltildi");
+
                           return (
                             <div
                               key={slot.id}
-                              className="p-3 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                              className="p-3.5 sm:p-4 rounded-2xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
                             >
-                              <div className="space-y-0.5 text-xs">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                              <div className="space-y-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-bold text-xs sm:text-sm text-[#0F172A] dark:text-[#F1F5F9]">
                                     {cleanMachineName(slot.makineNo)}
                                   </span>
-                                  <span
-                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                      currentStatus === "Yıkanıyor"
-                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                        : currentStatus === "Sırada"
-                                          ? "bg-sky-50 text-sky-700 border-sky-200"
-                                          : currentStatus === "İptal"
-                                            ? "bg-rose-50 text-rose-700 border-rose-200"
-                                            : "bg-slate-100 text-slate-700 border-slate-200"
-                                    }`}
-                                  >
-                                    {currentStatus}
-                                  </span>
+
+                                  {isWaitlist ? (
+                                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700 flex items-center gap-1.5">
+                                      <svg className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <polyline points="12 6 12 12 16 14" />
+                                      </svg>
+                                      <span>{slot.not?.split(" - ")[0] || "Yedek Sıra"}</span>
+                                    </span>
+                                  ) : isPromoted ? (
+                                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-700 flex items-center gap-1.5">
+                                      <svg className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
+                                      <span>Asil Randevuya Yükseltildi</span>
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                        currentStatus === "Yıkanıyor"
+                                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                                          : currentStatus === "Sırada"
+                                            ? "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800"
+                                            : currentStatus === "İptal"
+                                              ? "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
+                                              : "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+                                      }`}
+                                    >
+                                      {currentStatus} (Asil)
+                                    </span>
+                                  )}
                                 </div>
                                 <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-                                  Saat: <strong>{slot.saatAraligi}</strong>
+                                  Tarih: <strong className="text-[#0F172A] dark:text-[#F1F5F9]">{slot.tarih}</strong> • Saat: <strong className="text-[#0F172A] dark:text-[#F1F5F9]">{slot.saatAraligi}</strong>
                                 </p>
                               </div>
 
@@ -1621,7 +1676,7 @@ export default function StudentPortalView({
                                 <button
                                   type="button"
                                   onClick={() => setCancelConfirmSlot(slot)}
-                                  className="self-end sm:self-center px-2.5 py-1 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 rounded-lg border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
+                                  className="self-end sm:self-center px-3 py-1.5 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:text-rose-300 rounded-xl border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer min-h-[36px]"
                                 >
                                   İptal Et
                                 </button>
