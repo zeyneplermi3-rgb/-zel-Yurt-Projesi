@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Project Charter - Dormitory Management System and Student Portal (DMS)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    @page {
+      size: A4;
+      margin: 16mm 18mm 16mm 18mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Calibri, Arial, sans-serif;
+      color: #1e293b;
+      background-color: #f1f5f9;
+      line-height: 1.45;
+      font-size: 10.5pt;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page-container {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 20px auto;
+      background: #ffffff;
+      padding: 18mm 20mm 16mm 20mm;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .page-break {
+      page-break-after: always;
+      break-after: page;
+    }
+
+    @media print {
+      body {
+        background: none;
+      }
+      .page-container {
+        width: 100%;
+        min-height: auto;
+        margin: 0;
+        padding: 0;
+        box-shadow: none;
+      }
+      .page-break {
+        page-break-after: always;
+        break-after: page;
+      }
+    }
+
+    /* Header */
+    .doc-header {
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 8px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .doc-title-main {
+      font-size: 19pt;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+
+    .doc-subtitle-top {
+      font-size: 9pt;
+      font-weight: 600;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Project Metadata Box */
+    .metadata-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      row-gap: 5px;
+      column-gap: 20px;
+      font-size: 9.5pt;
+    }
+
+    .meta-item {
+      display: flex;
+      line-height: 1.35;
+    }
+
+    .meta-label {
+      font-weight: 700;
+      color: #0f172a;
+      min-width: 150px;
+      flex-shrink: 0;
+    }
+
+    .meta-value {
+      color: #334155;
+      font-weight: 500;
+    }
+
+    .meta-item.full-width {
+      grid-column: span 2;
+    }
+
+    /* Section Headings */
+    .section-title {
+      font-size: 11pt;
+      font-weight: 700;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-top: 13px;
+      margin-bottom: 5px;
+      padding-bottom: 3px;
+      border-bottom: 1px solid #cbd5e1;
+    }
+
+    p {
+      font-size: 9.5pt;
+      color: #334155;
+      margin-bottom: 6px;
+      text-align: justify;
+    }
+
+    ul {
+      margin-left: 18px;
+      margin-bottom: 8px;
+    }
+
+    li {
+      font-size: 9.3pt;
+      color: #334155;
+      margin-bottom: 3.5px;
+      line-height: 1.38;
+      text-align: justify;
+    }
+
+    li strong {
+      color: #0f172a;
+    }
+
+    /* Milestone Schedule Table */
+    .table-container {
+      margin: 8px 0 12px 0;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9pt;
+      background: #ffffff;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      text-align: left;
+      padding: 7px 10px;
+      border-bottom: 1px solid #cbd5e1;
+      font-size: 9pt;
+    }
+
+    td {
+      padding: 7px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      color: #334155;
+      vertical-align: top;
+      line-height: 1.35;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:nth-child(even) td {
+      background: #fafafa;
+    }
+
+    .col-week {
+      width: 24%;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .col-desc {
+      width: 53%;
+    }
+
+    .col-mile {
+      width: 23%;
+      font-weight: 600;
+      color: #0284c7;
+    }
+
+    ol {
+      margin-left: 18px;
+      margin-bottom: 8px;
+    }
+
+    ol li {
+      font-size: 9.3pt;
+      color: #334155;
+      margin-bottom: 3px;
+      line-height: 1.35;
+    }
+
+    ol li strong {
+      color: #0f172a;
+    }
+
+    /* Sponsor Declaration Box */
+    .sponsor-card {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-top: 10px;
+    }
+
+    .sponsor-declaration-text {
+      font-size: 9pt;
+      color: #334155;
+      line-height: 1.4;
+      text-align: justify;
+      margin-bottom: 8px;
+    }
+
+    .sponsor-meta-row {
+      font-size: 8.5pt;
+      font-weight: 600;
+      color: #475569;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e2e8f0;
+      margin-bottom: 10px;
+    }
+
+    .signature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-top: 4px;
+    }
+
+    .signature-col {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 9pt;
+    }
+
+    .sign-role-title {
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 2px;
+    }
+
+    .sign-line {
+      margin-top: 24px;
+      border-bottom: 1px dotted #64748b;
+      width: 100%;
+    }
+
+    /* Page Footer */
+    .page-footer {
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8.5pt;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== PAGE 1 ==================== -->
+  <div class="page-container page-break">
+    <div class="doc-header">
+      <div>
+        <div class="doc-title-main">Project Charter</div>
+      </div>
+      <div class="doc-subtitle-top">
+        SENG211 Software Project Management • AYBU Software Engineering
+      </div>
+    </div>
+
+    <!-- Metadata Section -->
+    <div class="metadata-card">
+      <div class="meta-item full-width">
+        <span class="meta-label">Project Name:</span>
+        <span class="meta-value">Dormitory Management System and Student Portal (DMS)</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Prepared By:</span>
+        <span class="meta-value">Zeynep Lermi, Anna Demkiv</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Project Sponsor / Client:</span>
+        <span class="meta-value">Özel Ankara Karahan Yükseköğrenim Kız Öğrenci Yurdu</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Estimated Budget:</span>
+        <span class="meta-value">0 TL (Volunteer Engineering Student Project)</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Project Timeline:</span>
+        <span class="meta-value">4 Weeks (01.11.2026 – 01.12.2026)</span>
+      </div>
+    </div>
+
+    <!-- 1. Description -->
+    <div class="section-title">DESCRIPTION</div>
+    <p>
+      This project aims to develop a responsive web application for Özel Ankara Karahan Yükseköğrenim Kız Öğrenci Yurdu.
+      The system provides a unified digital platform where students and dormitory staff can manage meal menu viewing,
+      laundry room time-slot appointments, and room maintenance fault tracking without relying on manual paperwork, physical
+      sign-up lists, or in-person queues.
+    </p>
+
+    <!-- 2. Customer Problem -->
+    <div class="section-title">CUSTOMER PROBLEM</div>
+    <p>
+      Currently, the dormitory coordinates daily operational routines through manual, paper-based, and verbal processes, leading
+      to recurring bottlenecks:
+    </p>
+    <ul>
+      <li><strong>Meal Menu Tracking:</strong> Daily meal lists are posted on bulletin boards or shared through messaging groups, causing communication gaps and missed updates when schedules change.</li>
+      <li><strong>Laundry Room Conflicts:</strong> Reservations rely on manual sign-up sheets, leading to forgotten appointments, idle washing/drying machines during reserved times, and booking disputes among students.</li>
+      <li><strong>Maintenance Delays:</strong> Room issues (plumbing, electrical, furniture repairs) are reported verbally, resulting in untracked requests and no real-time status visibility for residents.</li>
+      <li><strong>Administrative Burden:</strong> Dormitory personnel spend significant manual time fielding repetitive inquiries instead of focusing on core facility operations.</li>
+    </ul>
+
+    <!-- 3. Purpose -->
+    <div class="section-title">PURPOSE</div>
+    <ul>
+      <li>Publish weekly and monthly dining hall menus in real time on an accessible web interface.</li>
+      <li>Automate laundry reservations with conflict-free slot scheduling to eliminate machine idle time and prevent double bookings.</li>
+      <li>Establish a transparent fault-ticketing pipeline where students submit categorized repair requests and administrators update progress status (<em>Pending</em> → <em>Resolved</em>).</li>
+      <li>Provide dedicated, role-separated portals for resident students and administrative staff with secure authentication.</li>
+    </ul>
+
+    <!-- 4. Requirements -->
+    <div class="section-title">REQUIREMENTS</div>
+    <ul>
+      <li><strong>User Authentication & Roles:</strong> Role-based access control with encrypted logins for students and dormitory staff.</li>
+      <li><strong>Meal Menu Module:</strong> Admin interface to create and update daily/weekly menus; student view to display schedules by date.</li>
+      <li><strong>Laundry Appointment System:</strong> Machine catalog (washers/dryers), time-slot booking, automatic conflict blocking, and cancellation handling.</li>
+      <li><strong>Maintenance Fault Reporting:</strong> Categorized repair requests (plumbing, electrical, furniture) with live progress tracking.</li>
+      <li><strong>Responsive Design:</strong> Clean layouts compatible with mobile smartphone screens and desktop web browsers.</li>
+    </ul>
+
+    <!-- 5. Scope -->
+    <div class="section-title">SCOPE</div>
+    <ul>
+      <li>User authentication and role-based access control</li>
+      <li>Daily and weekly meal menu publishing module</li>
+      <li>Laundry machine time-slot scheduling engine</li>
+      <li>Maintenance ticketing and administrative status tracking</li>
+      <li>Administrative oversight and management dashboard</li>
+      <li>Comprehensive user and administrator documentation</li>
+    </ul>
+
+    <!-- 6. Constraints -->
+    <div class="section-title">CONSTRAINTS</div>
+    <ul>
+      <li><strong>Time:</strong> The project must be completed and deployed within 4 weeks (01.11.2026 – 01.12.2026).</li>
+      <li><strong>Budget:</strong> 0 TL (The project is developed by a volunteer student team and requires no financial fee).</li>
+    </ul>
+
+    <div class="page-footer">
+      <span>Dormitory Management System (DMS) • Project Charter</span>
+      <span>Page 1 of 2</span>
+    </div>
+  </div>
+
+  <!-- ==================== PAGE 2 ==================== -->
+  <div class="page-container">
+    <div class="doc-header">
+      <div>
+        <div class="doc-title-main">Project Plan & Formal Endorsement</div>
+      </div>
+      <div class="doc-subtitle-top">
+        Milestone Schedule, Governance & Official Approval
+      </div>
+    </div>
+
+    <!-- 1. Milestone Schedule Table -->
+    <div class="section-title" style="margin-top: 4px;">HIGH-LEVEL MILESTONE SCHEDULE</div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-week">Week</th>
+            <th class="col-desc">Description</th>
+            <th class="col-mile">Milestone</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-week"><strong>Week 1</strong><br><span style="font-size: 8pt; color: #64748b;">(01.11 – 07.11.2026)</span></td>
+            <td class="col-desc">Project initiation; charter sign-off; baseline data collection (rooms, machines); requirements gathering and database schema design.</td>
+            <td class="col-mile">Project Initiation</td>
+          </tr>
+          <tr>
+            <td class="col-week"><strong>Week 2</strong><br><span style="font-size: 8pt; color: #64748b;">(08.11 – 14.11.2026)</span></td>
+            <td class="col-desc">Database deployment; user authentication setup; development of Meal Menu module and initial UI layouts.</td>
+            <td class="col-mile">Core Infrastructure</td>
+          </tr>
+          <tr>
+            <td class="col-week"><strong>Week 3</strong><br><span style="font-size: 8pt; color: #64748b;">(15.11 – 21.11.2026)</span></td>
+            <td class="col-desc">Implementation of Laundry Appointment engine (conflict prevention logic) and Maintenance Fault Reporting module; Beta build delivery.</td>
+            <td class="col-mile">Feature Development & MVP</td>
+          </tr>
+          <tr>
+            <td class="col-week"><strong>Week 4</strong><br><span style="font-size: 8pt; color: #64748b;">(22.11 – 01.12.2026)</span></td>
+            <td class="col-desc">System integration; pilot user testing with staff; bug fixes; live deployment; user manual handover and project closure.</td>
+            <td class="col-mile">Testing & Closure</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 2. Success Criteria -->
+    <div class="section-title">SUCCESS CRITERIA</div>
+    <ul>
+      <li>0% double-booking errors during concurrent laundry reservation tests.</li>
+      <li>Successful sign-off on User Acceptance Testing (UAT) by the dormitory administration.</li>
+      <li>Over 80% positive feedback rating in student usability evaluations during pilot usage.</li>
+      <li>Full delivery and live deployment of the functional application within the defined 4-week timeline and 0 TL budget.</li>
+    </ul>
+
+    <!-- 3. Risks & Mitigation -->
+    <div class="section-title">RISKS & MITIGATION</div>
+    <ul>
+      <li><strong>Scope Creep:</strong> Any requests for out-of-scope features (e.g., student payment collection) will be deferred to post-course phases.</li>
+      <li><strong>Data Delays:</strong> Pre-formatted data templates for room and machine inventories will be supplied to dormitory staff during Week 1.</li>
+      <li><strong>User Hesitation:</strong> An illustrated user guide will be provided to resident students to facilitate smooth digital onboarding.</li>
+      <li><strong>Technical Roadblocks:</strong> Dedicated buffer days are allocated prior to final deployment to resolve unforeseen edge-case bugs.</li>
+    </ul>
+
+    <!-- 4. Stakeholders -->
+    <div class="section-title">STAKEHOLDERS</div>
+    <ul>
+      <li><strong>Project Sponsor:</strong> Aybüke Karahan (Dormitory Manager, Özel Ankara Karahan Kız Öğrenci Yurdu)</li>
+      <li><strong>Project Team:</strong> Zeynep Lermi & Anna Demkiv (Project Managers & Lead Developers)</li>
+      <li><strong>End Users:</strong> Resident students and dormitory administrative/maintenance personnel</li>
+    </ul>
+
+    <!-- 5. Responsibilities -->
+    <div class="section-title">PROJECT MANAGERS' RESPONSIBILITIES & AUTHORITIES</div>
+    <p>
+      The project is co-managed by Zeynep Lermi and Anna Demkiv, who are responsible for planning, executing, architecture design, and milestone reporting.
+    </p>
+    <ol>
+      <li><strong>Task Allocation:</strong> Define work packages and allocate tasks across frontend, backend, and testing.</li>
+      <li><strong>Technical Decision Making:</strong> Approve the technology stack, software architecture, and database schemas.</li>
+      <li><strong>Schedule Control:</strong> Adjust internal development schedules to ensure adherence to milestones.</li>
+      <li><strong>Scope Enforcement:</strong> Maintain defined project boundaries and manage change requests.</li>
+      <li><strong>Client Liaison:</strong> Lead stakeholder communication, progress reviews, and pilot evaluations.</li>
+    </ol>
+
+    <!-- 6. Formal Declaration -->
+    <div class="section-title">FORMAL DECLARATION OF SPONSOR'S SUPPORT</div>
+    <div class="sponsor-card">
+      <p class="sponsor-declaration-text">
+        I, Aybüke KARAHAN, as the Dormitory Manager of Özel Ankara Karahan Yükseköğrenim Kız Öğrenci Yurdu, hereby approve and endorse the Dormitory Management System and Student Portal (DMS) project. I declare that I will provide the necessary institutional support (room lists, machine inventories, and pilot testing access) for its successful completion. The project is developed by a volunteer student team and requires no financial fee.
+      </p>
+      <div class="sponsor-meta-row">
+        Estimated Budget: 0 TL (Volunteer Engineering Student Project) &nbsp;|&nbsp; Date: 01.11.2026
+      </div>
+
+      <div class="signature-grid">
+        <div class="signature-col">
+          <span class="sign-role-title">Project Sponsor:</span>
+          <span>Name Surname: Aybüke KARAHAN</span>
+          <span>Title: Dormitory Manager</span>
+          <div class="sign-line"></div>
+          <span style="font-size: 7.5pt; color: #64748b; margin-top: 2px;">Signature / Date</span>
+        </div>
+
+        <div class="signature-col">
+          <span class="sign-role-title">Project Managers & Lead Developers:</span>
+          <span>Name Surname: Zeynep LERMİ</span>
+          <span style="visibility: hidden;">Placeholder</span>
+          <div class="sign-line"></div>
+          <span style="font-size: 7.5pt; color: #64748b; margin-top: 2px;">Signature / Date</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-footer">
+      <span>Dormitory Management System (DMS) • Project Charter</span>
+      <span>Page 2 of 2</span>
+    </div>
+  </div>
+
+</body>
+</html>

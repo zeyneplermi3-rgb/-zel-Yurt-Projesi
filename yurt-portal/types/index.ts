@@ -62,6 +62,7 @@ export interface MaintenanceTicket {
   bildiren: string;
   tarih: string;
   yurtId?: string;
+  memnuniyet?: "evet" | "hayir";
 }
 
 export interface Announcement {
@@ -144,6 +145,17 @@ export interface MealAttendanceRecord {
   updatedAt: string;
 }
 
+export interface MealRatingRecord {
+  id: string;
+  studentName: string;
+  odaNo?: string;
+  rating: number; // 1 to 5
+  comment: string;
+  date: string; // YYYY-MM-DD
+  createdAt: string;
+  yurtId?: string;
+}
+
 export interface YurtSettings {
   haftaIciGiris: string;
   haftaSonuGiris: string;
@@ -161,4 +173,16 @@ export interface YurtSettings {
   misafirPolitikasi: string;
   sessizlikBaslangic: string;
   gecKalmaToleransDk: number;
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  time: string;
+  type: "menu" | "camasir" | "ariza" | "duyuru" | "genel";
+  read: boolean;
+  targetRole?: "ogrenci" | "yonetici" | "all";
+  targetUser?: string;
+  yurtId?: string;
 }
