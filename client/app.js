@@ -44,51 +44,14 @@ const AppState = {
   savedUsername: localStorage.getItem('yurtify_saved_username') || 'eda.etem',
 
   // Live Students List (Synchronized with Supabase `ogrenciler`)
-  students: [
-    {
-      id: 'std-1793349124719',
-      username: 'eda.etem',
-      name: 'Eda Etem',
-      room: 'Oda 302',
-      bed: 'Yatak 3',
-      password: 'edaetem',
-      isFirstLogin: false
-    },
-    {
-      id: 'std-1793351680146',
-      username: 'aleyna.ersoy',
-      name: 'Aleyna Seda Ersoy',
-      room: 'Oda 201',
-      bed: 'Yatak 2',
-      password: 'ogrenci123',
-      isFirstLogin: true
-    },
-    {
-      id: 'std-1793351699047',
-      username: 'yagmur.arslan',
-      name: 'Yağmur Arslan',
-      room: 'Oda 201',
-      bed: 'Yatak 2',
-      password: 'ogrenci123',
-      isFirstLogin: true
-    },
-    {
-      id: 'std-1793351785024',
-      username: 'ebrar.karakas',
-      name: 'Ebrar Karakaş',
-      room: 'Oda 103',
-      bed: 'Yatak 1',
-      password: 'ogrenci123',
-      isFirstLogin: true
-    }
-  ],
+  students: [],
 
-  // Admin Credentials
+  // Admin Credentials (Synchronized with Supabase `yurtlar`)
   adminUser: {
-    username: 'admin',
-    name: 'Meltem Karahan',
+    username: 'mudur',
+    name: 'Aybuke Karahan',
     role: 'Yurt Müdiresi / İdareci',
-    password: '123456'
+    password: ''
   },
 
   // Laundry Facility Data (Synchronized with Supabase `camasirhane_makineler` & `camasirhane_randevular`)
@@ -451,13 +414,13 @@ DOM.authRoleTabs.forEach(tab => {
     selectedLoginRole = tab.dataset.role;
 
     if (selectedLoginRole === 'admin') {
-      DOM.authLabelUser.textContent = 'Kullanıcı Adı (Yönetici)';
-      DOM.usernameInput.value = 'admin';
-      DOM.passwordInput.value = '123456';
+      DOM.authLabelUser.textContent = 'Kullanıcı Adı veya E-posta (Yönetici)';
+      DOM.usernameInput.value = 'mudur';
+      DOM.passwordInput.value = '';
     } else {
-      DOM.authLabelUser.textContent = 'Kullanıcı Adı (Öğrenci)';
+      DOM.authLabelUser.textContent = 'Kullanıcı Adı veya E-posta (Öğrenci)';
       DOM.usernameInput.value = 'eda.etem';
-      DOM.passwordInput.value = 'edaetem';
+      DOM.passwordInput.value = '';
     }
   });
 });
@@ -467,7 +430,8 @@ if (DOM.demoStudentEda) {
   DOM.demoStudentEda.addEventListener('click', () => {
     DOM.authRoleTabs[0].click();
     DOM.usernameInput.value = 'eda.etem';
-    DOM.passwordInput.value = 'edaetem';
+    DOM.passwordInput.value = '';
+    DOM.passwordInput.focus();
   });
 }
 
@@ -475,29 +439,59 @@ if (DOM.demoStudentAleyna) {
   DOM.demoStudentAleyna.addEventListener('click', () => {
     DOM.authRoleTabs[0].click();
     DOM.usernameInput.value = 'aleyna.ersoy';
-    DOM.passwordInput.value = 'ogrenci123';
+    DOM.passwordInput.value = '';
+    DOM.passwordInput.focus();
   });
 }
 
 if (DOM.demoAdminMeltem) {
   DOM.demoAdminMeltem.addEventListener('click', () => {
     DOM.authRoleTabs[1].click();
-    DOM.usernameInput.value = 'admin';
-    DOM.passwordInput.value = '123456';
+    DOM.usernameInput.value = 'mudur';
+    DOM.passwordInput.value = '';
+    DOM.passwordInput.focus();
   });
 }
 
 /**
- * Handle Login Submission
+ * Handle Login Submission (Veritabanından Dinamik Doğrulama)
  */
-function handleLogin() {
+async function handleLogin() {
   const username = DOM.usernameInput.value.trim();
   const password = DOM.passwordInput.value.trim();
 
+  if (!username || !password) {
+    alert('Lütfen kullanıcı adı ve şifrenizi giriniz.');
+    return;
+  }
+
   // 1. ADMIN LOGIN
-  if (selectedLoginRole === 'admin' || username.toLowerCase() === 'admin') {
-    if (password !== AppState.adminUser.password) {
-      alert('Hatalı yönetici şifresi!');
+  if (selectedLoginRole === 'admin' || username.toLowerCase() === 'mudur' || username.toLowerCase() === 'admin') {
+    let matchedYurt = null;
+    if (supabaseClient) {
+      try {
+        const { data: yurtData } = await supabaseClient.from('yurtlar').select('*');
+        if (yurtData && yurtData.length > 0) {
+          matchedYurt = yurtData.find(y => 
+            (y.admin_kullanici_adi && y.admin_kullanici_adi.toLowerCase() === username.toLowerCase()) ||
+            (y.yetkili_eposta && y.yetkili_eposta.toLowerCase() === username.toLowerCase()) ||
+            username.toLowerCase() === 'mudur' ||
+            username.toLowerCase() === 'admin'
+          );
+        }
+      } catch (e) {
+        console.error('Yurt bilgisi çekilemedi:', e);
+      }
+    }
+
+    if (!matchedYurt) {
+      alert('Yurt yöneticisi kaydı veritabanında bulunamadı.');
+      return;
+    }
+
+    const adminDbPass = matchedYurt.admin_sifre;
+    if (!adminDbPass || password !== adminDbPass) {
+      alert('Hatalı yönetici şifresi! Şifre veritabanı ile eşleşmiyor.');
       return;
     }
 
@@ -507,21 +501,62 @@ function handleLogin() {
     DOM.portalAdmin.classList.add('active');
 
     AppState.currentRole = 'admin';
+    AppState.adminUser.username = matchedYurt.admin_kullanici_adi || 'mudur';
+    AppState.adminUser.name = matchedYurt.yetkili_ad || 'Aybuke Karahan';
+    AppState.adminUser.password = adminDbPass;
     renderAdminViews();
-    showPushNotification('İdari Portal Açıldı', 'Hoş geldiniz, Sayın Meltem Karahan.');
+    showPushNotification('İdari Portal Açıldı', `Hoş geldiniz, Sayın ${matchedYurt.yetkili_ad || 'Yurt Yöneticisi'}.`);
     return;
   }
 
   // 2. STUDENT LOGIN
-  const student = AppState.students.find(s => s.username.toLowerCase() === username.toLowerCase());
+  let matchedStudent = null;
+  if (supabaseClient) {
+    try {
+      const { data: stdData } = await supabaseClient.from('ogrenciler').select('*');
+      if (stdData && stdData.length > 0) {
+        const found = stdData.find(s => {
+          const u = (s.kullanici_adi || '').toLowerCase().trim();
+          const e = (s.eposta || '').toLowerCase().trim();
+          const n = (s.ad_soyad || '').toLowerCase().trim();
+          const input = username.toLowerCase().trim();
+          return u === input || e === input || n === input || (e.includes('@') && e.split('@')[0] === input);
+        });
+        if (found) {
+          matchedStudent = {
+            id: found.id,
+            username: found.kullanici_adi || '',
+            name: found.ad_soyad || '',
+            room: found.oda_no ? (found.oda_no.toString().startsWith('Oda') ? found.oda_no : `Oda ${found.oda_no}`) : 'Oda -',
+            bed: found.yatak_no ? (found.yatak_no.toString().startsWith('Yatak') ? found.yatak_no : `Yatak ${found.yatak_no}`) : 'Yatak 1',
+            password: found.sifre || '',
+            isFirstLogin: found.gecici_sifre_mi === true,
+            phone: found.telefon,
+            email: found.eposta
+          };
+        }
+      }
+    } catch (e) {
+      console.error('Öğrenci verisi çekilemedi:', e);
+    }
+  }
 
-  if (!student) {
-    alert('Bu kullanıcı adına ait öğrenci kaydı bulunamadı. Lütfen yurt idaresi ile iletişime geçiniz.');
+  if (!matchedStudent && AppState.students.length > 0) {
+    matchedStudent = AppState.students.find(s => 
+      s.username.toLowerCase() === username.toLowerCase() ||
+      (s.email && s.email.toLowerCase() === username.toLowerCase()) ||
+      s.name.toLowerCase() === username.toLowerCase()
+    );
+  }
+
+  if (!matchedStudent) {
+    alert('Bu kullanıcı adına veya e-postaya ait öğrenci kaydı veritabanında bulunamadı.');
     return;
   }
 
-  if (student.password !== password) {
-    alert('Hatalı şifre girdiniz! Lütfen idarenin verdiği şifreyi kontrol ediniz.');
+  // Kesinlikle yalnızca veritabanındaki şifre ile kontrol
+  if (!matchedStudent.password || password !== matchedStudent.password) {
+    alert('Hatalı şifre girdiniz! Lütfen veritabanında kayıtlı şifrenizi kontrol ediniz.');
     return;
   }
 

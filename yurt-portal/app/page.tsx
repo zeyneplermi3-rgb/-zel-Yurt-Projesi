@@ -792,8 +792,8 @@ export default function Home() {
           adSoyad: d.ad_soyad,
           eposta: d.eposta || "",
           kullaniciAdi: d.kullanici_adi || (d.eposta ? d.eposta.split("@")[0] : ""),
-          sifre: d.sifre || "ogrenci123",
-          geciciSifreMi: d.gecici_sifre_mi ?? (d.sifre === "ogrenci123" || !d.sifre),
+          sifre: d.sifre || "",
+          geciciSifreMi: d.gecici_sifre_mi ?? false,
           odaNo: d.oda_no || "",
           yatakNo: d.yatak_no || "1",
           telefon: d.telefon || undefined,
@@ -1812,6 +1812,7 @@ export default function Home() {
       const enteredPassword = password.trim();
 
       // ==========================================
+      // ==========================================
       // A. SÜPER ADMİN GİRİŞİ
       // ==========================================
       if (activeRole === "superadmin") {
@@ -1823,14 +1824,11 @@ export default function Home() {
 
         const configuredSuperUser = (yurtSettings.superadminKullaniciAdi || "superadmin").trim().toLowerCase();
         const configuredSuperEmail = (yurtSettings.superadminEposta || "superadmin@yurtify.com").trim().toLowerCase();
-        const configuredSuperPass = yurtSettings.superadminSifre || "Admin*2026!";
+        const configuredSuperPass = yurtSettings.superadminSifre;
 
         const isSuperIdentifierValid =
           enteredIdentifier === configuredSuperUser ||
-          enteredIdentifier === configuredSuperEmail ||
-          enteredIdentifier === "superadmin" ||
-          enteredIdentifier === "superadmin@yurtify.com" ||
-          enteredIdentifier === "superadmin@yurtportal.com";
+          enteredIdentifier === configuredSuperEmail;
         const isSuperPassValid = enteredPassword === configuredSuperPass;
 
         if (!isSuperIdentifierValid || !isSuperPassValid) {
@@ -1846,7 +1844,7 @@ export default function Home() {
       }
 
       // ==========================================
-      // B. YURT MÜDÜRÜ / YÖNETİCİ GİRİŞİ (Tüm Yurtlar Arasında Doğrulama)
+      // B. YURT MÜDÜRÜ / YÖNETİCİ GİRİŞİ (Veritabanından Dinamik Doğrulama)
       // ==========================================
       if (activeRole === "yonetici") {
         if (enteredIdentifier.includes(" ") || enteredIdentifier.split(/\s+/).length > 1) {
@@ -1861,113 +1859,114 @@ export default function Home() {
           return;
         }
 
-        // Tüm yurtlar arasından girilen kullanıcı adı veya e-postaya ait yurdu bul
-        let matchedYurt = yurtlar.find((y: any) => {
-          const dbUser = ((y as any)?.admin_kullanici_adi || y?.yetkiliEposta || "").toLowerCase().trim();
-          const dbEmail = (y?.yetkiliEposta || "").toLowerCase().trim();
+        // Tüm yurtlar arasından girilen kullanıcı adı veya e-postaya ait yurdu doğrudan Supabase veritabanından anlık çekerek doğrula
+        let currentYurtlar: any[] = yurtlar;
+        try {
+          const { data: dbYurtlar, error: yurtErr } = await supabase.from("yurtlar").select("*");
+          if (!yurtErr && dbYurtlar && dbYurtlar.length > 0) {
+            currentYurtlar = dbYurtlar;
+            setYurtlar(dbYurtlar.map((d: any) => ({
+              id: d.id,
+              ad: d.ad,
+              sehir: d.sehir,
+              ilce: d.ilce,
+              adres: d.adres || "",
+              kapasite: d.kapasite || 100,
+              mevcutOgrenci: d.mevcut_ogrenci ?? 0,
+              yetkiliAd: d.yetkili_ad || "Yetkili",
+              yetkiliTel: d.yetkili_tel || "",
+              yetkiliEposta: d.yetkili_eposta || "",
+              durum: d.durum || "aktif",
+              yurtTuru: d.yurt_turu || "Kız Öğrenci Yurdu",
+              admin_kullanici_adi: d.admin_kullanici_adi,
+              admin_sifre: d.admin_sifre,
+              kayitTarihi: new Date(d.created_at || Date.now()).toLocaleDateString("tr-TR"),
+            })));
+          }
+        } catch (e) {
+          console.warn("Veritabanından yurtlar çekilirken uyarı:", e);
+        }
+
+        const matchedYurt = currentYurtlar.find((y: any) => {
+          const dbUser = ((y as any)?.admin_kullanici_adi || y?.adminKullaniciAdi || "").toLowerCase().trim();
+          const dbEmail = ((y as any)?.yetkili_eposta || y?.yetkiliEposta || "").toLowerCase().trim();
           return (
             (dbUser && enteredIdentifier === dbUser) ||
             (dbEmail && enteredIdentifier === dbEmail)
           );
         });
 
-        const configuredUsername = (yurtSettings.adminKullaniciAdi || "mudur").trim().toLowerCase();
-        const configuredEmail = (yurtSettings.adminEposta || "mudur@gmail.com").trim().toLowerCase();
-
-        // Eğer doğrudan eşleşmediyse genel varsayılan yönetici hesapları üzerinden ilk yurdu dene
         if (!matchedYurt) {
-          if (
-            enteredIdentifier === configuredUsername ||
-            enteredIdentifier === configuredEmail ||
-            enteredIdentifier === "mudur" ||
-            enteredIdentifier === "mudur@gmail.com"
-          ) {
-            matchedYurt = yurtlar[0];
-          }
-        }
-
-        if (!matchedYurt) {
-          recordFailedAttempt("Hatalı yönetici kullanıcı adı veya şifresi.");
+          recordFailedAttempt("Bu kullanıcı adı veya e-posta ile kayıtlı yurt yöneticisi bulunamadı.");
           setIsLoading(false);
           return;
         }
 
-        const yurtAdminPass = (matchedYurt as any)?.admin_sifre || yurtSettings.adminSifre || "mudur123456";
-        const isPasswordMatch =
-          enteredPassword === yurtAdminPass ||
-          enteredPassword === "mudur123456";
+        // Şifreyi yalnızca ve doğrudan veritabanındaki admin_sifre alanı ile doğrula (sabit fallback yok)
+        const yurtAdminPass = (matchedYurt as any)?.admin_sifre || (matchedYurt as any)?.adminSifre;
 
-        if (!isPasswordMatch) {
-          recordFailedAttempt("Hatalı yönetici kullanıcı adı veya şifresi.");
+        if (!yurtAdminPass || enteredPassword !== yurtAdminPass) {
+          recordFailedAttempt("Hatalı yönetici şifresi.");
           setIsLoading(false);
           return;
         }
 
         try {
-          const authEmail = enteredIdentifier.includes("@") ? enteredIdentifier : (matchedYurt.yetkiliEposta || configuredEmail);
-          await supabase.auth.signInWithPassword({
-            email: authEmail,
-            password: enteredPassword,
-          });
+          const authEmail = enteredIdentifier.includes("@") ? enteredIdentifier : ((matchedYurt as any).yetkili_eposta || matchedYurt.yetkiliEposta);
+          if (authEmail) {
+            await supabase.auth.signInWithPassword({
+              email: authEmail,
+              password: enteredPassword,
+            });
+          }
         } catch { }
 
         setFailedLoginAttempts(0);
         setLockoutUntil(null);
-        loginUserDirect("yonetici", matchedYurt.yetkiliAd || "Yurt Müdürü", matchedYurt.yetkiliEposta || configuredEmail, matchedYurt.id, matchedYurt.ad);
+        loginUserDirect("yonetici", matchedYurt.yetkiliAd || (matchedYurt as any).yetkili_ad || "Yurt Müdürü", (matchedYurt as any).yetkili_eposta || matchedYurt.yetkiliEposta, matchedYurt.id, matchedYurt.ad);
         return;
       }
 
       // ==========================================
-      // C. ÖĞRENCİ GİRİŞİ (Yurda Özel Eşleştirme)
+      // C. ÖĞRENCİ GİRİŞİ (Veritabanından Dinamik Doğrulama)
       // ==========================================
       if (activeRole === "ogrenci") {
-        let currentStudents = students;
-        if (typeof window !== "undefined") {
-          try {
-            const curYurtKey = currentUser?.selectedYurtId || yurtlar[0]?.id;
-            const raw = localStorage.getItem(`yurtify_${curYurtKey}_students`) || localStorage.getItem("yurtify_students");
-            if (raw) {
-              const parsed = JSON.parse(raw);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                currentStudents = parsed;
-                setStudents(parsed);
+        // Öğrenci listesini her giriş denemesinde doğrudan Supabase ogrenciler tablosundan anlık ve taze olarak çek
+        let currentStudents: Student[] = [];
+        try {
+          const { data: dbStudents, error: stdErr } = await supabase.from("ogrenciler").select("*");
+          if (!stdErr && dbStudents && dbStudents.length > 0) {
+            currentStudents = dbStudents.map((d: any) => ({
+              id: d.id,
+              adSoyad: d.ad_soyad,
+              eposta: d.eposta || "",
+              kullaniciAdi: d.kullanici_adi || (d.eposta ? d.eposta.split("@")[0] : ""),
+              sifre: d.sifre || "",
+              geciciSifreMi: d.gecici_sifre_mi ?? false,
+              odaNo: d.oda_no || "",
+              yatakNo: d.yatak_no || "1",
+              telefon: d.telefon || undefined,
+              veliAd: d.veli_ad || undefined,
+              veliTel: d.veli_tel || undefined,
+              kayitTarihi: d.kayit_tarihi || undefined,
+              yurtId: d.yurt_id,
+            }));
+            setStudents(currentStudents);
+            if (typeof window !== "undefined") {
+              const curYurtKey = currentUser?.selectedYurtId || yurtlar[0]?.id;
+              if (curYurtKey) {
+                localStorage.setItem(`yurtify_${curYurtKey}_students`, JSON.stringify(currentStudents));
               }
             }
-          } catch (e) {
-            console.error("Öğrenci okuma hatası:", e);
+          } else {
+            currentStudents = students;
           }
-        }
-
-        // Eğer yerel listede yoksa veritabanındaki tüm öğrencileri çekerek eşleştirmeyi dene
-        if (currentStudents.length === 0) {
-          try {
-            const { data } = await supabase.from("ogrenciler").select("*");
-            if (data && data.length > 0) {
-              currentStudents = data.map((d: any) => ({
-                id: d.id,
-                adSoyad: d.ad_soyad,
-                eposta: d.eposta || "",
-                kullaniciAdi: d.kullanici_adi || (d.eposta ? d.eposta.split("@")[0] : ""),
-                sifre: d.sifre || "ogrenci123",
-                geciciSifreMi: d.gecici_sifre_mi ?? (d.sifre === "ogrenci123" || !d.sifre),
-                odaNo: d.oda_no || "",
-                yatakNo: d.yatak_no || "1",
-                yurtId: d.yurt_id,
-              }));
-              setStudents(currentStudents);
-            }
-          } catch { }
+        } catch (e) {
+          console.warn("Veritabanından öğrenci çekilirken uyarı:", e);
+          currentStudents = students;
         }
 
         const cleanIdentifier = enteredIdentifier.trim().toLowerCase();
-
-        // Ad Soyad ile girişi kesinlikle engelle
-        if (cleanIdentifier.includes(" ") || cleanIdentifier.split(/\s+/).length > 1) {
-          recordFailedAttempt("Giriş için ad soyad kullanılamaz. Lütfen yalnızca e-posta adresinizi veya kullanıcı adınızı giriniz.");
-          setIsLoading(false);
-          return;
-        }
-
         const identifierPrefix = cleanIdentifier.includes("@")
           ? cleanIdentifier.split("@")[0].trim()
           : cleanIdentifier;
@@ -1990,12 +1989,14 @@ export default function Home() {
         const matchedStudent = currentStudents.find((s) => {
           const sEmail = (s.eposta || "").trim().toLowerCase();
           const sUsername = (s.kullaniciAdi || (s.eposta ? s.eposta.split("@")[0] : "")).trim().toLowerCase();
+          const sFullName = (s.adSoyad || "").trim().toLowerCase();
           const sEmailPrefix = sEmail.includes("@") ? sEmail.split("@")[0].trim() : sEmail;
 
-          // 1. Doğrudan tam eşleşme (Yalnızca E-posta veya Kullanıcı Adı)
+          // 1. Doğrudan tam eşleşme (E-posta, Kullanıcı Adı veya Ad Soyad)
           if (
             (sEmail && sEmail === cleanIdentifier) ||
-            (sUsername && sUsername === cleanIdentifier)
+            (sUsername && sUsername === cleanIdentifier) ||
+            (sFullName && sFullName === cleanIdentifier)
           ) {
             return true;
           }
@@ -2008,14 +2009,16 @@ export default function Home() {
             return true;
           }
 
-          // 3. Normalize edilmiş eşleşme (Yalnızca E-posta ve Kullanıcı Adı için)
+          // 3. Normalize edilmiş eşleşme (Türkçe karakter duyarsız)
           const normEmail = normalize(sEmail);
           const normUsername = normalize(sUsername);
+          const normFullName = normalize(sFullName);
           const normEmailPrefix = normalize(sEmailPrefix);
 
           if (
             (normEmail && normEmail === normalizedIdentifier) ||
             (normUsername && normUsername === normalizedIdentifier) ||
+            (normFullName && normFullName === normalizedIdentifier) ||
             (normEmailPrefix && (normEmailPrefix === normalizedPrefix || normEmailPrefix === normalizedIdentifier))
           ) {
             return true;
@@ -2025,13 +2028,14 @@ export default function Home() {
         });
 
         if (!matchedStudent) {
-          recordFailedAttempt("Bu kullanıcı adı veya e-posta ile kayıtlı öğrenci bulunamadı.");
+          recordFailedAttempt("Bu kullanıcı adı, e-posta veya isimle kayıtlı öğrenci bulunamadı.");
           setIsLoading(false);
           return;
         }
 
-        const studentPassword = matchedStudent.sifre || "ogrenci123";
-        if (enteredPassword !== studentPassword) {
+        // Şifreyi yalnızca ve kesinlikle veritabanındaki sifre alanı ile doğrula (sabit fallback kesinlikle yok)
+        const studentPassword = matchedStudent.sifre;
+        if (!studentPassword || enteredPassword !== studentPassword) {
           recordFailedAttempt("Hatalı öğrenci şifresi.");
           setIsLoading(false);
           return;
