@@ -52,8 +52,9 @@ import {
 import StudentPortalView, { StudentTab } from "../components/student/StudentPortalView";
 import MenuTimePickerModal from "../components/modals/MenuTimePickerModal";
 import EntryTimeModal from "../components/modals/EntryTimeModal";
-import { trackGAEvent, trackGAPageView } from "../lib/analytics";
+import { trackGAEvent, trackGAPageView, recordUserActivity } from "../lib/analytics";
 import GoogleAnalyticsLivePanel from "../components/GoogleAnalyticsLivePanel";
+import SuperAdminAnalyticsView from "../components/superadmin/SuperAdminAnalyticsView";
 export default function Home() {
   const supabase = createClient();
 
@@ -272,6 +273,11 @@ export default function Home() {
 
   // Yurtlar: Yalnızca veritabanındaki gerçek verileri tutar (başlangıçta boştur)
   const [yurtlar, setYurtlar] = useState<Yurt[]>([]);
+
+  // ==========================================
+  // SÜPER ADMİN PANELİ STATE
+  // ==========================================
+  const [superadminSubTab, setSuperadminSubTab] = useState<"yurtlar" | "analitik">("yurtlar");
 
   // ==========================================
   // YÖNETİCİ PANELİ STATE & VERİLERİ
@@ -1801,6 +1807,19 @@ export default function Home() {
       role === "ogrenci" ? "/ogrenci-portali" : role === "yonetici" ? "/yonetici-paneli" : "/superadmin",
       `${role.toUpperCase()} Portalı`
     );
+
+    // Süper Admin Kullanıcı Hareketleri Günlüğü ve Günlük Giriş Sayacına Kaydet
+    recordUserActivity({
+      userId: userObj.details || userObj.name,
+      userName: userObj.name,
+      userRole: role,
+      roomNo: role === "ogrenci" ? (customDetails?.includes("Oda") ? customDetails.split("•")[0].replace("Oda", "").trim() : undefined) : undefined,
+      yurtName: userObj.selectedYurtName,
+      actionType: "login",
+      actionTitle: role === "ogrenci" ? "Öğrenci Portalı Girişi" : role === "yonetici" ? "Yönetici Paneli Girişi" : "Süper Admin Girişi",
+      actionDetail: `Başarılı oturum açıldı (${userObj.name})`,
+      gaEventName: "login_success",
+    });
 
     fetchDbData(chosenYurtId);
   };
@@ -3376,6 +3395,18 @@ export default function Home() {
       yurt_id: targetYurtId,
     });
 
+    recordUserActivity({
+      userId: currentStudent?.id || sName,
+      userName: sName,
+      userRole: "ogrenci",
+      roomNo: currentStudent?.odaNo || "",
+      yurtName: currentUser?.selectedYurtName || yurtSettings.ad,
+      actionType: "meal_rating",
+      actionTitle: "Yemekhane Menüsünü Puanladı",
+      actionDetail: `Puan: ${rating} Yıldız ★ • Yorum: "${comment.trim() || 'Yorumsuz'}"`,
+      gaEventName: "meal_rating_submitted",
+    });
+
     try {
       const updatedSaatler = {
         ...(dailyMenu.saatler || {}),
@@ -3856,6 +3887,17 @@ export default function Home() {
       yurt_id: targetYurtId,
     });
 
+    recordUserActivity({
+      userId: currentUser?.name || "Öğrenci",
+      userName: currentUser?.name || "Öğrenci",
+      userRole: "ogrenci",
+      yurtName: currentUser?.selectedYurtName || yurtSettings.ad,
+      actionType: "maintenance_satisfaction",
+      actionTitle: "Arıza Hizmet Memnuniyeti Belirtti",
+      actionDetail: `Arıza çözümü onaylandı (Memnuniyet: ${satisfaction === "evet" ? "Evet" : "Hayır"})`,
+      gaEventName: "maintenance_satisfaction_submitted",
+    });
+
     try {
       const statusWithFeedback = `Çözüldü (Memnuniyet: ${satisfaction === "evet" ? "Evet" : "Hayır"})`;
       supabase
@@ -3903,6 +3945,18 @@ export default function Home() {
       room: created.odaNo,
       priority: created.oncelik,
       yurt_id: targetYurtId,
+    });
+
+    recordUserActivity({
+      userId: created.bildiren,
+      userName: created.bildiren,
+      userRole: currentUser?.role || "ogrenci",
+      roomNo: created.odaNo,
+      yurtName: currentUser?.selectedYurtName || yurtSettings.ad,
+      actionType: "maintenance_ticket",
+      actionTitle: "Teknik Arıza Talebi Oluşturdu",
+      actionDetail: `Başlık: "${created.baslik}" • Kategori: ${created.kategori} • Öncelik: ${created.oncelik}`,
+      gaEventName: "maintenance_ticket_created",
     });
 
     try {
@@ -4500,6 +4554,43 @@ export default function Home() {
         {/* ========================================================= */}
         {currentUser.role === "superadmin" && (
           <div className="space-y-4 sm:space-y-6 md:space-y-8">
+            {/* Süper Admin Üst Sekmeleri (Yurtlar vs Analitik & Kullanıcı Hareketleri) */}
+            <div className="flex items-center gap-2 border-b border-[#E2E8F0] dark:border-[#334155] pb-2">
+              <button
+                type="button"
+                onClick={() => setSuperadminSubTab("yurtlar")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  superadminSubTab === "yurtlar"
+                    ? "bg-[#0284C7] text-white shadow-xs"
+                    : "bg-white dark:bg-[#1E293B] text-slate-700 dark:text-slate-200 border border-[#E2E8F0] dark:border-[#334155] hover:bg-slate-50"
+                }`}
+              >
+                <span>🏢</span>
+                <span>Yurtlar ve Şubeler ({yurtlar.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSuperadminSubTab("analitik")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  superadminSubTab === "analitik"
+                    ? "bg-[#0284C7] text-white shadow-xs"
+                    : "bg-white dark:bg-[#1E293B] text-slate-700 dark:text-slate-200 border border-[#E2E8F0] dark:border-[#334155] hover:bg-slate-50"
+                }`}
+              >
+                <span>📊</span>
+                <span>Kullanıcı Hareketleri & GA4 Analitik</span>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+              </button>
+            </div>
+
+            {superadminSubTab === "analitik" ? (
+              <SuperAdminAnalyticsView onBackToDorms={() => setSuperadminSubTab("yurtlar")} />
+            ) : (
+              <>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 bg-white border border-[#E2E8F0] p-4 sm:p-6 rounded-2xl sm:rounded-3xl">
               <h2 className="text-lg sm:text-xl md:text-2xl font-black text-[#0F172A]">
                 Yurtlar ve Şubeler
@@ -4807,6 +4898,11 @@ export default function Home() {
               onClose={() => setIsAddModalOpen(false)}
               onSubmit={handleCreateYurt}
             />
+              </>
+            )}
+
+            {/* Google Analytics 4 (GA4) Canlı İzleyici - YALNIZCA SÜPER ADMİN İÇİN */}
+            <GoogleAnalyticsLivePanel />
           </div>
         )}
 
@@ -7757,6 +7853,18 @@ export default function Home() {
                 date: normalizedSlot.tarih,
                 room: normalizedSlot.odaNo,
                 yurt_id: targetYurtId,
+              });
+
+              recordUserActivity({
+                userId: normalizedSlot.ogrenciAd || "Öğrenci",
+                userName: normalizedSlot.ogrenciAd || "Öğrenci",
+                userRole: "ogrenci",
+                roomNo: normalizedSlot.odaNo,
+                yurtName: currentUser?.selectedYurtName || yurtSettings.ad,
+                actionType: "laundry_booking",
+                actionTitle: "Çamaşır Randevusu Aldı",
+                actionDetail: `Makine: ${normalizedSlot.makineNo} • Saat: ${normalizedSlot.saatAraligi} • Tarih: ${normalizedSlot.tarih}`,
+                gaEventName: "laundry_reservation_created",
               });
 
               try {

@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
-import GoogleAnalyticsLivePanel from "../components/GoogleAnalyticsLivePanel";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -90,10 +89,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col">
-        {children}
-        <GoogleAnalyticsLivePanel />
-      </body>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }
