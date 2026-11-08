@@ -52,6 +52,8 @@ import {
 import StudentPortalView, { StudentTab } from "../components/student/StudentPortalView";
 import MenuTimePickerModal from "../components/modals/MenuTimePickerModal";
 import EntryTimeModal from "../components/modals/EntryTimeModal";
+import { trackGAEvent, trackGAPageView } from "../lib/analytics";
+import GoogleAnalyticsLivePanel from "../components/GoogleAnalyticsLivePanel";
 export default function Home() {
   const supabase = createClient();
 
@@ -225,6 +227,7 @@ export default function Home() {
     }
 
     const resolved = selectedMode === "system" ? getSystemTheme() : selectedMode;
+    trackGAEvent("theme_toggle", { selected_mode: selectedMode, resolved_theme: resolved });
 
     const applyThemeChange = () => {
       applyDomTheme(resolved);
@@ -304,6 +307,19 @@ export default function Home() {
       setOpenSettingsSections((prev) => ({ ...prev, ogrenciler: true }));
     }
   }, [managerTab]);
+
+  // Google Analytics 4 Sayfa / Sekme Değişimi Canlı İzleme
+  useEffect(() => {
+    if (currentUser?.role === "yonetici") {
+      trackGAPageView(`/yonetici/${managerTab}`, `Yönetici Paneli - ${managerTab}`);
+    }
+  }, [managerTab, currentUser?.role]);
+
+  useEffect(() => {
+    if (currentUser?.role === "ogrenci") {
+      trackGAPageView(`/ogrenci/${studentTab}`, `Öğrenci Portalı - ${studentTab}`);
+    }
+  }, [studentTab, currentUser?.role]);
 
   const [students, setStudents] = useState<Student[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -1774,6 +1790,18 @@ export default function Home() {
         localStorage.removeItem("yurtify_remembered_role");
       }
     }
+    // Google Analytics 4 Olay Takibi
+    trackGAEvent("login_success", {
+      role: role,
+      user_name: userObj.name,
+      yurt_id: userObj.selectedYurtId,
+      yurt_name: userObj.selectedYurtName,
+    });
+    trackGAPageView(
+      role === "ogrenci" ? "/ogrenci-portali" : role === "yonetici" ? "/yonetici-paneli" : "/superadmin",
+      `${role.toUpperCase()} Portalı`
+    );
+
     fetchDbData(chosenYurtId);
   };
 
@@ -1798,6 +1826,12 @@ export default function Home() {
     const recordFailedAttempt = (customMsg?: string) => {
       const nextCount = failedLoginAttempts + 1;
       setFailedLoginAttempts(nextCount);
+      trackGAEvent("login_failed", {
+        role: activeRole,
+        identifier: username.trim().toLowerCase(),
+        attempt_number: nextCount,
+        reason: customMsg || "Hatalı kimlik bilgisi",
+      });
       if (nextCount >= 5) {
         const lockoutTime = Date.now() + 60000;
         setLockoutUntil(lockoutTime);
@@ -2082,6 +2116,10 @@ export default function Home() {
 
   // Çıkış Yap: Hem React state'i hem LocalStorage'ı hem Supabase oturumunu temizler
   const handleLogout = async () => {
+    trackGAEvent("logout", {
+      role: currentUser?.role || "unknown",
+      name: currentUser?.name || "Kullanıcı",
+    });
     setCurrentUser(null);
     setIsAuthChecking(false);
     setIsSuperAdminLogin(false);
@@ -3331,6 +3369,13 @@ export default function Home() {
       localStorage.setItem("yurtify_meal_ratings", JSON.stringify(updatedRatings));
     }
 
+    trackGAEvent("meal_rating_submitted", {
+      rating,
+      has_comment: !!comment.trim(),
+      student_room: currentStudent?.odaNo || "",
+      yurt_id: targetYurtId,
+    });
+
     try {
       const updatedSaatler = {
         ...(dailyMenu.saatler || {}),
@@ -3805,6 +3850,12 @@ export default function Home() {
       localStorage.setItem(`yurtify_${targetYurtId}_maintenance`, JSON.stringify(updated));
     }
 
+    trackGAEvent("maintenance_satisfaction_submitted", {
+      ticket_id: id,
+      satisfaction,
+      yurt_id: targetYurtId,
+    });
+
     try {
       const statusWithFeedback = `Çözüldü (Memnuniyet: ${satisfaction === "evet" ? "Evet" : "Hayır"})`;
       supabase
@@ -3846,6 +3897,13 @@ export default function Home() {
     if (typeof window !== "undefined") {
       localStorage.setItem(`yurtify_${targetYurtId}_maintenance`, JSON.stringify(updated));
     }
+
+    trackGAEvent("maintenance_ticket_created", {
+      category: created.kategori,
+      room: created.odaNo,
+      priority: created.oncelik,
+      yurt_id: targetYurtId,
+    });
 
     try {
       supabase.from("arizalar").insert({
@@ -7692,6 +7750,14 @@ export default function Home() {
                 localStorage.setItem(`yurtify_${targetYurtId}_laundry`, JSON.stringify(updatedSlots));
                 localStorage.setItem(`yurtify_${targetYurtId}_laundry_slots`, JSON.stringify(updatedSlots));
               }
+
+              trackGAEvent("laundry_reservation_created", {
+                machine: normalizedSlot.makineNo,
+                slot: normalizedSlot.saatAraligi,
+                date: normalizedSlot.tarih,
+                room: normalizedSlot.odaNo,
+                yurt_id: targetYurtId,
+              });
 
               try {
                 supabase.from("camasirhane_randevular").upsert({

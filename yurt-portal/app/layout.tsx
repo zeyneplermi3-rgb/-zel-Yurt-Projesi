@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
+import GoogleAnalyticsLivePanel from "../components/GoogleAnalyticsLivePanel";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -59,8 +61,39 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             })();`,
           }}
         />
+        {/* Google Analytics 4 (GA4) Canlı Entegrasyon */}
+        <Script
+          strategy="afterInteractive"
+          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-E8W3QY79B1"}`}
+        />
+        <Script
+          id="google-analytics-init"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              window.gtag = gtag;
+              gtag('js', new Date());
+              var customGaId = (function() {
+                try {
+                  var saved = localStorage.getItem('yurtify_ga_measurement_id');
+                  if (saved && saved.indexOf('G-') === 0) return saved;
+                } catch(e) {}
+                return '${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-E8W3QY79B1"}';
+              })();
+              gtag('config', customGaId, {
+                debug_mode: true,
+                send_page_view: true
+              });
+            `,
+          }}
+        />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <GoogleAnalyticsLivePanel />
+      </body>
     </html>
   );
 }

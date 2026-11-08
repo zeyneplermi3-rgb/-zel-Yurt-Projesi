@@ -32,6 +32,29 @@ const supabaseClient = (window.supabase && typeof window.supabase.createClient =
   ? window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
   : null;
 
+// ================= GOOGLE ANALYTICS 4 (GA4) EVENT TRACKER =================
+function trackGAEvent(eventName, params = {}) {
+  try {
+    const enriched = {
+      ...params,
+      app_name: 'Yurtify_Web',
+      send_to: localStorage.getItem('yurtify_ga_measurement_id') || 'G-E8W3QY79B1',
+      timestamp: new Date().toISOString()
+    };
+    if (typeof window.gtag === 'function') {
+      window.gtag('event', eventName, enriched);
+    }
+    console.log(
+      `%c[GA4 Canlı Olay Gönderildi] %c${eventName}`,
+      'background: #0284C7; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;',
+      'color: #0284C7; font-weight: bold; font-size: 11px;',
+      enriched
+    );
+  } catch (e) {
+    console.warn('GA4 Dispatch Error:', e);
+  }
+}
+
 // ================= GLOBAL APP STATE =================
 const AppState = {
   currentRole: 'student', // 'student' or 'admin'
@@ -491,10 +514,12 @@ async function handleLogin() {
 
     const adminDbPass = matchedYurt.admin_sifre;
     if (!adminDbPass || password !== adminDbPass) {
+      trackGAEvent('login_failed', { role: 'admin', reason: 'Hatalı yönetici şifresi' });
       alert('Hatalı yönetici şifresi! Şifre veritabanı ile eşleşmiyor.');
       return;
     }
 
+    trackGAEvent('login_success', { role: 'admin', username: matchedYurt.admin_kullanici_adi || 'mudur', name: matchedYurt.yetkili_ad });
     DOM.viewAuth.classList.remove('active');
     DOM.viewForcePassword.classList.remove('active');
     DOM.portalStudent.classList.remove('active');
@@ -550,15 +575,19 @@ async function handleLogin() {
   }
 
   if (!matchedStudent) {
+    trackGAEvent('login_failed', { role: 'student', username: username, reason: 'Kayıt bulunamadı' });
     alert('Bu kullanıcı adına veya e-postaya ait öğrenci kaydı veritabanında bulunamadı.');
     return;
   }
 
   // Kesinlikle yalnızca veritabanındaki şifre ile kontrol
   if (!matchedStudent.password || password !== matchedStudent.password) {
+    trackGAEvent('login_failed', { role: 'student', username: username, reason: 'Hatalı şifre' });
     alert('Hatalı şifre girdiniz! Lütfen veritabanında kayıtlı şifrenizi kontrol ediniz.');
     return;
   }
+
+  trackGAEvent('login_success', { role: 'student', username: matchedStudent.username, room: matchedStudent.room });
 
   // Handle Remember Me (Feedback 1.a)
   if (DOM.rememberMeCheck.checked) {
@@ -567,8 +596,8 @@ async function handleLogin() {
   }
 
   // CHECK: Mandatory First-Time Password Change!
-  if (student.isFirstLogin) {
-    AppState.pendingFirstLoginStudent = student;
+  if (matchedStudent.isFirstLogin) {
+    AppState.pendingFirstLoginStudent = matchedStudent;
     DOM.viewAuth.classList.remove('active');
     DOM.viewForcePassword.classList.add('active');
     DOM.newPasswordInput.value = '';
@@ -578,7 +607,7 @@ async function handleLogin() {
   }
 
   // Regular Student Portal Access
-  activateStudentPortal(student);
+  activateStudentPortal(matchedStudent);
 }
 
 function activateStudentPortal(student) {
