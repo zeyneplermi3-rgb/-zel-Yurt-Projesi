@@ -6,7 +6,7 @@
  * - Gizlilik ve yetkilendirme: Bu istatistikler ve denetleyici YALNIZCA Süper Admin tarafından görüntülenebilir.
  */
 
-export const GA_DEFAULT_MEASUREMENT_ID = "G-E8W3QY79B1";
+export const GA_DEFAULT_MEASUREMENT_ID = "G-97S16X4ECZ";
 
 export interface GAEventItem {
   id: string;

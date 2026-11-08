@@ -63,7 +63,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* Google Analytics 4 (GA4) Canlı Entegrasyon */}
         <Script
           strategy="afterInteractive"
-          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-E8W3QY79B1"}`}
+          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-97S16X4ECZ"}`}
         />
         <Script
           id="google-analytics-init"
@@ -79,7 +79,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                   var saved = localStorage.getItem('yurtify_ga_measurement_id');
                   if (saved && saved.indexOf('G-') === 0) return saved;
                 } catch(e) {}
-                return '${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-E8W3QY79B1"}';
+                return '${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-97S16X4ECZ"}';
               })();
               gtag('config', customGaId, {
                 debug_mode: true,
