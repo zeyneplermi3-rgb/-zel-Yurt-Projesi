@@ -51,7 +51,7 @@ export interface UserDailySummary {
   yurtName?: string;
   todayLoginCount: number;
   lastLoginTime: string;
-  lastActionTime: string;
+  lastActionTime?: string;
   totalActionsCount: number;
   status: "online" | "recent" | "offline";
   actions: UserActivityLog[];
