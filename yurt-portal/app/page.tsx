@@ -4056,7 +4056,6 @@ export default function Home() {
   const totalKapasite = yurtlar.reduce((acc, y) => acc + y.kapasite, 0);
   const totalOgrenci = yurtlar.reduce((acc, y) => acc + y.mevcutOgrenci, 0);
   const activeYurtlar = yurtlar.filter((y) => y.durum === "aktif").length;
-  const totalCities = new Set(yurtlar.map((y) => y.sehir).filter(Boolean)).size;
 
   // ==========================================
   // OTURUM KONTROLÜ (GİRİŞ EKRANI PARLAMASINI ÖNLER & AKICI GEÇİŞ)
@@ -4627,17 +4626,11 @@ export default function Home() {
             </div>
 
             {/* İstatistikler (Flat 5-Color Tones) */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4">
               <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0F172A]">
                 <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Kayıtlı Yurt</div>
                 <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0F172A] mt-0.5 sm:mt-1">{yurtlar.length}</div>
                 <div className="text-[10px] sm:text-[11px] font-bold text-[#64748B] mt-0.5 sm:mt-1">{activeYurtlar} Yurt Aktif</div>
-              </div>
-
-              <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0284C7]">
-                <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Faal Şehirler</div>
-                <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0F172A] mt-0.5 sm:mt-1">{totalCities}</div>
-                <div className="text-[10px] sm:text-[11px] text-[#64748B] mt-0.5 sm:mt-1">Farklı Lokasyon</div>
               </div>
 
               <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0284C7]">
