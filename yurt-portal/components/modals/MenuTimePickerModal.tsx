@@ -20,22 +20,6 @@ interface MenuTimePickerModalProps {
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
-const BREAKFAST_PRESETS = [
-  { label: "07:30 - 09:30", sH: 7, sM: 30, eH: 9, eM: 30 },
-  { label: "07:30 - 10:00", sH: 7, sM: 30, eH: 10, eM: 0 },
-  { label: "08:00 - 10:00", sH: 8, sM: 0, eH: 10, eM: 0 },
-  { label: "08:00 - 10:30", sH: 8, sM: 0, eH: 10, eM: 30 },
-  { label: "08:30 - 11:30", sH: 8, sM: 30, eH: 11, eM: 30 },
-];
-
-const DINNER_PRESETS = [
-  { label: "18:00 - 20:00", sH: 18, sM: 0, eH: 20, eM: 0 },
-  { label: "18:00 - 20:30", sH: 18, sM: 0, eH: 20, eM: 30 },
-  { label: "18:30 - 20:30", sH: 18, sM: 30, eH: 20, eM: 30 },
-  { label: "18:30 - 21:00", sH: 18, sM: 30, eH: 21, eM: 0 },
-  { label: "19:00 - 21:30", sH: 19, sM: 0, eH: 21, eM: 30 },
-];
-
 export default function MenuTimePickerModal({
   isOpen,
   title,
@@ -51,9 +35,6 @@ export default function MenuTimePickerModal({
   onSave,
 }: MenuTimePickerModalProps) {
   if (!isOpen) return null;
-
-  const isBreakfast = title.toLowerCase().includes("kahvaltı");
-  const presets = isBreakfast ? BREAKFAST_PRESETS : DINNER_PRESETS;
 
   const sHStr = String(startHour).padStart(2, "0");
   const sMStr = String(startMinute).padStart(2, "0");
@@ -73,13 +54,6 @@ export default function MenuTimePickerModal({
     if (m === 0) return `${h} saat`;
     return `${h} saat ${m} dakika`;
   })();
-
-  const handleApplyPreset = (p: (typeof BREAKFAST_PRESETS)[0]) => {
-    onStartHourChange(p.sH);
-    onStartMinuteChange(p.sM);
-    onEndHourChange(p.eH);
-    onEndMinuteChange(p.eM);
-  };
 
   return (
     <div
@@ -110,36 +84,6 @@ export default function MenuTimePickerModal({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-        </div>
-
-        {/* Hızlı Hazır Saatler */}
-        <div className="space-y-1.5">
-          <span className="text-[11px] font-bold text-[#64748B] dark:text-[#94A3B8] block">
-            Hızlı Seçim
-          </span>
-          <div className="flex flex-wrap gap-1.5">
-            {presets.map((p) => {
-              const isSelected =
-                startHour === p.sH &&
-                startMinute === p.sM &&
-                endHour === p.eH &&
-                endMinute === p.eM;
-              return (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => handleApplyPreset(p)}
-                  className={`px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer min-h-[36px] ${
-                    isSelected
-                      ? "bg-[#0284C7] text-white shadow-xs"
-                      : "bg-[#F8FAFC] dark:bg-[#1E293B] text-[#0F172A] dark:text-[#F8FAFC] border border-[#E2E8F0] dark:border-[#334155] hover:border-[#0284C7]"
-                  }`}
-                >
-                  {p.label}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
         {/* Saat Seçim Alanları (Başlangıç ve Bitiş Dropdownları) */}
