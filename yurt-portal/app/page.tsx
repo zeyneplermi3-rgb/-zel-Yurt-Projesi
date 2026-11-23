@@ -5123,106 +5123,99 @@ export default function Home() {
                       </button>
                     </div>
 
-                    {/* 3. Günlük Yemeğe Katılım Durumu Kartı (Sade ve Net Görünüm) */}
-                    <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-4 sm:p-5 rounded-2xl sm:rounded-3xl space-y-3.5 shadow-xs transition-colors">
-                      <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#E2E8F0] dark:border-[#334155]">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-sm sm:text-base font-bold text-[#0F172A] dark:text-[#F1F5F9]">
-                            Yemek Katılımı
-                          </h3>
-                          <span className="text-xs text-[#64748B] dark:text-[#94A3B8]">
-                            Bugün
-                          </span>
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                              yurtSettings.yemekKatilimAktif !== false
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                                : "bg-stone-100 text-stone-600 border-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700"
-                            }`}
+                    {/* 3. Günlük Yemeğe Katılım Durumu Kartı (Sadece Aktifken Görünür) */}
+                    {yurtSettings.yemekKatilimAktif !== false && (
+                      <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-4 sm:p-5 rounded-2xl sm:rounded-3xl space-y-3.5 shadow-xs transition-colors">
+                        <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#E2E8F0] dark:border-[#334155]">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm sm:text-base font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                              Yemek Katılımı
+                            </h3>
+                            <span className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+                              Bugün
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setManagerTab("yemekhane")}
+                            className="text-xs font-bold text-[#0284C7] hover:underline cursor-pointer"
                           >
-                            {yurtSettings.yemekKatilimAktif !== false ? "Açık" : "Kapalı"}
+                            Menüye Git →
+                          </button>
+                        </div>
+
+                        {/* 2 Sade Sayaç */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between">
+                            <div>
+                              <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 block">
+                                Varım (Katılacak)
+                              </span>
+                              <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400">
+                                {attendingCount}
+                              </span>
+                            </div>
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                          </div>
+
+                          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 flex items-center justify-between">
+                            <div>
+                              <span className="text-xs font-semibold text-rose-800 dark:text-rose-300 block">
+                                Yokum (Katılmayacak)
+                              </span>
+                              <span className="text-2xl font-black text-rose-700 dark:text-rose-400">
+                                {notAttendingCount}
+                              </span>
+                            </div>
+                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+                          </div>
+                        </div>
+
+                        {/* Alt Kısım: Öğrenci Listesi Aç/Kapat */}
+                        <div className="pt-1 flex items-center justify-between text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setIsAttendanceListOpen(!isAttendanceListOpen)}
+                            className="font-bold text-[#0284C7] hover:underline cursor-pointer"
+                          >
+                            {isAttendanceListOpen ? "Listeyi Kapat" : `Öğrenci Listesi (${todayMealAttendance.length})`}
+                          </button>
+                          <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                            Toplam {students.length} öğrenci
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setManagerTab("yemekhane")}
-                          className="text-xs font-bold text-[#0284C7] hover:underline cursor-pointer"
-                        >
-                          Menüye Git →
-                        </button>
-                      </div>
 
-                      {/* 2 Sade Sayaç */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between">
-                          <div>
-                            <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 block">
-                              Varım (Katılacak)
-                            </span>
-                            <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400">
-                              {attendingCount}
-                            </span>
-                          </div>
-                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                        </div>
-
-                        <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 flex items-center justify-between">
-                          <div>
-                            <span className="text-xs font-semibold text-rose-800 dark:text-rose-300 block">
-                              Yokum (Katılmayacak)
-                            </span>
-                            <span className="text-2xl font-black text-rose-700 dark:text-rose-400">
-                              {notAttendingCount}
-                            </span>
-                          </div>
-                          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
-                        </div>
-                      </div>
-
-                      {/* Alt Kısım: Öğrenci Listesi Aç/Kapat */}
-                      <div className="pt-1 flex items-center justify-between text-xs">
-                        <button
-                          type="button"
-                          onClick={() => setIsAttendanceListOpen(!isAttendanceListOpen)}
-                          className="font-bold text-[#0284C7] hover:underline cursor-pointer"
-                        >
-                          {isAttendanceListOpen ? "Listeyi Kapat" : `Öğrenci Listesi (${todayMealAttendance.length})`}
-                        </button>
-                        <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-                          Toplam {students.length} öğrenci
-                        </span>
-                      </div>
-
-                      {/* Açılır Liste */}
-                      {isAttendanceListOpen && (
-                        <div className="pt-2 border-t border-[#E2E8F0] dark:border-[#334155] grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                          {todayMealAttendance.length === 0 ? (
-                            <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic py-1 col-span-2">
-                              Henüz bildirim yapılmadı.
-                            </p>
-                          ) : (
-                            todayMealAttendance.map((att) => (
-                              <div
-                                key={att.id}
-                                className="p-2 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between text-xs"
-                              >
-                                <span className="font-semibold text-[#0F172A] dark:text-[#F1F5F9]">
-                                  {att.studentName}
-                                </span>
-                                <span
-                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${att.status === "var"
-                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                                      : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                                    }`}
+                        {/* Açılır Liste */}
+                        {isAttendanceListOpen && (
+                          <div className="pt-2 border-t border-[#E2E8F0] dark:border-[#334155] grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                            {todayMealAttendance.length === 0 ? (
+                              <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic py-1 col-span-2">
+                                Henüz bildirim yapılmadı.
+                              </p>
+                            ) : (
+                              todayMealAttendance.map((att) => (
+                                <div
+                                  key={att.id}
+                                  className="p-2 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between text-xs"
                                 >
-                                  {att.status === "var" ? "Varım" : "Yokum"}
-                                </span>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
+                                  <span className="font-semibold text-[#0F172A] dark:text-[#F1F5F9]">
+                                    {att.studentName}
+                                  </span>
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${att.status === "var"
+                                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                        : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                                      }`}
+                                  >
+                                    {att.status === "var" ? "Varım" : "Yokum"}
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* 4. YURT DUYURULARI VE PANO BÖLÜMÜ */}
                     <div className="bg-white border border-[#E2E8F0] p-4 sm:p-6 rounded-2xl sm:rounded-3xl space-y-4">
@@ -5584,7 +5577,8 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* Günün Menü Değerlendirmeleri ve Öğrenci Yorumları (Sade & Kompakt) */}
+                    {/* Günün Menü Değerlendirmeleri ve Öğrenci Yorumları (Sadece Aktifken Görünür) */}
+                    {yurtSettings.yemekDegerlendirmeAktif !== false && (
                     <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-4 sm:p-5 rounded-2xl space-y-3 shadow-xs transition-colors">
                       {(() => {
                         const todayKey = getTodayDateKey();
@@ -5601,20 +5595,9 @@ export default function Home() {
                           <div className="space-y-3">
                             <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0] dark:border-[#334155]">
                               <div>
-                                <div className="flex items-center gap-2">
-                                  <h4 className="text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">
-                                    Yemek Değerlendirmeleri
-                                  </h4>
-                                  <span
-                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                      yurtSettings.yemekDegerlendirmeAktif !== false
-                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                                        : "bg-stone-100 text-stone-600 border-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700"
-                                    }`}
-                                  >
-                                    {yurtSettings.yemekDegerlendirmeAktif !== false ? "Öğrenciye Açık" : "Öğrenciye Kapalı"}
-                                  </span>
-                                </div>
+                                <h4 className="text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                                  Yemek Değerlendirmeleri
+                                </h4>
                                 <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
                                   Günün menüsüne ait öğrenci puan ve geri bildirimleri
                                 </p>
@@ -5686,6 +5669,7 @@ export default function Home() {
                         );
                       })()}
                     </div>
+                    )}
                   </div>
                 )}
 
