@@ -135,33 +135,20 @@ export default function AddYurtModal({
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-stone-600 mb-1">Telefon</label>
-                  <input
-                    type="tel"
-                    placeholder="05XX XXX XX XX"
-                    value={newYurt.yetkiliTel}
-                    onChange={(e) => setNewYurt({ ...newYurt, yetkiliTel: e.target.value })}
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20 font-medium"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-stone-600 mb-1">
-                    Yönetici E-posta <span className="text-rose-400">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="mudur@yurt.com"
-                    value={newYurt.yetkiliEposta}
-                    onChange={(e) =>
-                      setNewYurt({ ...newYurt, yetkiliEposta: e.target.value })
-                    }
-                    className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20"
-                  />
-                </div>
+              <div>
+                <label className="block font-semibold text-stone-600 mb-1">
+                  Yönetici E-posta <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="mudur@yurt.com"
+                  value={newYurt.yetkiliEposta}
+                  onChange={(e) =>
+                    setNewYurt({ ...newYurt, yetkiliEposta: e.target.value })
+                  }
+                  className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20"
+                />
               </div>
             </div>
           </div>

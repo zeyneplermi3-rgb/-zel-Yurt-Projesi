@@ -24,10 +24,7 @@ export default function EditYurtModal({
     yurtTuru: "Kız Öğrenci Yurdu",
     durum: "aktif" as "aktif" | "askida" | "deneme",
     yetkiliAd: "",
-    yetkiliTel: "",
     yetkiliEposta: "",
-    admin_kullanici_adi: "",
-    admin_sifre: "",
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -42,10 +39,7 @@ export default function EditYurtModal({
         yurtTuru: yurt.yurtTuru || "Kız Öğrenci Yurdu",
         durum: yurt.durum || "aktif",
         yetkiliAd: yurt.yetkiliAd || "",
-        yetkiliTel: yurt.yetkiliTel || "",
         yetkiliEposta: yurt.yetkiliEposta || "",
-        admin_kullanici_adi: yurt.admin_kullanici_adi || yurt.yetkiliEposta || "",
-        admin_sifre: yurt.admin_sifre || "mudur123456",
       });
     }
   }, [yurt, isOpen]);
@@ -70,10 +64,10 @@ export default function EditYurtModal({
         yurtTuru: formData.yurtTuru,
         durum: formData.durum,
         yetkiliAd: formData.yetkiliAd.trim(),
-        yetkiliTel: formData.yetkiliTel.trim(),
+        yetkiliTel: yurt.yetkiliTel || "",
         yetkiliEposta: formData.yetkiliEposta.trim(),
-        admin_kullanici_adi: formData.admin_kullanici_adi.trim() || formData.yetkiliEposta.trim(),
-        admin_sifre: formData.admin_sifre || "mudur123456",
+        admin_kullanici_adi: formData.yetkiliEposta.trim(),
+        admin_sifre: yurt.admin_sifre || "mudur123456",
       });
       onClose();
     } catch (err) {
@@ -209,10 +203,10 @@ export default function EditYurtModal({
             />
           </div>
 
-          {/* Yetkili & Yönetici Giriş Bilgileri */}
+          {/* Yetkili Bilgileri */}
           <div className="pt-3 border-t border-[#E2E8F0] dark:border-[#334155] space-y-3">
             <h4 className="font-bold text-[#0284C7] text-xs">
-              Yurt Yöneticisi ve Giriş Bilgileri
+              Yurt Yöneticisi Bilgileri
             </h4>
 
             <div>
@@ -228,62 +222,17 @@ export default function EditYurtModal({
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-stone-700 dark:text-slate-300 mb-1">
-                  Telefon
-                </label>
-                <input
-                  type="tel"
-                  value={formData.yetkiliTel}
-                  onChange={(e) => setFormData({ ...formData, yetkiliTel: e.target.value })}
-                  placeholder="05XX XXX XX XX"
-                  className="w-full bg-[#F8FAFC] dark:bg-slate-900 border border-[#E2E8F0] dark:border-[#334155] rounded-xl p-3 text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20 text-xs font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-stone-700 dark:text-slate-300 mb-1">
-                  Yetkili E-posta <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={formData.yetkiliEposta}
-                  onChange={(e) => setFormData({ ...formData, yetkiliEposta: e.target.value })}
-                  className="w-full bg-[#F8FAFC] dark:bg-slate-900 border border-[#E2E8F0] dark:border-[#334155] rounded-xl p-3 text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20 text-xs font-medium"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-stone-700 dark:text-slate-300 mb-1">
-                  Müdür Giriş Kullanıcı Adı
-                </label>
-                <input
-                  type="text"
-                  value={formData.admin_kullanici_adi}
-                  onChange={(e) =>
-                    setFormData({ ...formData, admin_kullanici_adi: e.target.value })
-                  }
-                  placeholder="mudur veya e-posta"
-                  className="w-full bg-[#F8FAFC] dark:bg-slate-900 border border-[#E2E8F0] dark:border-[#334155] rounded-xl p-3 text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20 text-xs font-mono font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-stone-700 dark:text-slate-300 mb-1">
-                  Müdür Giriş Şifresi
-                </label>
-                <input
-                  type="text"
-                  value={formData.admin_sifre}
-                  onChange={(e) => setFormData({ ...formData, admin_sifre: e.target.value })}
-                  placeholder="Giriş şifresi"
-                  className="w-full bg-[#F8FAFC] dark:bg-slate-900 border border-[#E2E8F0] dark:border-[#334155] rounded-xl p-3 text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20 text-xs font-mono font-medium"
-                />
-              </div>
+            <div>
+              <label className="block font-semibold text-stone-700 dark:text-slate-300 mb-1">
+                Yetkili E-posta <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="email"
+                required
+                value={formData.yetkiliEposta}
+                onChange={(e) => setFormData({ ...formData, yetkiliEposta: e.target.value })}
+                className="w-full bg-[#F8FAFC] dark:bg-slate-900 border border-[#E2E8F0] dark:border-[#334155] rounded-xl p-3 text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20 text-xs font-medium"
+              />
             </div>
           </div>
 

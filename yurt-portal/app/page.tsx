@@ -4760,7 +4760,7 @@ export default function Home() {
 
                         {/* Yetkili & İletişim */}
                         <div className="text-[11px] space-y-0.5">
-                          <div className="text-[#0F172A]">Yetkili: <strong>{yurt.yetkiliAd}</strong> ({yurt.yetkiliTel})</div>
+                          <div className="text-[#0F172A]">Yetkili: <strong>{yurt.yetkiliAd}</strong></div>
                           <div className="text-[#64748B] text-[10px] truncate">{yurt.yetkiliEposta}</div>
                         </div>
 
@@ -4846,7 +4846,6 @@ export default function Home() {
 
                             <td className="p-4">
                               <div className="font-medium text-[#0F172A]">{yurt.yetkiliAd}</div>
-                              <div className="text-[#64748B] text-[11px] font-mono">{yurt.yetkiliTel}</div>
                               <div className="text-[#64748B] text-[11px]">{yurt.yetkiliEposta}</div>
                             </td>
 
