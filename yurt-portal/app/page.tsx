@@ -3343,6 +3343,20 @@ export default function Home() {
     studentName?: string,
     studentKey?: string
   ) => {
+    const isMenuPublished = Boolean(
+      dailyMenu &&
+      (dailyMenu.gorunumModu === "tek"
+        ? (dailyMenu.aktifOgun === "kahvalti"
+            ? Boolean(dailyMenu.kahvalti?.trim())
+            : Boolean(dailyMenu.aksam?.trim()))
+        : Boolean(dailyMenu.kahvalti?.trim() || dailyMenu.aksam?.trim()))
+    );
+
+    if (!isMenuPublished) {
+      showToast("Günün menüsü henüz yayınlanmadığı için katılım tercihi kaydedilemez.");
+      return;
+    }
+
     const today = getTodayDateKey();
     const sName = studentName || currentUser?.name || "Öğrenci";
     const sKey = studentKey || currentUser?.details || currentUser?.name || "ogrenci";

@@ -326,6 +326,15 @@ export default function StudentPortalView({
         a.studentName.toLowerCase() === currentUser.name.toLowerCase())
   );
 
+  const isMenuPublished = Boolean(
+    dailyMenu &&
+    (dailyMenu.gorunumModu === "tek"
+      ? (dailyMenu.aktifOgun === "kahvalti"
+          ? Boolean(dailyMenu.kahvalti?.trim())
+          : Boolean(dailyMenu.aksam?.trim()))
+      : Boolean(dailyMenu.kahvalti?.trim() || dailyMenu.aksam?.trim()))
+  );
+
   const [selectedAttendance, setSelectedAttendance] = useState<"var" | "yok" | null>(
     currentAttendance?.status || null
   );
@@ -338,6 +347,10 @@ export default function StudentPortalView({
   }, [currentAttendance?.status]);
 
   const handleSelectAttendance = (status: "var" | "yok") => {
+    if (!isMenuPublished) {
+      showToast("Günün menüsü henüz yayınlanmadı. Menü yayınlandıktan sonra katılım bildirimi yapabilirsiniz.");
+      return;
+    }
     setSelectedAttendance(status);
     if (currentAttendance?.status !== status) {
       setJustSaved(false);
@@ -345,6 +358,10 @@ export default function StudentPortalView({
   };
 
   const handleSaveAttendance = () => {
+    if (!isMenuPublished) {
+      showToast("Günün menüsü henüz yayınlanmadığı için katılım tercihi kaydedilemez.");
+      return;
+    }
     if (!selectedAttendance) {
       showToast("Lütfen 'Varım' veya 'Yokum' seçeneklerinden birini işaretleyiniz.");
       return;
@@ -795,7 +812,7 @@ export default function StudentPortalView({
                   <span className="text-xs sm:text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">
                     Yemek Katılımı
                   </span>
-                  {currentAttendance?.status && (
+                  {isMenuPublished && currentAttendance?.status && (
                     <span
                       className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${currentAttendance.status === "var"
                           ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
@@ -807,7 +824,23 @@ export default function StudentPortalView({
                   )}
                 </div>
 
-                {(() => {
+                {!isMenuPublished ? (
+                  <div className="p-3.5 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 rounded-2xl flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <div className="text-xs">
+                      <p className="font-bold text-amber-900 dark:text-amber-300">
+                        Menü Henüz Yayınlanmadı
+                      </p>
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">
+                        Günün yemek menüsü yurt yönetimi tarafından yayınlandıktan sonra katılım tercihinizi kaydedebilirsiniz.
+                      </p>
+                    </div>
+                  </div>
+                ) : (() => {
                   const isSaved = Boolean(
                     justSaved ||
                     (currentAttendance?.status && currentAttendance.status === selectedAttendance)
