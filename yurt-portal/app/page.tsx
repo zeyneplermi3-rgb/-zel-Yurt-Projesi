@@ -4792,12 +4792,6 @@ export default function Home() {
                             Düzenle
                           </button>
                           <button
-                            onClick={() => toggleYurtStatus(yurt.id, yurt.durum)}
-                            className="py-1.5 px-2.5 bg-white hover:bg-[#F8FAFC] text-[#0F172A] font-semibold rounded-lg text-xs transition-colors cursor-pointer border border-[#E2E8F0] min-h-[36px]"
-                          >
-                            {yurt.durum === "aktif" ? "Askıya Al" : "Aktifleştir"}
-                          </button>
-                          <button
                             onClick={() => deleteYurt(yurt.id, yurt.ad)}
                             className="py-1.5 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-xs transition-colors cursor-pointer border border-rose-200 min-h-[36px]"
                           >
@@ -4903,13 +4897,6 @@ export default function Home() {
                                 className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-[11px] transition-colors cursor-pointer border border-[#E2E8F0]"
                               >
                                 Düzenle
-                              </button>
-
-                              <button
-                                onClick={() => toggleYurtStatus(yurt.id, yurt.durum)}
-                                className="px-2 py-1.5 bg-[#F8FAFC] hover:bg-[#E2E8F0] text-[#0F172A] rounded-lg text-[11px] transition-colors cursor-pointer border border-[#E2E8F0]"
-                              >
-                                {yurt.durum === "aktif" ? "Askıya Al" : "Aktifleştir"}
                               </button>
 
                               <button
