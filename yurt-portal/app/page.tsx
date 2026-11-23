@@ -7220,15 +7220,11 @@ export default function Home() {
                                 }`}
                               >
                                 <div>
-                                  <div className="font-bold text-xs sm:text-sm text-[#0F172A]">
+                                  <div className="font-bold text-xs text-[#0F172A]">
                                     Varım / Yokum Bildirimi
                                   </div>
-                                  <div
-                                    className={`text-[11px] font-semibold mt-0.5 ${
-                                      yurtSettings.yemekKatilimAktif !== false ? "text-[#0284C7]" : "text-[#64748B]"
-                                    }`}
-                                  >
-                                    {yurtSettings.yemekKatilimAktif !== false ? "Açık" : "Kapalı"}
+                                  <div className="text-[10px] text-[#64748B] mt-0.5">
+                                    Öğrenci katılım tercihi
                                   </div>
                                 </div>
 
@@ -7256,15 +7252,11 @@ export default function Home() {
                                 }`}
                               >
                                 <div>
-                                  <div className="font-bold text-xs sm:text-sm text-[#0F172A]">
+                                  <div className="font-bold text-xs text-[#0F172A]">
                                     Yemek Değerlendirme
                                   </div>
-                                  <div
-                                    className={`text-[11px] font-semibold mt-0.5 ${
-                                      yurtSettings.yemekDegerlendirmeAktif !== false ? "text-[#0284C7]" : "text-[#64748B]"
-                                    }`}
-                                  >
-                                    {yurtSettings.yemekDegerlendirmeAktif !== false ? "Açık" : "Kapalı"}
+                                  <div className="text-[10px] text-[#64748B] mt-0.5">
+                                    Öğrenci puan ve yorumları
                                   </div>
                                 </div>
 
