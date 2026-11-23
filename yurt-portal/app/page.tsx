@@ -7202,93 +7202,84 @@ export default function Home() {
                             </div>
                           </div>
 
-                          {/* B. ÖĞRENCİ ETKİLEŞİM VE GERİ BİLDİRİM AYARLARI */}
-                          <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-3">
-                            <div className="pb-2 border-b border-[#E2E8F0]">
-                              <h4 className="text-xs font-bold text-[#0F172A]">
-                                Öğrenci Etkileşim ve Geri Bildirim Özellikleri
-                              </h4>
-                              <p className="text-[11px] text-[#64748B] mt-0.5">
-                                Öğrenci portalındaki yemekhane modüllerini tek tıkla açıp kapatabilirsiniz.
-                              </p>
-                            </div>
+                          {/* B. ÖĞRENCİ ETKİLEŞİM AYARLARI */}
+                          <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-2.5">
+                            <label className="text-xs font-bold text-[#0F172A] block">
+                              Öğrenci Özellikleri
+                            </label>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                              {/* 1. Varım / Yokum Katılım Bildirimi */}
-                              <div className="p-3.5 bg-white border border-[#E2E8F0] rounded-xl flex items-center justify-between gap-3 shadow-2xs">
-                                <div className="space-y-0.5 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold text-xs text-[#0F172A]">
-                                      Varım / Yokum Bildirimi
-                                    </span>
-                                    <span
-                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                        yurtSettings.yemekKatilimAktif !== false
-                                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                          : "bg-stone-100 text-stone-600 border-stone-200"
-                                      }`}
-                                    >
-                                      {yurtSettings.yemekKatilimAktif !== false ? "Açık" : "Kapalı"}
-                                    </span>
+                              {/* 1. Varım / Yokum */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleYemekSetting("yemekKatilimAktif")}
+                                className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 text-left ${
+                                  yurtSettings.yemekKatilimAktif !== false
+                                    ? "bg-white border-2 border-[#0284C7] shadow-xs"
+                                    : "bg-white border-[#E2E8F0] hover:border-[#0284C7]"
+                                }`}
+                              >
+                                <div>
+                                  <div className="font-bold text-xs sm:text-sm text-[#0F172A]">
+                                    Varım / Yokum Bildirimi
                                   </div>
-                                  <p className="text-[11px] text-[#64748B] leading-snug">
-                                    Öğrencilerin yemek katılım tercihi (Varım/Yokum) bildirmesini sağlar.
-                                  </p>
+                                  <div
+                                    className={`text-[11px] font-semibold mt-0.5 ${
+                                      yurtSettings.yemekKatilimAktif !== false ? "text-[#0284C7]" : "text-[#64748B]"
+                                    }`}
+                                  >
+                                    {yurtSettings.yemekKatilimAktif !== false ? "Açık" : "Kapalı"}
+                                  </div>
                                 </div>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleYemekSetting("yemekKatilimAktif")}
-                                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none min-h-[44px] min-w-[44px] items-center p-0.5 ${
+                                <div
+                                  className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
                                     yurtSettings.yemekKatilimAktif !== false ? "bg-[#0284C7]" : "bg-stone-300"
                                   }`}
-                                  aria-label="Varım / Yokum bildirimini aç veya kapat"
                                 >
                                   <span
-                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
                                       yurtSettings.yemekKatilimAktif !== false ? "translate-x-5" : "translate-x-0"
                                     }`}
                                   />
-                                </button>
-                              </div>
+                                </div>
+                              </button>
 
-                              {/* 2. Yemek Değerlendirme & Yorumlar */}
-                              <div className="p-3.5 bg-white border border-[#E2E8F0] rounded-xl flex items-center justify-between gap-3 shadow-2xs">
-                                <div className="space-y-0.5 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold text-xs text-[#0F172A]">
-                                      Yemek Değerlendirme
-                                    </span>
-                                    <span
-                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                        yurtSettings.yemekDegerlendirmeAktif !== false
-                                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                          : "bg-stone-100 text-stone-600 border-stone-200"
-                                      }`}
-                                    >
-                                      {yurtSettings.yemekDegerlendirmeAktif !== false ? "Açık" : "Kapalı"}
-                                    </span>
+                              {/* 2. Yemek Değerlendirme */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleYemekSetting("yemekDegerlendirmeAktif")}
+                                className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 text-left ${
+                                  yurtSettings.yemekDegerlendirmeAktif !== false
+                                    ? "bg-white border-2 border-[#0284C7] shadow-xs"
+                                    : "bg-white border-[#E2E8F0] hover:border-[#0284C7]"
+                                }`}
+                              >
+                                <div>
+                                  <div className="font-bold text-xs sm:text-sm text-[#0F172A]">
+                                    Yemek Değerlendirme
                                   </div>
-                                  <p className="text-[11px] text-[#64748B] leading-snug">
-                                    Öğrencilerin günün menüsünü 1-5 yıldızla puanlayıp yorum yapmasını sağlar.
-                                  </p>
+                                  <div
+                                    className={`text-[11px] font-semibold mt-0.5 ${
+                                      yurtSettings.yemekDegerlendirmeAktif !== false ? "text-[#0284C7]" : "text-[#64748B]"
+                                    }`}
+                                  >
+                                    {yurtSettings.yemekDegerlendirmeAktif !== false ? "Açık" : "Kapalı"}
+                                  </div>
                                 </div>
 
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleYemekSetting("yemekDegerlendirmeAktif")}
-                                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none min-h-[44px] min-w-[44px] items-center p-0.5 ${
+                                <div
+                                  className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
                                     yurtSettings.yemekDegerlendirmeAktif !== false ? "bg-[#0284C7]" : "bg-stone-300"
                                   }`}
-                                  aria-label="Yemek değerlendirmesini aç veya kapat"
                                 >
                                   <span
-                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
                                       yurtSettings.yemekDegerlendirmeAktif !== false ? "translate-x-5" : "translate-x-0"
                                     }`}
                                   />
-                                </button>
-                              </div>
+                                </div>
+                              </button>
                             </div>
                           </div>
                         </div>
