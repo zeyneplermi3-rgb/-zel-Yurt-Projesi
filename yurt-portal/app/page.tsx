@@ -3535,7 +3535,7 @@ export default function Home() {
         localStorage.setItem(`yurtify_${targetYurtId}_settings`, JSON.stringify(updated));
       }
     }
-    const label = key === "yemekKatilimAktif" ? "Varım / Yokum katılım bildirimi" : "Yemek değerlendirme sistemi";
+    const label = key === "yemekKatilimAktif" ? "Katılım bildirimi" : "Yemek değerlendirme sistemi";
     const statusLabel = nextVal ? "açıldı" : "kapatıldı";
     showToast(`${label} ${statusLabel}.`);
   };
@@ -5149,7 +5149,7 @@ export default function Home() {
                           <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between">
                             <div>
                               <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 block">
-                                Varım (Katılacak)
+                                Katılacak
                               </span>
                               <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400">
                                 {attendingCount}
@@ -5161,7 +5161,7 @@ export default function Home() {
                           <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 flex items-center justify-between">
                             <div>
                               <span className="text-xs font-semibold text-rose-800 dark:text-rose-300 block">
-                                Yokum (Katılmayacak)
+                                Katılmayacak
                               </span>
                               <span className="text-2xl font-black text-rose-700 dark:text-rose-400">
                                 {notAttendingCount}
@@ -5207,7 +5207,7 @@ export default function Home() {
                                         : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
                                       }`}
                                   >
-                                    {att.status === "var" ? "Varım" : "Yokum"}
+                                    {att.status === "var" ? "Katılacak" : "Katılmayacak"}
                                   </span>
                                 </div>
                               ))
@@ -7210,7 +7210,7 @@ export default function Home() {
                             </label>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                              {/* 1. Varım / Yokum */}
+                              {/* 1. Katılım Bildirimi */}
                               <button
                                 type="button"
                                 onClick={() => handleToggleYemekSetting("yemekKatilimAktif")}
@@ -7222,7 +7222,7 @@ export default function Home() {
                               >
                                 <div>
                                   <div className="font-bold text-xs text-[#0F172A]">
-                                    Varım / Yokum Bildirimi
+                                    Katılacak / Katılmayacak Bildirimi
                                   </div>
                                   <div className="text-[10px] text-[#64748B] mt-0.5">
                                     Öğrenci katılım tercihi
