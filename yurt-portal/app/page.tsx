@@ -7042,15 +7042,15 @@ export default function Home() {
                                 Bugünün Yemek Saati Tarifesi
                               </label>
                               <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md bg-[#F1F5F9] text-[#0F172A] border border-[#E2E8F0] self-start sm:self-auto">
-                                Geçerli: {dailyMenu.gunTipi === "haftasonu" ? "Hafta Sonu" : dailyMenu.gunTipi === "ozelgun" ? "Bayram / Özel Gün" : "Hafta İçi"}
+                                Geçerli: {dailyMenu.gunTipi === "haftasonu" ? "Hafta Sonu" : "Hafta İçi"}
                               </span>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                               {/* 1. Hafta İçi Kartı */}
                               <div
                                 onClick={() => handleToggleGunTipi("haftaici")}
-                                className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${dailyMenu.gunTipi === "haftaici" || !dailyMenu.gunTipi
+                                className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${dailyMenu.gunTipi === "haftaici" || !dailyMenu.gunTipi || dailyMenu.gunTipi === "ozelgun"
                                     ? "bg-white border-2 border-[#0284C7] shadow-xs"
                                     : "bg-white border-[#E2E8F0] hover:border-[#0284C7]"
                                   }`}
@@ -7060,8 +7060,8 @@ export default function Home() {
                                     <div className="font-bold text-xs text-[#0F172A]">Hafta İçi</div>
                                     <div className="text-[10px] text-[#64748B]">Pzt - Cuma</div>
                                   </div>
-                                  {dailyMenu.gunTipi === "haftaici" || !dailyMenu.gunTipi ? (
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0284C7] text-[#0F172A] border border-[#0369A1]">
+                                  {dailyMenu.gunTipi === "haftaici" || !dailyMenu.gunTipi || dailyMenu.gunTipi === "ozelgun" ? (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0284C7] text-white border border-[#0369A1]">
                                       Geçerli
                                     </span>
                                   ) : (
@@ -7116,7 +7116,7 @@ export default function Home() {
                                     <div className="text-[10px] text-[#64748B]">Cmt - Pazar</div>
                                   </div>
                                   {dailyMenu.gunTipi === "haftasonu" ? (
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0284C7] text-[#0F172A] border border-[#0369A1]">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0284C7] text-white border border-[#0369A1]">
                                       Geçerli
                                     </span>
                                   ) : (
@@ -7152,61 +7152,6 @@ export default function Home() {
                                       className="w-full py-1.5 px-2 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs"
                                     >
                                       {formatDisplayHours(dailyMenu.saatler?.haftasonu?.aksam || "18:30 - 21:00")}
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* 3. Bayram / Özel Gün Kartı */}
-                              <div
-                                onClick={() => handleToggleGunTipi("ozelgun")}
-                                className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${dailyMenu.gunTipi === "ozelgun"
-                                    ? "bg-white border-2 border-[#0284C7] shadow-xs"
-                                    : "bg-white border-[#E2E8F0] hover:border-[#0284C7]"
-                                  }`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <div className="font-bold text-xs text-[#0F172A]">Bayram / Özel</div>
-                                    <div className="text-[10px] text-[#64748B]">Tatil & Özel Gün</div>
-                                  </div>
-                                  {dailyMenu.gunTipi === "ozelgun" ? (
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0284C7] text-[#0F172A] border border-[#0369A1]">
-                                      Geçerli
-                                    </span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleToggleGunTipi("ozelgun");
-                                      }}
-                                      className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#64748B] hover:bg-[#0284C7] hover:text-[#0F172A] transition-colors"
-                                    >
-                                      Seç
-                                    </button>
-                                  )}
-                                </div>
-
-                                <div className="space-y-2 pt-2 border-t border-[#E2E8F0]" onClick={(e) => e.stopPropagation()}>
-                                  <div className="space-y-1">
-                                    <span className="text-[11px] font-semibold text-[#64748B] block">Kahvaltı</span>
-                                    <button
-                                      type="button"
-                                      onClick={() => openTimePicker("ozelgun", "kahvalti", "Bayram / Özel • Sabah Kahvaltısı")}
-                                      className="w-full py-1.5 px-2 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs"
-                                    >
-                                      {formatDisplayHours(dailyMenu.saatler?.ozelgun?.kahvalti || "09:00 - 12:00")}
-                                    </button>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <span className="text-[11px] font-semibold text-[#64748B] block">Akşam</span>
-                                    <button
-                                      type="button"
-                                      onClick={() => openTimePicker("ozelgun", "aksam", "Bayram / Özel • Akşam Yemeği")}
-                                      className="w-full py-1.5 px-2 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs"
-                                    >
-                                      {formatDisplayHours(dailyMenu.saatler?.ozelgun?.aksam || "19:00 - 21:30")}
                                     </button>
                                   </div>
                                 </div>

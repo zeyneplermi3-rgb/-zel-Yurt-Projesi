@@ -66,7 +66,7 @@ export const getResetDailyMenu = (
   const todayKey = getTodayDateKey();
   const autoTip = getAutoGunTipi();
   const saatler = existing?.saatler || defaultDailyMenu.saatler;
-  const gunTipi = existing?.gunTipi === "ozelgun" ? "ozelgun" : autoTip;
+  const gunTipi = existing?.gunTipi === "haftasonu" ? "haftasonu" : autoTip;
   const activeSaatler = saatler[gunTipi] || saatler.haftaici;
 
   return {
