@@ -3623,15 +3623,32 @@ export default function Home() {
     });
   };
 
-  const handleApplyTimePicker = () => {
-    const sH = String(timePickerModal.startHour).padStart(2, "0");
-    const sM = String(timePickerModal.startMinute).padStart(2, "0");
-    const eH = String(timePickerModal.endHour).padStart(2, "0");
-    const eM = String(timePickerModal.endMinute).padStart(2, "0");
+  const handleApplyTimePicker = (
+    overrideSH?: number,
+    overrideSM?: number,
+    overrideEH?: number,
+    overrideEM?: number
+  ) => {
+    const finalSH = typeof overrideSH === "number" ? overrideSH : timePickerModal.startHour;
+    const finalSM = typeof overrideSM === "number" ? overrideSM : timePickerModal.startMinute;
+    const finalEH = typeof overrideEH === "number" ? overrideEH : timePickerModal.endHour;
+    const finalEM = typeof overrideEM === "number" ? overrideEM : timePickerModal.endMinute;
+
+    const sH = String(finalSH).padStart(2, "0");
+    const sM = String(finalSM).padStart(2, "0");
+    const eH = String(finalEH).padStart(2, "0");
+    const eM = String(finalEM).padStart(2, "0");
     const formatted = `${sH}:${sM} - ${eH}:${eM}`;
 
     handleUpdateScheduleTimes(timePickerModal.tip, timePickerModal.field, formatted);
-    setTimePickerModal((prev) => ({ ...prev, isOpen: false }));
+    setTimePickerModal((prev) => ({
+      ...prev,
+      isOpen: false,
+      startHour: finalSH,
+      startMinute: finalSM,
+      endHour: finalEH,
+      endMinute: finalEM,
+    }));
     showToast(`Servis saati güncellendi: ${formatted}`);
   };
 
