@@ -36,24 +36,9 @@ export default function MenuTimePickerModal({
 }: MenuTimePickerModalProps) {
   if (!isOpen) return null;
 
-  const sHStr = String(startHour).padStart(2, "0");
-  const sMStr = String(startMinute).padStart(2, "0");
-  const eHStr = String(endHour).padStart(2, "0");
-  const eMStr = String(endMinute).padStart(2, "0");
-
   const startTotalMinutes = startHour * 60 + startMinute;
   const endTotalMinutes = endHour * 60 + endMinute;
-  const diffMinutes = endTotalMinutes - startTotalMinutes;
-  const isInvalid = diffMinutes <= 0;
-
-  const durationText = (() => {
-    if (diffMinutes <= 0) return null;
-    const h = Math.floor(diffMinutes / 60);
-    const m = diffMinutes % 60;
-    if (h === 0) return `${m} dakika`;
-    if (m === 0) return `${h} saat`;
-    return `${h} saat ${m} dakika`;
-  })();
+  const isInvalid = endTotalMinutes <= startTotalMinutes;
 
   return (
     <div
@@ -61,7 +46,7 @@ export default function MenuTimePickerModal({
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-xl space-y-4 animate-in zoom-in-95 duration-200"
+        className="bg-white dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-xl space-y-4 animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Başlığı */}
@@ -153,21 +138,12 @@ export default function MenuTimePickerModal({
           </div>
         </div>
 
-        {/* Canlı Önizleme ve Süre Şeridi */}
-        <div className="p-3 bg-[#F8FAFC] dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] rounded-2xl text-center space-y-0.5">
-          <div className="text-base sm:text-lg font-mono font-black text-[#0284C7]">
-            {sHStr}:{sMStr} - {eHStr}:{eMStr}
+        {/* Hata uyarısı */}
+        {isInvalid && (
+          <div className="text-[11px] font-bold text-rose-600 text-center">
+            Bitiş saati başlangıç saatinden sonra olmalıdır
           </div>
-          {isInvalid ? (
-            <span className="text-[11px] font-bold text-rose-600 block">
-              Bitiş saati başlangıç saatinden sonra olmalıdır
-            </span>
-          ) : (
-            <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8] font-medium block">
-              Servis Süresi: {durationText}
-            </span>
-          )}
-        </div>
+        )}
 
         {/* Butonlar */}
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E2E8F0] dark:border-[#334155]">
