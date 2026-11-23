@@ -373,9 +373,12 @@ export default function Home() {
       };
     });
   }, [laundrySlots, laundryClockTick]);
-  const [selectedLaundryDate, setSelectedLaundryDate] = useState<string>("");
-  const [laundryViewYear, setLaundryViewYear] = useState<number>(2026);
-  const [laundryViewMonth, setLaundryViewMonth] = useState<number>(9);
+  const [selectedLaundryDate, setSelectedLaundryDate] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  });
+  const [laundryViewYear, setLaundryViewYear] = useState<number>(() => new Date().getFullYear());
+  const [laundryViewMonth, setLaundryViewMonth] = useState<number>(() => new Date().getMonth());
   const [laundryCalendarView, setLaundryCalendarView] = useState<"month" | "day">("month");
   const [isDayTimelineOpen, setIsDayTimelineOpen] = useState<boolean>(true);
   const [isLiveQueueExpanded, setIsLiveQueueExpanded] = useState<boolean>(true);
@@ -6073,8 +6076,8 @@ export default function Home() {
                       {laundryCalendarView === "month" && (
                         <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-xs overflow-hidden animate-ios-month p-4 sm:p-6 transition-all duration-300">
                           {/* iOS Takvim Üst Navigasyon Çubuğu */}
-                          <div className="flex items-center justify-between pb-4 border-b border-[#E2E8F0]">
-                            <div className="flex items-center gap-3">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-[#E2E8F0]">
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                               <h2 className="text-xl sm:text-2xl font-black text-[#0F172A] tracking-tight">
                                 {currentMonthLabel}
                               </h2>
@@ -6095,6 +6098,32 @@ export default function Home() {
                                 >
                                   &gt;
                                 </button>
+                              </div>
+
+                              {/* Hızlı Ay ve Yıl Seçimi */}
+                              <div className="flex items-center gap-1.5">
+                                <select
+                                  value={laundryViewMonth}
+                                  onChange={(e) => setLaundryViewMonth(Number(e.target.value))}
+                                  className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-2.5 py-1 text-xs text-[#0F172A] font-bold cursor-pointer transition-colors focus:outline-none focus:border-[#0284C7]"
+                                >
+                                  {turkishMonthNames.map((name, idx) => (
+                                    <option key={name} value={idx}>
+                                      {name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <select
+                                  value={laundryViewYear}
+                                  onChange={(e) => setLaundryViewYear(Number(e.target.value))}
+                                  className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl px-2 py-1 text-xs text-[#0F172A] font-bold cursor-pointer transition-colors focus:outline-none focus:border-[#0284C7]"
+                                >
+                                  {[2024, 2025, 2026, 2027, 2028].map((y) => (
+                                    <option key={y} value={y}>
+                                      {y}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
                             </div>
 
