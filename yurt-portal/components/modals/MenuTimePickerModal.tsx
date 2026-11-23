@@ -216,22 +216,6 @@ export default function MenuTimePickerModal({
           </button>
         </div>
 
-        {/* Canli Secim Gostergeleri */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155]">
-            <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">Baslangic:</span>
-            <span className="text-sm font-mono font-black text-[#0284C7]">
-              {String(localSHour).padStart(2, "0")}:{String(localSMin).padStart(2, "0")}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#F8FAFC] dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155]">
-            <span className="text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">Bitis:</span>
-            <span className="text-sm font-mono font-black text-[#0284C7]">
-              {String(localEHour).padStart(2, "0")}:{String(localEMin).padStart(2, "0")}
-            </span>
-          </div>
-        </div>
 
         {/* Kaydirmali Carklar (Baslangic ve Bitis) */}
         <div className="grid grid-cols-2 gap-3">
