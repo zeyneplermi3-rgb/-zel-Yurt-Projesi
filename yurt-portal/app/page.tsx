@@ -33,6 +33,7 @@ import {
   cleanMachineName,
 } from "../lib/laundryUtils";
 import AddYurtModal from "../components/modals/AddYurtModal";
+import EditYurtModal from "../components/modals/EditYurtModal";
 import { AddRoomModal, EditRoomModal } from "../components/modals/RoomModals";
 import {
   AddStudentModal,
@@ -715,6 +716,8 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
   const [cityFilter, setCityFilter] = useState("all");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingYurt, setEditingYurt] = useState<Yurt | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
   const [newYurt, setNewYurt] = useState({
@@ -763,6 +766,8 @@ export default function Home() {
           durum: d.durum || "aktif",
           yurtTuru: d.yurt_turu || "Kız Öğrenci Yurdu",
           kayitTarihi: new Date(d.created_at || Date.now()).toLocaleDateString("tr-TR"),
+          admin_kullanici_adi: d.admin_kullanici_adi || "",
+          admin_sifre: d.admin_sifre || "",
         }));
         setYurtlar(currentYurtList);
         if (typeof window !== "undefined") {
@@ -2326,6 +2331,39 @@ export default function Home() {
       console.warn("Supabase delete hatası:", e);
     } finally {
       await fetchDbData();
+    }
+  };
+
+  // D. Yurt Bilgilerini Düzenle
+  const handleOpenEditYurt = (yurt: Yurt) => {
+    setEditingYurt(yurt);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateYurt = async (updatedData: Partial<Yurt> & { id: string }) => {
+    try {
+      const payload: any = {
+        ad: updatedData.ad,
+        sehir: updatedData.sehir,
+        ilce: updatedData.ilce,
+        adres: updatedData.adres,
+        yurt_turu: updatedData.yurtTuru,
+        durum: updatedData.durum,
+        yetkili_ad: updatedData.yetkiliAd,
+        yetkili_tel: updatedData.yetkiliTel,
+        yetkili_eposta: updatedData.yetkiliEposta,
+        admin_kullanici_adi: updatedData.admin_kullanici_adi,
+        admin_sifre: updatedData.admin_sifre,
+      };
+
+      const { error } = await supabase.from("yurtlar").update(payload).eq("id", updatedData.id);
+      if (error) {
+        console.error("Supabase yurt güncelleme hatası:", error);
+      } else {
+        await fetchDbData();
+      }
+    } catch (err: any) {
+      console.error("Yurt güncelleme işleminde hata:", err);
     }
   };
 
@@ -4727,7 +4765,7 @@ export default function Home() {
                         </div>
 
                         {/* Aksiyon Butonları */}
-                        <div className="flex items-center gap-1.5 pt-2 border-t border-[#E2E8F0]">
+                        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#E2E8F0]">
                           <button
                             onClick={() => {
                               const managerUser = {
@@ -4743,19 +4781,25 @@ export default function Home() {
                               }
                               fetchDbData(yurt.id);
                             }}
-                            className="flex-1 py-1.5 px-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-lg text-xs transition-colors cursor-pointer text-center border border-[#0369A1]"
+                            className="flex-1 py-1.5 px-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-lg text-xs transition-colors cursor-pointer text-center border border-[#0369A1] min-h-[36px]"
                           >
                             Paneline Geç
                           </button>
                           <button
+                            onClick={() => handleOpenEditYurt(yurt)}
+                            className="py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs transition-colors cursor-pointer border border-[#E2E8F0] min-h-[36px]"
+                          >
+                            Düzenle
+                          </button>
+                          <button
                             onClick={() => toggleYurtStatus(yurt.id, yurt.durum)}
-                            className="py-1.5 px-2.5 bg-white hover:bg-[#F8FAFC] text-[#0F172A] font-semibold rounded-lg text-xs transition-colors cursor-pointer border border-[#E2E8F0]"
+                            className="py-1.5 px-2.5 bg-white hover:bg-[#F8FAFC] text-[#0F172A] font-semibold rounded-lg text-xs transition-colors cursor-pointer border border-[#E2E8F0] min-h-[36px]"
                           >
                             {yurt.durum === "aktif" ? "Askıya Al" : "Aktifleştir"}
                           </button>
                           <button
                             onClick={() => deleteYurt(yurt.id, yurt.ad)}
-                            className="py-1.5 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-xs transition-colors cursor-pointer border border-rose-200"
+                            className="py-1.5 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-xs transition-colors cursor-pointer border border-rose-200 min-h-[36px]"
                           >
                             Sil
                           </button>
@@ -4856,6 +4900,13 @@ export default function Home() {
                               </button>
 
                               <button
+                                onClick={() => handleOpenEditYurt(yurt)}
+                                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-[11px] transition-colors cursor-pointer border border-[#E2E8F0]"
+                              >
+                                Düzenle
+                              </button>
+
+                              <button
                                 onClick={() => toggleYurtStatus(yurt.id, yurt.durum)}
                                 className="px-2 py-1.5 bg-[#F8FAFC] hover:bg-[#E2E8F0] text-[#0F172A] rounded-lg text-[11px] transition-colors cursor-pointer border border-[#E2E8F0]"
                               >
@@ -4885,6 +4936,17 @@ export default function Home() {
               setNewYurt={setNewYurt}
               onClose={() => setIsAddModalOpen(false)}
               onSubmit={handleCreateYurt}
+            />
+
+            {/* YURT DÜZENLEME MODALI */}
+            <EditYurtModal
+              isOpen={isEditModalOpen}
+              yurt={editingYurt}
+              onClose={() => {
+                setIsEditModalOpen(false);
+                setEditingYurt(null);
+              }}
+              onUpdate={handleUpdateYurt}
             />
               </>
             )}

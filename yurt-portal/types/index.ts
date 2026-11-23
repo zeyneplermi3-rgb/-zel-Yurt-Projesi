@@ -22,6 +22,8 @@ export interface Yurt {
   durum: "aktif" | "askida" | "deneme";
   yurtTuru: string;
   kayitTarihi: string;
+  admin_kullanici_adi?: string;
+  admin_sifre?: string;
 }
 
 export interface Student {
