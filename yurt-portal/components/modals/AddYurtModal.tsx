@@ -105,36 +105,17 @@ export default function AddYurtModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-stone-600 mb-1">
-                Yatak Kapasitesi <span className="text-rose-400">*</span>
-              </label>
-              <input
-                type="number"
-                required
-                min={10}
-                max={5000}
-                value={newYurt.kapasite}
-                onChange={(e) =>
-                  setNewYurt({ ...newYurt, kapasite: Number(e.target.value) })
-                }
-                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-stone-900 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-stone-600 mb-1">Yurt Türü</label>
-              <select
-                value={newYurt.yurtTuru}
-                onChange={(e) => setNewYurt({ ...newYurt, yurtTuru: e.target.value })}
-                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-stone-900 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20"
-              >
-                <option value="Kız Öğrenci Yurdu">Kız Öğrenci Yurdu</option>
-                <option value="Erkek Öğrenci Yurdu">Erkek Öğrenci Yurdu</option>
-                <option value="Karma Öğrenci Rezidansı">Karma Öğrenci Rezidansı</option>
-              </select>
-            </div>
+          <div>
+            <label className="block font-semibold text-stone-600 mb-1">Yurt Türü</label>
+            <select
+              value={newYurt.yurtTuru}
+              onChange={(e) => setNewYurt({ ...newYurt, yurtTuru: e.target.value })}
+              className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 text-stone-900 focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20"
+            >
+              <option value="Kız Öğrenci Yurdu">Kız Öğrenci Yurdu</option>
+              <option value="Erkek Öğrenci Yurdu">Erkek Öğrenci Yurdu</option>
+              <option value="Karma Öğrenci Rezidansı">Karma Öğrenci Rezidansı</option>
+            </select>
           </div>
 
           <div className="pt-2 border-t border-[#E2E8F0]">

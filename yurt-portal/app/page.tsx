@@ -4056,6 +4056,7 @@ export default function Home() {
   const totalKapasite = yurtlar.reduce((acc, y) => acc + y.kapasite, 0);
   const totalOgrenci = yurtlar.reduce((acc, y) => acc + y.mevcutOgrenci, 0);
   const activeYurtlar = yurtlar.filter((y) => y.durum === "aktif").length;
+  const totalCities = new Set(yurtlar.map((y) => y.sehir).filter(Boolean)).size;
 
   // ==========================================
   // OTURUM KONTROLÜ (GİRİŞ EKRANI PARLAMASINI ÖNLER & AKICI GEÇİŞ)
@@ -4626,7 +4627,7 @@ export default function Home() {
             </div>
 
             {/* İstatistikler (Flat 5-Color Tones) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
               <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0F172A]">
                 <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Kayıtlı Yurt</div>
                 <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0F172A] mt-0.5 sm:mt-1">{yurtlar.length}</div>
@@ -4634,23 +4635,17 @@ export default function Home() {
               </div>
 
               <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0284C7]">
-                <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Yatak Kapasitesi</div>
-                <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0F172A] mt-0.5 sm:mt-1">{totalKapasite}</div>
-                <div className="text-[10px] sm:text-[11px] text-[#64748B] mt-0.5 sm:mt-1">Toplam kontenjan</div>
+                <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Faal Şehirler</div>
+                <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0F172A] mt-0.5 sm:mt-1">{totalCities}</div>
+                <div className="text-[10px] sm:text-[11px] text-[#64748B] mt-0.5 sm:mt-1">Farklı Lokasyon</div>
               </div>
 
               <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0284C7]">
                 <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Toplam Öğrenci</div>
                 <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0F172A] mt-0.5 sm:mt-1">{totalOgrenci}</div>
                 <div className="text-[10px] sm:text-[11px] font-bold text-[#0284C7] mt-0.5 sm:mt-1">
-                  Doluluk: %{totalKapasite > 0 ? Math.round((totalOgrenci / totalKapasite) * 100) : 0}
+                  Sistem Geneli Kayıtlı
                 </div>
-              </div>
-
-              <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0284C7]">
-                <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Boş Yatak</div>
-                <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0284C7] mt-0.5 sm:mt-1">{Math.max(0, totalKapasite - totalOgrenci)}</div>
-                <div className="text-[10px] sm:text-[11px] font-bold text-[#64748B] mt-0.5 sm:mt-1">Açık Kontenjan</div>
               </div>
             </div>
 
@@ -4697,7 +4692,6 @@ export default function Home() {
                   </div>
                 ) : (
                   filteredYurtlar.map((yurt) => {
-                    const fillRate = yurt.kapasite > 0 ? Math.round((yurt.mevcutOgrenci / yurt.kapasite) * 100) : 0;
                     return (
                       <div
                         key={yurt.id}
@@ -4725,20 +4719,12 @@ export default function Home() {
                           </span>
                         </div>
 
-                        {/* Doluluk ve Kapasite */}
-                        <div className="space-y-1 bg-white p-2.5 rounded-xl border border-[#E2E8F0]">
-                          <div className="flex justify-between text-[11px] font-medium">
-                            <span className="text-[#64748B]">Kapasite & Doluluk</span>
-                            <span className="font-bold text-[#0F172A]">
-                              {yurt.mevcutOgrenci} / {yurt.kapasite} (%{fillRate})
-                            </span>
-                          </div>
-                          <div className="w-full bg-[#F8FAFC] h-2 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-[#0284C7]"
-                              style={{ width: `${Math.min(100, fillRate)}%` }}
-                            />
-                          </div>
+                        {/* Kayıtlı Öğrenci */}
+                        <div className="bg-white p-2.5 rounded-xl border border-[#E2E8F0] flex justify-between items-center text-[11px]">
+                          <span className="text-[#64748B] font-medium">Kayıtlı Öğrenci</span>
+                          <span className="font-bold text-[#0F172A]">
+                            {yurt.mevcutOgrenci} Öğrenci
+                          </span>
                         </div>
 
                         {/* Yetkili & İletişim */}
@@ -4794,7 +4780,7 @@ export default function Home() {
                     <tr>
                       <th className="p-4">Yurt Adı & Lokasyon</th>
                       <th className="p-4">Yetkili / İletişim</th>
-                      <th className="p-4">Kapasite & Doluluk</th>
+                      <th className="p-4">Kayıtlı Öğrenci</th>
                       <th className="p-4">Yurt Türü & Durum</th>
                       <th className="p-4 text-right">İşlemler</th>
                     </tr>
@@ -4811,7 +4797,6 @@ export default function Home() {
                       </tr>
                     ) : (
                       filteredYurtlar.map((yurt) => {
-                        const fillRate = yurt.kapasite > 0 ? Math.round((yurt.mevcutOgrenci / yurt.kapasite) * 100) : 0;
                         return (
                           <tr key={yurt.id} className="hover:bg-[#F8FAFC] transition-colors">
                             <td className="p-4">
@@ -4829,20 +4814,9 @@ export default function Home() {
                             </td>
 
                             <td className="p-4">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-[#0F172A]">
-                                  {yurt.mevcutOgrenci} / {yurt.kapasite}
-                                </span>
-                                <span className="text-[10px] text-emerald-600 font-semibold">
-                                  (%{fillRate})
-                                </span>
-                              </div>
-                              <div className="w-32 bg-[#F8FAFC] h-1.5 rounded-full mt-1.5 overflow-hidden">
-                                <div
-                                  className="h-full bg-[#0284C7]"
-                                  style={{ width: `${fillRate}%` }}
-                                ></div>
-                              </div>
+                              <span className="font-bold text-[#0F172A] text-xs">
+                                {yurt.mevcutOgrenci} Öğrenci
+                              </span>
                             </td>
 
                             <td className="p-4">
