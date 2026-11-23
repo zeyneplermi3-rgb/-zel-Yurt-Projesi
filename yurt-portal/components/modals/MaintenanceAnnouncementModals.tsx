@@ -90,30 +90,14 @@ export function AddMaintenanceModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-stone-500 block mb-1">Öncelik Derecesi</label>
-              <select
-                value={newMaintenance.oncelik}
-                onChange={(e) =>
-                  setNewMaintenance({ ...newMaintenance, oncelik: e.target.value as any })
-                }
-                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-[#0284C7]"
-              >
-                <option value="Düşük">Düşük</option>
-                <option value="Orta">Orta</option>
-                <option value="Acil">Acil</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-stone-500 block mb-1">Bildiren Kişi</label>
-              <input
-                type="text"
-                value={newMaintenance.bildiren}
-                onChange={(e) => setNewMaintenance({ ...newMaintenance, bildiren: e.target.value })}
-                className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-[#0284C7]"
-              />
-            </div>
+          <div>
+            <label className="text-stone-500 block mb-1">Bildiren Kişi</label>
+            <input
+              type="text"
+              value={newMaintenance.bildiren}
+              onChange={(e) => setNewMaintenance({ ...newMaintenance, bildiren: e.target.value })}
+              className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-2.5 text-stone-900 focus:outline-none focus:border-[#0284C7]"
+            />
           </div>
 
           <div className="flex justify-end gap-2 pt-3">

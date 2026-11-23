@@ -3995,7 +3995,7 @@ export default function Home() {
       yurtName: currentUser?.selectedYurtName || yurtSettings.ad,
       actionType: "maintenance_ticket",
       actionTitle: "Teknik Arıza Talebi Oluşturdu",
-      actionDetail: `Başlık: "${created.baslik}" • Kategori: ${created.kategori} • Öncelik: ${created.oncelik}`,
+      actionDetail: `Başlık: "${created.baslik}" • Kategori: ${created.kategori}`,
       gaEventName: "maintenance_ticket_created",
     });
 
@@ -6466,16 +6466,6 @@ export default function Home() {
                             <div className="flex justify-between items-center">
                               <span className="px-2.5 py-0.5 rounded-lg bg-[#F1F5F9] text-[#0284C7] font-bold text-xs border border-[#E2E8F0]">
                                 Oda {m.odaNo}
-                              </span>
-                              <span
-                                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${m.oncelik === "Acil"
-                                    ? "bg-rose-50 text-rose-700 border-rose-200"
-                                    : m.oncelik === "Orta"
-                                      ? "bg-[#F1F5F9] text-[#0284C7] border-[#E2E8F0]"
-                                      : "bg-white text-[#64748B] border-[#E2E8F0]"
-                                  }`}
-                              >
-                                {m.oncelik}
                               </span>
                             </div>
 
