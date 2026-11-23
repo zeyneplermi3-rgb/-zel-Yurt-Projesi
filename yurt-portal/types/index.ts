@@ -175,6 +175,8 @@ export interface YurtSettings {
   misafirPolitikasi: string;
   sessizlikBaslangic: string;
   gecKalmaToleransDk: number;
+  yemekKatilimAktif?: boolean;
+  yemekDegerlendirmeAktif?: boolean;
 }
 
 export interface AppNotification {

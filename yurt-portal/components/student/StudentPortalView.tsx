@@ -35,6 +35,8 @@ interface StudentPortalViewProps {
     sonGirisHaftaSonu?: string;
     camasirhaneBaslangic?: string;
     camasirhaneBitis?: string;
+    yemekKatilimAktif?: boolean;
+    yemekDegerlendirmeAktif?: boolean;
   };
   yurtlar: Yurt[];
   dailyMenu: {
@@ -787,182 +789,186 @@ export default function StudentPortalView({
             )}
 
             {/* Yemek Katılım Bildirimi (Varım / Yokum & Kaydet) */}
-            <div className="pt-3 border-t border-[#E2E8F0] dark:border-[#334155] space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs sm:text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">
-                  Yemek Katılımı
-                </span>
-                {currentAttendance?.status && (
-                  <span
-                    className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${currentAttendance.status === "var"
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
-                        : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
-                      }`}
-                  >
-                    Seçim: {currentAttendance.status === "var" ? "Varım" : "Yokum"}
+            {yurtSettings.yemekKatilimAktif !== false && (
+              <div className="pt-3 border-t border-[#E2E8F0] dark:border-[#334155] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs sm:text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                    Yemek Katılımı
                   </span>
-                )}
+                  {currentAttendance?.status && (
+                    <span
+                      className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${currentAttendance.status === "var"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                          : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800"
+                        }`}
+                    >
+                      Seçim: {currentAttendance.status === "var" ? "Varım" : "Yokum"}
+                    </span>
+                  )}
+                </div>
+
+                {(() => {
+                  const isSaved = Boolean(
+                    justSaved ||
+                    (currentAttendance?.status && currentAttendance.status === selectedAttendance)
+                  );
+                  const isUpdate = Boolean(
+                    currentAttendance?.status && selectedAttendance && currentAttendance.status !== selectedAttendance
+                  );
+
+                  return (
+                    <div className="flex items-center gap-2">
+                      {/* Varım Butonu */}
+                      <button
+                        type="button"
+                        onClick={() => handleSelectAttendance("var")}
+                        className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] active:scale-95 ${selectedAttendance === "var"
+                            ? "bg-emerald-600 text-white shadow-xs font-black ring-2 ring-emerald-500/30"
+                            : "bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] hover:border-emerald-500"
+                          }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${selectedAttendance === "var" ? "bg-white" : "bg-emerald-500"}`} />
+                        Varım
+                      </button>
+
+                      {/* Yokum Butonu */}
+                      <button
+                        type="button"
+                        onClick={() => handleSelectAttendance("yok")}
+                        className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] active:scale-95 ${selectedAttendance === "yok"
+                            ? "bg-rose-600 text-white shadow-xs font-black ring-2 ring-rose-500/30"
+                            : "bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] hover:border-rose-500"
+                          }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${selectedAttendance === "yok" ? "bg-white" : "bg-rose-500"}`} />
+                        Yokum
+                      </button>
+
+                      {/* Kaydet / Kaydedildi / Güncelle Butonu */}
+                      {isSaved ? (
+                        <button
+                          type="button"
+                          disabled
+                          className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs sm:text-sm rounded-xl shadow-xs min-h-[44px] flex items-center justify-center gap-1.5 cursor-default transition-all"
+                        >
+                          <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span>Kaydedildi</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleSaveAttendance}
+                          disabled={!selectedAttendance}
+                          className="px-5 py-2 bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm rounded-xl cursor-pointer transition-all shadow-xs active:scale-95 min-h-[44px] flex items-center justify-center gap-1.5"
+                        >
+                          <span>{isUpdate ? "Güncelle" : "Kaydet"}</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
-
-              {(() => {
-                const isSaved = Boolean(
-                  justSaved ||
-                  (currentAttendance?.status && currentAttendance.status === selectedAttendance)
-                );
-                const isUpdate = Boolean(
-                  currentAttendance?.status && selectedAttendance && currentAttendance.status !== selectedAttendance
-                );
-
-                return (
-                  <div className="flex items-center gap-2">
-                    {/* Varım Butonu */}
-                    <button
-                      type="button"
-                      onClick={() => handleSelectAttendance("var")}
-                      className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] active:scale-95 ${selectedAttendance === "var"
-                          ? "bg-emerald-600 text-white shadow-xs font-black ring-2 ring-emerald-500/30"
-                          : "bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] hover:border-emerald-500"
-                        }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full ${selectedAttendance === "var" ? "bg-white" : "bg-emerald-500"}`} />
-                      Varım
-                    </button>
-
-                    {/* Yokum Butonu */}
-                    <button
-                      type="button"
-                      onClick={() => handleSelectAttendance("yok")}
-                      className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[44px] active:scale-95 ${selectedAttendance === "yok"
-                          ? "bg-rose-600 text-white shadow-xs font-black ring-2 ring-rose-500/30"
-                          : "bg-[#F8FAFC] dark:bg-[#0F172A] text-[#0F172A] dark:text-[#F1F5F9] border border-[#E2E8F0] dark:border-[#334155] hover:border-rose-500"
-                        }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full ${selectedAttendance === "yok" ? "bg-white" : "bg-rose-500"}`} />
-                      Yokum
-                    </button>
-
-                    {/* Kaydet / Kaydedildi / Güncelle Butonu */}
-                    {isSaved ? (
-                      <button
-                        type="button"
-                        disabled
-                        className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs sm:text-sm rounded-xl shadow-xs min-h-[44px] flex items-center justify-center gap-1.5 cursor-default transition-all"
-                      >
-                        <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span>Kaydedildi</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleSaveAttendance}
-                        disabled={!selectedAttendance}
-                        className="px-5 py-2 bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm rounded-xl cursor-pointer transition-all shadow-xs active:scale-95 min-h-[44px] flex items-center justify-center gap-1.5"
-                      >
-                        <span>{isUpdate ? "Güncelle" : "Kaydet"}</span>
-                      </button>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
+            )}
 
             {/* Günün Menüsünü Değerlendir (Puanlama & Yorum) */}
-            <div className="pt-3 border-t border-[#E2E8F0] dark:border-[#334155] space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                <div>
-                  <span className="text-xs sm:text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9] block">
-                    Günün Menüsünü Değerlendir
-                  </span>
-                  <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-                    Yemek kalitesi ve lezzeti hakkında yurt yönetimine anlık geri bildirim iletin
-                  </span>
+            {yurtSettings.yemekDegerlendirmeAktif !== false && (
+              <div className="pt-3 border-t border-[#E2E8F0] dark:border-[#334155] space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                  <div>
+                    <span className="text-xs sm:text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9] block">
+                      Günün Menüsünü Değerlendir
+                    </span>
+                    <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                      Yemek kalitesi ve lezzeti hakkında yurt yönetimine anlık geri bildirim iletin
+                    </span>
+                  </div>
+                  {todayUserRating && (
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-1 self-start sm:self-auto">
+                      <svg className="w-3 h-3 fill-amber-500 text-amber-500" viewBox="0 0 24 24">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                      </svg>
+                      {todayUserRating.rating} / 5 Puan Verildi
+                    </span>
+                  )}
                 </div>
-                {todayUserRating && (
-                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-1 self-start sm:self-auto">
-                    <svg className="w-3 h-3 fill-amber-500 text-amber-500" viewBox="0 0 24 24">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                    {todayUserRating.rating} / 5 Puan Verildi
-                  </span>
-                )}
-              </div>
 
-              {/* Yıldız Puanlama */}
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map((star) => {
-                    const isActive = star <= (hoverRating || currentRating);
-                    return (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setCurrentRating(star)}
-                        onMouseEnter={() => setHoverRating(star)}
-                        onMouseLeave={() => setHoverRating(0)}
-                        className="p-1 -m-1 text-slate-300 dark:text-slate-600 hover:scale-110 transition-transform cursor-pointer"
-                        title={`${star} Yıldız`}
-                      >
-                        <svg
-                          className={`w-6 h-6 transition-colors ${
-                            isActive
-                              ? "fill-amber-400 text-amber-400 drop-shadow-xs"
-                              : "fill-transparent stroke-current"
-                          }`}
-                          viewBox="0 0 24 24"
-                          strokeWidth="1.75"
+                {/* Yıldız Puanlama */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const isActive = star <= (hoverRating || currentRating);
+                      return (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setCurrentRating(star)}
+                          onMouseEnter={() => setHoverRating(star)}
+                          onMouseLeave={() => setHoverRating(0)}
+                          className="p-1 -m-1 text-slate-300 dark:text-slate-600 hover:scale-110 transition-transform cursor-pointer"
+                          title={`${star} Yıldız`}
                         >
-                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                        </svg>
-                      </button>
-                    );
-                  })}
+                          <svg
+                            className={`w-6 h-6 transition-colors ${
+                              isActive
+                                ? "fill-amber-400 text-amber-400 drop-shadow-xs"
+                                : "fill-transparent stroke-current"
+                            }`}
+                            viewBox="0 0 24 24"
+                            strokeWidth="1.75"
+                          >
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                          </svg>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <span className="text-xs font-bold text-stone-700 dark:text-stone-300 ml-1">
+                    {currentRating === 5 && "Mükemmel (5/5)"}
+                    {currentRating === 4 && "Çok İyi (4/5)"}
+                    {currentRating === 3 && "Orta (3/5)"}
+                    {currentRating === 2 && "Geliştirilmeli (2/5)"}
+                    {currentRating === 1 && "Yetersiz (1/5)"}
+                    {currentRating === 0 && "Puan seçin"}
+                  </span>
                 </div>
-                <span className="text-xs font-bold text-stone-700 dark:text-stone-300 ml-1">
-                  {currentRating === 5 && "Mükemmel (5/5)"}
-                  {currentRating === 4 && "Çok İyi (4/5)"}
-                  {currentRating === 3 && "Orta (3/5)"}
-                  {currentRating === 2 && "Geliştirilmeli (2/5)"}
-                  {currentRating === 1 && "Yetersiz (1/5)"}
-                  {currentRating === 0 && "Puan seçin"}
-                </span>
-              </div>
 
-              {/* Yorum Kutusu */}
-              <div className="space-y-1.5">
-                <textarea
-                  rows={2}
-                  value={ratingComment}
-                  onChange={(e) => setRatingComment(e.target.value)}
-                  placeholder="Yemekler nasıldı? Lezzet, porsiyon, sıcaklık veya önerilerinizi yazabilirsiniz (Yöneticiye anlık iletilir)..."
-                  className="w-full bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-xl px-3 py-2 text-xs text-[#0F172A] dark:text-[#F1F5F9] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 resize-none leading-relaxed shadow-2xs transition-colors"
-                />
-              </div>
+                {/* Yorum Kutusu */}
+                <div className="space-y-1.5">
+                  <textarea
+                    rows={2}
+                    value={ratingComment}
+                    onChange={(e) => setRatingComment(e.target.value)}
+                    placeholder="Yemekler nasıldı? Lezzet, porsiyon, sıcaklık veya önerilerinizi yazabilirsiniz (Yöneticiye anlık iletilir)..."
+                    className="w-full bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-xl px-3 py-2 text-xs text-[#0F172A] dark:text-[#F1F5F9] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 resize-none leading-relaxed shadow-2xs transition-colors"
+                  />
+                </div>
 
-              {/* Gönder Butonu */}
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (currentRating === 0) {
-                      showToast("Lütfen en az 1 yıldız puan verin.");
-                      return;
-                    }
-                    onSaveMealRating?.(currentRating, ratingComment);
-                    showToast(todayUserRating ? "Değerlendirmeniz güncellendi." : "Yemek değerlendirmeniz yöneticiye iletildi!");
-                  }}
-                  disabled={currentRating === 0}
-                  className="px-4 py-2 bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl cursor-pointer transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="22" y1="2" x2="11" y2="13" />
-                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                  </svg>
-                  <span>{todayUserRating ? "Değerlendirmeyi Güncelle" : "Değerlendirmeyi Gönder"}</span>
-                </button>
+                {/* Gönder Butonu */}
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (currentRating === 0) {
+                        showToast("Lütfen en az 1 yıldız puan verin.");
+                        return;
+                      }
+                      onSaveMealRating?.(currentRating, ratingComment);
+                      showToast(todayUserRating ? "Değerlendirmeniz güncellendi." : "Yemek değerlendirmeniz yöneticiye iletildi!");
+                    }}
+                    disabled={currentRating === 0}
+                    className="px-4 py-2 bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl cursor-pointer transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="22" y1="2" x2="11" y2="13" />
+                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                    </svg>
+                    <span>{todayUserRating ? "Değerlendirmeyi Güncelle" : "Değerlendirmeyi Gönder"}</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Duyurular */}

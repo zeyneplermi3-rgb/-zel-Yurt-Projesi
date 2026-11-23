@@ -678,6 +678,8 @@ export default function Home() {
     guvenliOturum?: boolean;
     camasirhaneGunlukLimit?: number;
     camasirhaneYurtGunlukLimit?: number;
+    yemekKatilimAktif?: boolean;
+    yemekDegerlendirmeAktif?: boolean;
   }>({
     ad: "Karahan Yükseköğrenim Kız Öğrenci Yurdu",
     sehir: "Ankara",
@@ -701,6 +703,8 @@ export default function Home() {
     guvenliOturum: true,
     camasirhaneGunlukLimit: 2,
     camasirhaneYurtGunlukLimit: 6,
+    yemekKatilimAktif: true,
+    yemekDegerlendirmeAktif: true,
   });
 
   const [adminPasswordForm, setAdminPasswordForm] = useState({
@@ -3517,6 +3521,25 @@ export default function Home() {
     showToast(`Yemek saati tarifesi seçildi: ${tipLabels[tip]}`);
   };
 
+  const handleToggleYemekSetting = (key: "yemekKatilimAktif" | "yemekDegerlendirmeAktif") => {
+    const nextVal = yurtSettings[key] === false ? true : false;
+    const updated = {
+      ...yurtSettings,
+      [key]: nextVal,
+    };
+    setYurtSettings(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("yurtify_settings", JSON.stringify(updated));
+      const targetYurtId = currentUser?.selectedYurtId || yurtlar[0]?.id;
+      if (targetYurtId) {
+        localStorage.setItem(`yurtify_${targetYurtId}_settings`, JSON.stringify(updated));
+      }
+    }
+    const label = key === "yemekKatilimAktif" ? "Varım / Yokum katılım bildirimi" : "Yemek değerlendirme sistemi";
+    const statusLabel = nextVal ? "açıldı" : "kapatıldı";
+    showToast(`${label} ${statusLabel}.`);
+  };
+
   const handleUpdateScheduleTimes = (
     tip: "haftaici" | "haftasonu" | "ozelgun",
     field: "kahvalti" | "aksam",
@@ -5093,6 +5116,15 @@ export default function Home() {
                           <span className="text-xs text-[#64748B] dark:text-[#94A3B8]">
                             Bugün
                           </span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              yurtSettings.yemekKatilimAktif !== false
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                                : "bg-stone-100 text-stone-600 border-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700"
+                            }`}
+                          >
+                            {yurtSettings.yemekKatilimAktif !== false ? "Açık" : "Kapalı"}
+                          </span>
                         </div>
                         <button
                           type="button"
@@ -5552,9 +5584,20 @@ export default function Home() {
                           <div className="space-y-3">
                             <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0] dark:border-[#334155]">
                               <div>
-                                <h4 className="text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">
-                                  Yemek Değerlendirmeleri
-                                </h4>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                                    Yemek Değerlendirmeleri
+                                  </h4>
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                      yurtSettings.yemekDegerlendirmeAktif !== false
+                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                                        : "bg-stone-100 text-stone-600 border-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:border-stone-700"
+                                    }`}
+                                  >
+                                    {yurtSettings.yemekDegerlendirmeAktif !== false ? "Öğrenciye Açık" : "Öğrenciye Kapalı"}
+                                  </span>
+                                </div>
                                 <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
                                   Günün menüsüne ait öğrenci puan ve geri bildirimleri
                                 </p>
@@ -7155,6 +7198,96 @@ export default function Home() {
                                     </button>
                                   </div>
                                 </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* B. ÖĞRENCİ ETKİLEŞİM VE GERİ BİLDİRİM AYARLARI */}
+                          <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-3">
+                            <div className="pb-2 border-b border-[#E2E8F0]">
+                              <h4 className="text-xs font-bold text-[#0F172A]">
+                                Öğrenci Etkileşim ve Geri Bildirim Özellikleri
+                              </h4>
+                              <p className="text-[11px] text-[#64748B] mt-0.5">
+                                Öğrenci portalındaki yemekhane modüllerini tek tıkla açıp kapatabilirsiniz.
+                              </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                              {/* 1. Varım / Yokum Katılım Bildirimi */}
+                              <div className="p-3.5 bg-white border border-[#E2E8F0] rounded-xl flex items-center justify-between gap-3 shadow-2xs">
+                                <div className="space-y-0.5 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-xs text-[#0F172A]">
+                                      Varım / Yokum Bildirimi
+                                    </span>
+                                    <span
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                        yurtSettings.yemekKatilimAktif !== false
+                                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                          : "bg-stone-100 text-stone-600 border-stone-200"
+                                      }`}
+                                    >
+                                      {yurtSettings.yemekKatilimAktif !== false ? "Açık" : "Kapalı"}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-[#64748B] leading-snug">
+                                    Öğrencilerin yemek katılım tercihi (Varım/Yokum) bildirmesini sağlar.
+                                  </p>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleYemekSetting("yemekKatilimAktif")}
+                                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none min-h-[44px] min-w-[44px] items-center p-0.5 ${
+                                    yurtSettings.yemekKatilimAktif !== false ? "bg-[#0284C7]" : "bg-stone-300"
+                                  }`}
+                                  aria-label="Varım / Yokum bildirimini aç veya kapat"
+                                >
+                                  <span
+                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                      yurtSettings.yemekKatilimAktif !== false ? "translate-x-5" : "translate-x-0"
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+
+                              {/* 2. Yemek Değerlendirme & Yorumlar */}
+                              <div className="p-3.5 bg-white border border-[#E2E8F0] rounded-xl flex items-center justify-between gap-3 shadow-2xs">
+                                <div className="space-y-0.5 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-xs text-[#0F172A]">
+                                      Yemek Değerlendirme
+                                    </span>
+                                    <span
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                        yurtSettings.yemekDegerlendirmeAktif !== false
+                                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                          : "bg-stone-100 text-stone-600 border-stone-200"
+                                      }`}
+                                    >
+                                      {yurtSettings.yemekDegerlendirmeAktif !== false ? "Açık" : "Kapalı"}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-[#64748B] leading-snug">
+                                    Öğrencilerin günün menüsünü 1-5 yıldızla puanlayıp yorum yapmasını sağlar.
+                                  </p>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleYemekSetting("yemekDegerlendirmeAktif")}
+                                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none min-h-[44px] min-w-[44px] items-center p-0.5 ${
+                                    yurtSettings.yemekDegerlendirmeAktif !== false ? "bg-[#0284C7]" : "bg-stone-300"
+                                  }`}
+                                  aria-label="Yemek değerlendirmesini aç veya kapat"
+                                >
+                                  <span
+                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                      yurtSettings.yemekDegerlendirmeAktif !== false ? "translate-x-5" : "translate-x-0"
+                                    }`}
+                                  />
+                                </button>
                               </div>
                             </div>
                           </div>
