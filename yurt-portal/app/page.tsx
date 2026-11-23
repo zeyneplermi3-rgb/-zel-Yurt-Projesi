@@ -52,6 +52,9 @@ import {
 import StudentPortalView, { StudentTab } from "../components/student/StudentPortalView";
 import MenuTimePickerModal from "../components/modals/MenuTimePickerModal";
 import EntryTimeModal from "../components/modals/EntryTimeModal";
+import { trackGAEvent, trackGAPageView, recordUserActivity } from "../lib/analytics";
+import GoogleAnalyticsLivePanel from "../components/GoogleAnalyticsLivePanel";
+import SuperAdminAnalyticsView from "../components/superadmin/SuperAdminAnalyticsView";
 export default function Home() {
   const supabase = createClient();
 
@@ -225,6 +228,7 @@ export default function Home() {
     }
 
     const resolved = selectedMode === "system" ? getSystemTheme() : selectedMode;
+    trackGAEvent("theme_toggle", { selected_mode: selectedMode, resolved_theme: resolved });
 
     const applyThemeChange = () => {
       applyDomTheme(resolved);
@@ -271,6 +275,11 @@ export default function Home() {
   const [yurtlar, setYurtlar] = useState<Yurt[]>([]);
 
   // ==========================================
+  // SÜPER ADMİN PANELİ STATE
+  // ==========================================
+  const [superadminSubTab, setSuperadminSubTab] = useState<"yurtlar" | "analitik">("yurtlar");
+
+  // ==========================================
   // YÖNETİCİ PANELİ STATE & VERİLERİ
   // ==========================================
   const [managerTab, setManagerTab] = useState<
@@ -304,6 +313,19 @@ export default function Home() {
       setOpenSettingsSections((prev) => ({ ...prev, ogrenciler: true }));
     }
   }, [managerTab]);
+
+  // Google Analytics 4 Sayfa / Sekme Değişimi Canlı İzleme
+  useEffect(() => {
+    if (currentUser?.role === "yonetici") {
+      trackGAPageView(`/yonetici/${managerTab}`, `Yönetici Paneli - ${managerTab}`);
+    }
+  }, [managerTab, currentUser?.role]);
+
+  useEffect(() => {
+    if (currentUser?.role === "ogrenci") {
+      trackGAPageView(`/ogrenci/${studentTab}`, `Öğrenci Portalı - ${studentTab}`);
+    }
+  }, [studentTab, currentUser?.role]);
 
   const [students, setStudents] = useState<Student[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -792,8 +814,8 @@ export default function Home() {
           adSoyad: d.ad_soyad,
           eposta: d.eposta || "",
           kullaniciAdi: d.kullanici_adi || (d.eposta ? d.eposta.split("@")[0] : ""),
-          sifre: d.sifre || "ogrenci123",
-          geciciSifreMi: d.gecici_sifre_mi ?? (d.sifre === "ogrenci123" || !d.sifre),
+          sifre: d.sifre || "",
+          geciciSifreMi: d.gecici_sifre_mi ?? false,
           odaNo: d.oda_no || "",
           yatakNo: d.yatak_no || "1",
           telefon: d.telefon || undefined,
@@ -1774,6 +1796,31 @@ export default function Home() {
         localStorage.removeItem("yurtify_remembered_role");
       }
     }
+    // Google Analytics 4 Olay Takibi
+    trackGAEvent("login_success", {
+      role: role,
+      user_name: userObj.name,
+      yurt_id: userObj.selectedYurtId,
+      yurt_name: userObj.selectedYurtName,
+    });
+    trackGAPageView(
+      role === "ogrenci" ? "/ogrenci-portali" : role === "yonetici" ? "/yonetici-paneli" : "/superadmin",
+      `${role.toUpperCase()} Portalı`
+    );
+
+    // Süper Admin Kullanıcı Hareketleri Günlüğü ve Günlük Giriş Sayacına Kaydet
+    recordUserActivity({
+      userId: userObj.details || userObj.name,
+      userName: userObj.name,
+      userRole: role,
+      roomNo: role === "ogrenci" ? (customDetails?.includes("Oda") ? customDetails.split("•")[0].replace("Oda", "").trim() : undefined) : undefined,
+      yurtName: userObj.selectedYurtName,
+      actionType: "login",
+      actionTitle: role === "ogrenci" ? "Öğrenci Portalı Girişi" : role === "yonetici" ? "Yönetici Paneli Girişi" : "Süper Admin Girişi",
+      actionDetail: `Başarılı oturum açıldı (${userObj.name})`,
+      gaEventName: "login_success",
+    });
+
     fetchDbData(chosenYurtId);
   };
 
@@ -1798,6 +1845,12 @@ export default function Home() {
     const recordFailedAttempt = (customMsg?: string) => {
       const nextCount = failedLoginAttempts + 1;
       setFailedLoginAttempts(nextCount);
+      trackGAEvent("login_failed", {
+        role: activeRole,
+        identifier: username.trim().toLowerCase(),
+        attempt_number: nextCount,
+        reason: customMsg || "Hatalı kimlik bilgisi",
+      });
       if (nextCount >= 5) {
         const lockoutTime = Date.now() + 60000;
         setLockoutUntil(lockoutTime);
@@ -1812,6 +1865,7 @@ export default function Home() {
       const enteredPassword = password.trim();
 
       // ==========================================
+      // ==========================================
       // A. SÜPER ADMİN GİRİŞİ
       // ==========================================
       if (activeRole === "superadmin") {
@@ -1823,14 +1877,11 @@ export default function Home() {
 
         const configuredSuperUser = (yurtSettings.superadminKullaniciAdi || "superadmin").trim().toLowerCase();
         const configuredSuperEmail = (yurtSettings.superadminEposta || "superadmin@yurtify.com").trim().toLowerCase();
-        const configuredSuperPass = yurtSettings.superadminSifre || "Admin*2026!";
+        const configuredSuperPass = yurtSettings.superadminSifre;
 
         const isSuperIdentifierValid =
           enteredIdentifier === configuredSuperUser ||
-          enteredIdentifier === configuredSuperEmail ||
-          enteredIdentifier === "superadmin" ||
-          enteredIdentifier === "superadmin@yurtify.com" ||
-          enteredIdentifier === "superadmin@yurtportal.com";
+          enteredIdentifier === configuredSuperEmail;
         const isSuperPassValid = enteredPassword === configuredSuperPass;
 
         if (!isSuperIdentifierValid || !isSuperPassValid) {
@@ -1846,7 +1897,7 @@ export default function Home() {
       }
 
       // ==========================================
-      // B. YURT MÜDÜRÜ / YÖNETİCİ GİRİŞİ (Tüm Yurtlar Arasında Doğrulama)
+      // B. YURT MÜDÜRÜ / YÖNETİCİ GİRİŞİ (Veritabanından Dinamik Doğrulama)
       // ==========================================
       if (activeRole === "yonetici") {
         if (enteredIdentifier.includes(" ") || enteredIdentifier.split(/\s+/).length > 1) {
@@ -1861,113 +1912,114 @@ export default function Home() {
           return;
         }
 
-        // Tüm yurtlar arasından girilen kullanıcı adı veya e-postaya ait yurdu bul
-        let matchedYurt = yurtlar.find((y: any) => {
-          const dbUser = ((y as any)?.admin_kullanici_adi || y?.yetkiliEposta || "").toLowerCase().trim();
-          const dbEmail = (y?.yetkiliEposta || "").toLowerCase().trim();
+        // Tüm yurtlar arasından girilen kullanıcı adı veya e-postaya ait yurdu doğrudan Supabase veritabanından anlık çekerek doğrula
+        let currentYurtlar: any[] = yurtlar;
+        try {
+          const { data: dbYurtlar, error: yurtErr } = await supabase.from("yurtlar").select("*");
+          if (!yurtErr && dbYurtlar && dbYurtlar.length > 0) {
+            currentYurtlar = dbYurtlar;
+            setYurtlar(dbYurtlar.map((d: any) => ({
+              id: d.id,
+              ad: d.ad,
+              sehir: d.sehir,
+              ilce: d.ilce,
+              adres: d.adres || "",
+              kapasite: d.kapasite || 100,
+              mevcutOgrenci: d.mevcut_ogrenci ?? 0,
+              yetkiliAd: d.yetkili_ad || "Yetkili",
+              yetkiliTel: d.yetkili_tel || "",
+              yetkiliEposta: d.yetkili_eposta || "",
+              durum: d.durum || "aktif",
+              yurtTuru: d.yurt_turu || "Kız Öğrenci Yurdu",
+              admin_kullanici_adi: d.admin_kullanici_adi,
+              admin_sifre: d.admin_sifre,
+              kayitTarihi: new Date(d.created_at || Date.now()).toLocaleDateString("tr-TR"),
+            })));
+          }
+        } catch (e) {
+          console.warn("Veritabanından yurtlar çekilirken uyarı:", e);
+        }
+
+        const matchedYurt = currentYurtlar.find((y: any) => {
+          const dbUser = ((y as any)?.admin_kullanici_adi || y?.adminKullaniciAdi || "").toLowerCase().trim();
+          const dbEmail = ((y as any)?.yetkili_eposta || y?.yetkiliEposta || "").toLowerCase().trim();
           return (
             (dbUser && enteredIdentifier === dbUser) ||
             (dbEmail && enteredIdentifier === dbEmail)
           );
         });
 
-        const configuredUsername = (yurtSettings.adminKullaniciAdi || "mudur").trim().toLowerCase();
-        const configuredEmail = (yurtSettings.adminEposta || "mudur@gmail.com").trim().toLowerCase();
-
-        // Eğer doğrudan eşleşmediyse genel varsayılan yönetici hesapları üzerinden ilk yurdu dene
         if (!matchedYurt) {
-          if (
-            enteredIdentifier === configuredUsername ||
-            enteredIdentifier === configuredEmail ||
-            enteredIdentifier === "mudur" ||
-            enteredIdentifier === "mudur@gmail.com"
-          ) {
-            matchedYurt = yurtlar[0];
-          }
-        }
-
-        if (!matchedYurt) {
-          recordFailedAttempt("Hatalı yönetici kullanıcı adı veya şifresi.");
+          recordFailedAttempt("Bu kullanıcı adı veya e-posta ile kayıtlı yurt yöneticisi bulunamadı.");
           setIsLoading(false);
           return;
         }
 
-        const yurtAdminPass = (matchedYurt as any)?.admin_sifre || yurtSettings.adminSifre || "mudur123456";
-        const isPasswordMatch =
-          enteredPassword === yurtAdminPass ||
-          enteredPassword === "mudur123456";
+        // Şifreyi yalnızca ve doğrudan veritabanındaki admin_sifre alanı ile doğrula (sabit fallback yok)
+        const yurtAdminPass = (matchedYurt as any)?.admin_sifre || (matchedYurt as any)?.adminSifre;
 
-        if (!isPasswordMatch) {
-          recordFailedAttempt("Hatalı yönetici kullanıcı adı veya şifresi.");
+        if (!yurtAdminPass || enteredPassword !== yurtAdminPass) {
+          recordFailedAttempt("Hatalı yönetici şifresi.");
           setIsLoading(false);
           return;
         }
 
         try {
-          const authEmail = enteredIdentifier.includes("@") ? enteredIdentifier : (matchedYurt.yetkiliEposta || configuredEmail);
-          await supabase.auth.signInWithPassword({
-            email: authEmail,
-            password: enteredPassword,
-          });
+          const authEmail = enteredIdentifier.includes("@") ? enteredIdentifier : ((matchedYurt as any).yetkili_eposta || matchedYurt.yetkiliEposta);
+          if (authEmail) {
+            await supabase.auth.signInWithPassword({
+              email: authEmail,
+              password: enteredPassword,
+            });
+          }
         } catch { }
 
         setFailedLoginAttempts(0);
         setLockoutUntil(null);
-        loginUserDirect("yonetici", matchedYurt.yetkiliAd || "Yurt Müdürü", matchedYurt.yetkiliEposta || configuredEmail, matchedYurt.id, matchedYurt.ad);
+        loginUserDirect("yonetici", matchedYurt.yetkiliAd || (matchedYurt as any).yetkili_ad || "Yurt Müdürü", (matchedYurt as any).yetkili_eposta || matchedYurt.yetkiliEposta, matchedYurt.id, matchedYurt.ad);
         return;
       }
 
       // ==========================================
-      // C. ÖĞRENCİ GİRİŞİ (Yurda Özel Eşleştirme)
+      // C. ÖĞRENCİ GİRİŞİ (Veritabanından Dinamik Doğrulama)
       // ==========================================
       if (activeRole === "ogrenci") {
-        let currentStudents = students;
-        if (typeof window !== "undefined") {
-          try {
-            const curYurtKey = currentUser?.selectedYurtId || yurtlar[0]?.id;
-            const raw = localStorage.getItem(`yurtify_${curYurtKey}_students`) || localStorage.getItem("yurtify_students");
-            if (raw) {
-              const parsed = JSON.parse(raw);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                currentStudents = parsed;
-                setStudents(parsed);
+        // Öğrenci listesini her giriş denemesinde doğrudan Supabase ogrenciler tablosundan anlık ve taze olarak çek
+        let currentStudents: Student[] = [];
+        try {
+          const { data: dbStudents, error: stdErr } = await supabase.from("ogrenciler").select("*");
+          if (!stdErr && dbStudents && dbStudents.length > 0) {
+            currentStudents = dbStudents.map((d: any) => ({
+              id: d.id,
+              adSoyad: d.ad_soyad,
+              eposta: d.eposta || "",
+              kullaniciAdi: d.kullanici_adi || (d.eposta ? d.eposta.split("@")[0] : ""),
+              sifre: d.sifre || "",
+              geciciSifreMi: d.gecici_sifre_mi ?? false,
+              odaNo: d.oda_no || "",
+              yatakNo: d.yatak_no || "1",
+              telefon: d.telefon || undefined,
+              veliAd: d.veli_ad || undefined,
+              veliTel: d.veli_tel || undefined,
+              kayitTarihi: d.kayit_tarihi || undefined,
+              yurtId: d.yurt_id,
+            }));
+            setStudents(currentStudents);
+            if (typeof window !== "undefined") {
+              const curYurtKey = currentUser?.selectedYurtId || yurtlar[0]?.id;
+              if (curYurtKey) {
+                localStorage.setItem(`yurtify_${curYurtKey}_students`, JSON.stringify(currentStudents));
               }
             }
-          } catch (e) {
-            console.error("Öğrenci okuma hatası:", e);
+          } else {
+            currentStudents = students;
           }
-        }
-
-        // Eğer yerel listede yoksa veritabanındaki tüm öğrencileri çekerek eşleştirmeyi dene
-        if (currentStudents.length === 0) {
-          try {
-            const { data } = await supabase.from("ogrenciler").select("*");
-            if (data && data.length > 0) {
-              currentStudents = data.map((d: any) => ({
-                id: d.id,
-                adSoyad: d.ad_soyad,
-                eposta: d.eposta || "",
-                kullaniciAdi: d.kullanici_adi || (d.eposta ? d.eposta.split("@")[0] : ""),
-                sifre: d.sifre || "ogrenci123",
-                geciciSifreMi: d.gecici_sifre_mi ?? (d.sifre === "ogrenci123" || !d.sifre),
-                odaNo: d.oda_no || "",
-                yatakNo: d.yatak_no || "1",
-                yurtId: d.yurt_id,
-              }));
-              setStudents(currentStudents);
-            }
-          } catch { }
+        } catch (e) {
+          console.warn("Veritabanından öğrenci çekilirken uyarı:", e);
+          currentStudents = students;
         }
 
         const cleanIdentifier = enteredIdentifier.trim().toLowerCase();
-
-        // Ad Soyad ile girişi kesinlikle engelle
-        if (cleanIdentifier.includes(" ") || cleanIdentifier.split(/\s+/).length > 1) {
-          recordFailedAttempt("Giriş için ad soyad kullanılamaz. Lütfen yalnızca e-posta adresinizi veya kullanıcı adınızı giriniz.");
-          setIsLoading(false);
-          return;
-        }
-
         const identifierPrefix = cleanIdentifier.includes("@")
           ? cleanIdentifier.split("@")[0].trim()
           : cleanIdentifier;
@@ -1990,12 +2042,14 @@ export default function Home() {
         const matchedStudent = currentStudents.find((s) => {
           const sEmail = (s.eposta || "").trim().toLowerCase();
           const sUsername = (s.kullaniciAdi || (s.eposta ? s.eposta.split("@")[0] : "")).trim().toLowerCase();
+          const sFullName = (s.adSoyad || "").trim().toLowerCase();
           const sEmailPrefix = sEmail.includes("@") ? sEmail.split("@")[0].trim() : sEmail;
 
-          // 1. Doğrudan tam eşleşme (Yalnızca E-posta veya Kullanıcı Adı)
+          // 1. Doğrudan tam eşleşme (E-posta, Kullanıcı Adı veya Ad Soyad)
           if (
             (sEmail && sEmail === cleanIdentifier) ||
-            (sUsername && sUsername === cleanIdentifier)
+            (sUsername && sUsername === cleanIdentifier) ||
+            (sFullName && sFullName === cleanIdentifier)
           ) {
             return true;
           }
@@ -2008,14 +2062,16 @@ export default function Home() {
             return true;
           }
 
-          // 3. Normalize edilmiş eşleşme (Yalnızca E-posta ve Kullanıcı Adı için)
+          // 3. Normalize edilmiş eşleşme (Türkçe karakter duyarsız)
           const normEmail = normalize(sEmail);
           const normUsername = normalize(sUsername);
+          const normFullName = normalize(sFullName);
           const normEmailPrefix = normalize(sEmailPrefix);
 
           if (
             (normEmail && normEmail === normalizedIdentifier) ||
             (normUsername && normUsername === normalizedIdentifier) ||
+            (normFullName && normFullName === normalizedIdentifier) ||
             (normEmailPrefix && (normEmailPrefix === normalizedPrefix || normEmailPrefix === normalizedIdentifier))
           ) {
             return true;
@@ -2025,13 +2081,14 @@ export default function Home() {
         });
 
         if (!matchedStudent) {
-          recordFailedAttempt("Bu kullanıcı adı veya e-posta ile kayıtlı öğrenci bulunamadı.");
+          recordFailedAttempt("Bu kullanıcı adı, e-posta veya isimle kayıtlı öğrenci bulunamadı.");
           setIsLoading(false);
           return;
         }
 
-        const studentPassword = matchedStudent.sifre || "ogrenci123";
-        if (enteredPassword !== studentPassword) {
+        // Şifreyi yalnızca ve kesinlikle veritabanındaki sifre alanı ile doğrula (sabit fallback kesinlikle yok)
+        const studentPassword = matchedStudent.sifre;
+        if (!studentPassword || enteredPassword !== studentPassword) {
           recordFailedAttempt("Hatalı öğrenci şifresi.");
           setIsLoading(false);
           return;
@@ -2078,6 +2135,10 @@ export default function Home() {
 
   // Çıkış Yap: Hem React state'i hem LocalStorage'ı hem Supabase oturumunu temizler
   const handleLogout = async () => {
+    trackGAEvent("logout", {
+      role: currentUser?.role || "unknown",
+      name: currentUser?.name || "Kullanıcı",
+    });
     setCurrentUser(null);
     setIsAuthChecking(false);
     setIsSuperAdminLogin(false);
@@ -3327,6 +3388,25 @@ export default function Home() {
       localStorage.setItem("yurtify_meal_ratings", JSON.stringify(updatedRatings));
     }
 
+    trackGAEvent("meal_rating_submitted", {
+      rating,
+      has_comment: !!comment.trim(),
+      student_room: currentStudent?.odaNo || "",
+      yurt_id: targetYurtId,
+    });
+
+    recordUserActivity({
+      userId: currentStudent?.id || sName,
+      userName: sName,
+      userRole: "ogrenci",
+      roomNo: currentStudent?.odaNo || "",
+      yurtName: currentUser?.selectedYurtName || yurtSettings.ad,
+      actionType: "meal_rating",
+      actionTitle: "Yemekhane Menüsünü Puanladı",
+      actionDetail: `Puan: ${rating} Yıldız ★ • Yorum: "${comment.trim() || 'Yorumsuz'}"`,
+      gaEventName: "meal_rating_submitted",
+    });
+
     try {
       const updatedSaatler = {
         ...(dailyMenu.saatler || {}),
@@ -3801,6 +3881,23 @@ export default function Home() {
       localStorage.setItem(`yurtify_${targetYurtId}_maintenance`, JSON.stringify(updated));
     }
 
+    trackGAEvent("maintenance_satisfaction_submitted", {
+      ticket_id: id,
+      satisfaction,
+      yurt_id: targetYurtId,
+    });
+
+    recordUserActivity({
+      userId: currentUser?.name || "Öğrenci",
+      userName: currentUser?.name || "Öğrenci",
+      userRole: "ogrenci",
+      yurtName: currentUser?.selectedYurtName || yurtSettings.ad,
+      actionType: "maintenance_satisfaction",
+      actionTitle: "Arıza Hizmet Memnuniyeti Belirtti",
+      actionDetail: `Arıza çözümü onaylandı (Memnuniyet: ${satisfaction === "evet" ? "Evet" : "Hayır"})`,
+      gaEventName: "maintenance_satisfaction_submitted",
+    });
+
     try {
       const statusWithFeedback = `Çözüldü (Memnuniyet: ${satisfaction === "evet" ? "Evet" : "Hayır"})`;
       supabase
@@ -3841,6 +3938,25 @@ export default function Home() {
     if (typeof window !== "undefined") {
       localStorage.setItem(`yurtify_${targetYurtId}_maintenance`, JSON.stringify(updated));
     }
+
+    trackGAEvent("maintenance_ticket_created", {
+      category: created.kategori,
+      room: created.odaNo,
+      priority: created.oncelik,
+      yurt_id: targetYurtId,
+    });
+
+    recordUserActivity({
+      userId: created.bildiren,
+      userName: created.bildiren,
+      userRole: currentUser?.role || "ogrenci",
+      roomNo: created.odaNo,
+      yurtName: currentUser?.selectedYurtName || yurtSettings.ad,
+      actionType: "maintenance_ticket",
+      actionTitle: "Teknik Arıza Talebi Oluşturdu",
+      actionDetail: `Başlık: "${created.baslik}" • Kategori: ${created.kategori} • Öncelik: ${created.oncelik}`,
+      gaEventName: "maintenance_ticket_created",
+    });
 
     try {
       supabase.from("arizalar").insert({
@@ -4455,6 +4571,47 @@ export default function Home() {
         {/* ========================================================= */}
         {currentUser.role === "superadmin" && (
           <div className="space-y-4 sm:space-y-6 md:space-y-8">
+            {/* Süper Admin Üst Sekmeleri (Yurtlar vs Analitik & Kullanıcı Hareketleri) */}
+            <div className="flex items-center gap-2 border-b border-[#E2E8F0] dark:border-[#334155] pb-2">
+              <button
+                type="button"
+                onClick={() => setSuperadminSubTab("yurtlar")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  superadminSubTab === "yurtlar"
+                    ? "bg-[#0284C7] text-white shadow-xs"
+                    : "bg-white dark:bg-[#1E293B] text-slate-700 dark:text-slate-200 border border-[#E2E8F0] dark:border-[#334155] hover:bg-slate-50"
+                }`}
+              >
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                <span>Yurtlar ve Şubeler ({yurtlar.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSuperadminSubTab("analitik")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  superadminSubTab === "analitik"
+                    ? "bg-[#0284C7] text-white shadow-xs"
+                    : "bg-white dark:bg-[#1E293B] text-slate-700 dark:text-slate-200 border border-[#E2E8F0] dark:border-[#334155] hover:bg-slate-50"
+                }`}
+              >
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <span>Kullanıcı Hareketleri & GA4 Analitik</span>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+              </button>
+            </div>
+
+            {superadminSubTab === "analitik" ? (
+              <SuperAdminAnalyticsView onBackToDorms={() => setSuperadminSubTab("yurtlar")} />
+            ) : (
+              <>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4 bg-white border border-[#E2E8F0] p-4 sm:p-6 rounded-2xl sm:rounded-3xl">
               <h2 className="text-lg sm:text-xl md:text-2xl font-black text-[#0F172A]">
                 Yurtlar ve Şubeler
@@ -4762,6 +4919,11 @@ export default function Home() {
               onClose={() => setIsAddModalOpen(false)}
               onSubmit={handleCreateYurt}
             />
+              </>
+            )}
+
+            {/* Google Analytics 4 (GA4) Canlı İzleyici - YALNIZCA SÜPER ADMİN İÇİN */}
+            <GoogleAnalyticsLivePanel />
           </div>
         )}
 
@@ -7650,6 +7812,26 @@ export default function Home() {
                 localStorage.setItem(`yurtify_${targetYurtId}_laundry`, JSON.stringify(updatedSlots));
                 localStorage.setItem(`yurtify_${targetYurtId}_laundry_slots`, JSON.stringify(updatedSlots));
               }
+
+              trackGAEvent("laundry_reservation_created", {
+                machine: normalizedSlot.makineNo,
+                slot: normalizedSlot.saatAraligi,
+                date: normalizedSlot.tarih,
+                room: normalizedSlot.odaNo,
+                yurt_id: targetYurtId,
+              });
+
+              recordUserActivity({
+                userId: normalizedSlot.ogrenciAd || "Öğrenci",
+                userName: normalizedSlot.ogrenciAd || "Öğrenci",
+                userRole: "ogrenci",
+                roomNo: normalizedSlot.odaNo,
+                yurtName: currentUser?.selectedYurtName || yurtSettings.ad,
+                actionType: "laundry_booking",
+                actionTitle: "Çamaşır Randevusu Aldı",
+                actionDetail: `Makine: ${normalizedSlot.makineNo} • Saat: ${normalizedSlot.saatAraligi} • Tarih: ${normalizedSlot.tarih}`,
+                gaEventName: "laundry_reservation_created",
+              });
 
               try {
                 supabase.from("camasirhane_randevular").upsert({

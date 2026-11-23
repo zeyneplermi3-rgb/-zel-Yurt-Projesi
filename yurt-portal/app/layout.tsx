@@ -1,16 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Yurtify - Yurt Yönetim & Öğrenci Portalı",
@@ -31,7 +21,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="tr"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className="h-full antialiased font-sans"
       suppressHydrationWarning
     >
       <head>
@@ -57,6 +47,34 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 }
               } catch(e) {}
             })();`,
+          }}
+        />
+        {/* Google Analytics 4 (GA4) Canlı Entegrasyon */}
+        <Script
+          strategy="afterInteractive"
+          src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-97S16X4ECZ"}`}
+        />
+        <Script
+          id="google-analytics-init"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              window.gtag = gtag;
+              gtag('js', new Date());
+              var customGaId = (function() {
+                try {
+                  var saved = localStorage.getItem('yurtify_ga_measurement_id');
+                  if (saved && saved.indexOf('G-') === 0) return saved;
+                } catch(e) {}
+                return '${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-97S16X4ECZ"}';
+              })();
+              gtag('config', customGaId, {
+                debug_mode: true,
+                send_page_view: true
+              });
+            `,
           }}
         />
       </head>
