@@ -33,7 +33,6 @@ import {
   cleanMachineName,
 } from "../lib/laundryUtils";
 import AddYurtModal from "../components/modals/AddYurtModal";
-import EditYurtModal from "../components/modals/EditYurtModal";
 import { AddRoomModal, EditRoomModal } from "../components/modals/RoomModals";
 import {
   AddStudentModal,
@@ -373,12 +372,9 @@ export default function Home() {
       };
     });
   }, [laundrySlots, laundryClockTick]);
-  const [selectedLaundryDate, setSelectedLaundryDate] = useState<string>(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  });
-  const [laundryViewYear, setLaundryViewYear] = useState<number>(() => new Date().getFullYear());
-  const [laundryViewMonth, setLaundryViewMonth] = useState<number>(() => new Date().getMonth());
+  const [selectedLaundryDate, setSelectedLaundryDate] = useState<string>("");
+  const [laundryViewYear, setLaundryViewYear] = useState<number>(2026);
+  const [laundryViewMonth, setLaundryViewMonth] = useState<number>(9);
   const [laundryCalendarView, setLaundryCalendarView] = useState<"month" | "day">("month");
   const [isDayTimelineOpen, setIsDayTimelineOpen] = useState<boolean>(true);
   const [isLiveQueueExpanded, setIsLiveQueueExpanded] = useState<boolean>(true);
@@ -678,8 +674,6 @@ export default function Home() {
     guvenliOturum?: boolean;
     camasirhaneGunlukLimit?: number;
     camasirhaneYurtGunlukLimit?: number;
-    yemekKatilimAktif?: boolean;
-    yemekDegerlendirmeAktif?: boolean;
   }>({
     ad: "Karahan Yükseköğrenim Kız Öğrenci Yurdu",
     sehir: "Ankara",
@@ -703,8 +697,6 @@ export default function Home() {
     guvenliOturum: true,
     camasirhaneGunlukLimit: 2,
     camasirhaneYurtGunlukLimit: 6,
-    yemekKatilimAktif: true,
-    yemekDegerlendirmeAktif: true,
   });
 
   const [adminPasswordForm, setAdminPasswordForm] = useState({
@@ -723,8 +715,6 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
   const [cityFilter, setCityFilter] = useState("all");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingYurt, setEditingYurt] = useState<Yurt | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
   const [newYurt, setNewYurt] = useState({
@@ -773,8 +763,6 @@ export default function Home() {
           durum: d.durum || "aktif",
           yurtTuru: d.yurt_turu || "Kız Öğrenci Yurdu",
           kayitTarihi: new Date(d.created_at || Date.now()).toLocaleDateString("tr-TR"),
-          admin_kullanici_adi: d.admin_kullanici_adi || "",
-          admin_sifre: d.admin_sifre || "",
         }));
         setYurtlar(currentYurtList);
         if (typeof window !== "undefined") {
@@ -2341,39 +2329,6 @@ export default function Home() {
     }
   };
 
-  // D. Yurt Bilgilerini Düzenle
-  const handleOpenEditYurt = (yurt: Yurt) => {
-    setEditingYurt(yurt);
-    setIsEditModalOpen(true);
-  };
-
-  const handleUpdateYurt = async (updatedData: Partial<Yurt> & { id: string }) => {
-    try {
-      const payload: any = {
-        ad: updatedData.ad,
-        sehir: updatedData.sehir,
-        ilce: updatedData.ilce,
-        adres: updatedData.adres,
-        yurt_turu: updatedData.yurtTuru,
-        durum: updatedData.durum,
-        yetkili_ad: updatedData.yetkiliAd,
-        yetkili_tel: updatedData.yetkiliTel,
-        yetkili_eposta: updatedData.yetkiliEposta,
-        admin_kullanici_adi: updatedData.admin_kullanici_adi,
-        admin_sifre: updatedData.admin_sifre,
-      };
-
-      const { error } = await supabase.from("yurtlar").update(payload).eq("id", updatedData.id);
-      if (error) {
-        console.error("Supabase yurt güncelleme hatası:", error);
-      } else {
-        await fetchDbData();
-      }
-    } catch (err: any) {
-      console.error("Yurt güncelleme işleminde hata:", err);
-    }
-  };
-
   // ==========================================
   // YÖNETİCİ OPERASYONEL FONKSİYONLARI
   // ==========================================
@@ -3343,20 +3298,6 @@ export default function Home() {
     studentName?: string,
     studentKey?: string
   ) => {
-    const isMenuPublished = Boolean(
-      dailyMenu &&
-      (dailyMenu.gorunumModu === "tek"
-        ? (dailyMenu.aktifOgun === "kahvalti"
-            ? Boolean(dailyMenu.kahvalti?.trim())
-            : Boolean(dailyMenu.aksam?.trim()))
-        : Boolean(dailyMenu.kahvalti?.trim() || dailyMenu.aksam?.trim()))
-    );
-
-    if (!isMenuPublished) {
-      showToast("Günün menüsü henüz yayınlanmadığı için katılım tercihi kaydedilemez.");
-      return;
-    }
-
     const today = getTodayDateKey();
     const sName = studentName || currentUser?.name || "Öğrenci";
     const sKey = studentKey || currentUser?.details || currentUser?.name || "ogrenci";
@@ -3535,25 +3476,6 @@ export default function Home() {
     showToast(`Yemek saati tarifesi seçildi: ${tipLabels[tip]}`);
   };
 
-  const handleToggleYemekSetting = (key: "yemekKatilimAktif" | "yemekDegerlendirmeAktif") => {
-    const nextVal = yurtSettings[key] === false ? true : false;
-    const updated = {
-      ...yurtSettings,
-      [key]: nextVal,
-    };
-    setYurtSettings(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("yurtify_settings", JSON.stringify(updated));
-      const targetYurtId = currentUser?.selectedYurtId || yurtlar[0]?.id;
-      if (targetYurtId) {
-        localStorage.setItem(`yurtify_${targetYurtId}_settings`, JSON.stringify(updated));
-      }
-    }
-    const label = key === "yemekKatilimAktif" ? "Katılım bildirimi" : "Yemek değerlendirme sistemi";
-    const statusLabel = nextVal ? "açıldı" : "kapatıldı";
-    showToast(`${label} ${statusLabel}.`);
-  };
-
   const handleUpdateScheduleTimes = (
     tip: "haftaici" | "haftasonu" | "ozelgun",
     field: "kahvalti" | "aksam",
@@ -3637,32 +3559,15 @@ export default function Home() {
     });
   };
 
-  const handleApplyTimePicker = (
-    overrideSH?: number,
-    overrideSM?: number,
-    overrideEH?: number,
-    overrideEM?: number
-  ) => {
-    const finalSH = typeof overrideSH === "number" ? overrideSH : timePickerModal.startHour;
-    const finalSM = typeof overrideSM === "number" ? overrideSM : timePickerModal.startMinute;
-    const finalEH = typeof overrideEH === "number" ? overrideEH : timePickerModal.endHour;
-    const finalEM = typeof overrideEM === "number" ? overrideEM : timePickerModal.endMinute;
-
-    const sH = String(finalSH).padStart(2, "0");
-    const sM = String(finalSM).padStart(2, "0");
-    const eH = String(finalEH).padStart(2, "0");
-    const eM = String(finalEM).padStart(2, "0");
+  const handleApplyTimePicker = () => {
+    const sH = String(timePickerModal.startHour).padStart(2, "0");
+    const sM = String(timePickerModal.startMinute).padStart(2, "0");
+    const eH = String(timePickerModal.endHour).padStart(2, "0");
+    const eM = String(timePickerModal.endMinute).padStart(2, "0");
     const formatted = `${sH}:${sM} - ${eH}:${eM}`;
 
     handleUpdateScheduleTimes(timePickerModal.tip, timePickerModal.field, formatted);
-    setTimePickerModal((prev) => ({
-      ...prev,
-      isOpen: false,
-      startHour: finalSH,
-      startMinute: finalSM,
-      endHour: finalEH,
-      endMinute: finalEM,
-    }));
+    setTimePickerModal((prev) => ({ ...prev, isOpen: false }));
     showToast(`Servis saati güncellendi: ${formatted}`);
   };
 
@@ -3964,7 +3869,7 @@ export default function Home() {
     }
   };
 
-// 6.c. Arıza Hizmet Memnuniyeti Belirtme (Öğrenci)
+  // 6.c. Arıza Hizmet Memnuniyeti Belirtme (Öğrenci)
   const handleRateMaintenanceTicket = (id: string, satisfaction: "evet" | "hayir") => {
     const targetYurtId = currentUser?.selectedYurtId || yurtlar[0]?.id || "af81f031-1988-401e-84af-42ac75b4d409";
     const updated = maintenanceTickets.map((m) =>
@@ -4006,6 +3911,7 @@ export default function Home() {
       console.warn("Arıza memnuniyet hatası:", err);
     }
   };
+
   // 7. Yeni Arıza Talebi Ekle
   const handleAddMaintenance = (e: React.FormEvent) => {
     e.preventDefault();
@@ -4049,7 +3955,7 @@ export default function Home() {
       yurtName: currentUser?.selectedYurtName || yurtSettings.ad,
       actionType: "maintenance_ticket",
       actionTitle: "Teknik Arıza Talebi Oluşturdu",
-      actionDetail: `Başlık: "${created.baslik}" • Kategori: ${created.kategori}`,
+      actionDetail: `Başlık: "${created.baslik}" • Kategori: ${created.kategori} • Öncelik: ${created.oncelik}`,
       gaEventName: "maintenance_ticket_created",
     });
 
@@ -4321,7 +4227,7 @@ export default function Home() {
           </div>
 
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs">
-{/* 3 Seçenekli Giriş Rolü Seçici: Öğrenci, Yurt Müdürü, Süper Admin */}
+            {/* 3 Seçenekli Giriş Rolü Seçici: Öğrenci, Yurt Müdürü, Süper Admin */}
             <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4 border border-slate-200 dark:border-slate-700 text-xs font-semibold">
               <button
                 type="button"
@@ -4351,20 +4257,22 @@ export default function Home() {
               >
                 Yurt Müdürü
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSuperAdminLogin(true);
-                  handleRoleChange("superadmin");
-                }}
-                className={`flex-1 min-h-[44px] py-1.5 px-1 rounded-lg transition-all cursor-pointer flex items-center justify-center text-center ${
-                  activeRole === "superadmin"
-                    ? "bg-[#0284C7] text-white shadow-xs font-bold"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                }`}
-              >
-                Süper Admin
-              </button>
+              {isSuperAdminLogin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSuperAdminLogin(true);
+                    handleRoleChange("superadmin");
+                  }}
+                  className={`flex-1 min-h-[44px] py-1.5 px-1 rounded-lg transition-all cursor-pointer flex items-center justify-center text-center ${
+                    activeRole === "superadmin"
+                      ? "bg-[#0284C7] text-white shadow-xs font-bold"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Süper Admin
+                </button>
+              )}
             </div>
 
             <form onSubmit={handleLogin} className="space-y-3">
@@ -4428,24 +4336,29 @@ export default function Home() {
                 {isLoading ? "Giriş Yapılıyor..." : "Giriş Yap"}
               </button>
             </form>
+          </div>
 
-            {isSuperAdminLogin && (
-              <div className="mt-3.5 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSuperAdminLogin(false);
-                    handleRoleChange("ogrenci");
-                    if (typeof window !== "undefined") {
-                      window.history.replaceState({}, "", "/");
-                    }
-                  }}
-                  className="text-xs text-slate-500 dark:text-slate-400 hover:text-[#0284C7] dark:hover:text-[#38BDF8] font-semibold transition-colors cursor-pointer py-1"
-                >
-                  ← Öğrenci & Müdür Girişine Dön
-                </button>
-              </div>
-            )}
+          {/* Gizli Sistem Masası Tetikleyicisi (Yalnızca siz tıklayınca Süper Admin sekmesini açar) */}
+          <div className="mt-3 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                const nextState = !isSuperAdminLogin;
+                setIsSuperAdminLogin(nextState);
+                if (nextState) {
+                  handleRoleChange("superadmin");
+                } else {
+                  handleRoleChange("ogrenci");
+                }
+              }}
+              className="text-[10px] text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 transition-opacity cursor-pointer inline-flex items-center gap-1 opacity-30 hover:opacity-100 select-none"
+              title="Sistem Yöneticisi Konsolu"
+            >
+              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <span>Yurtify Altyapı</span>
+            </button>
           </div>
         </div>
       </div>
@@ -4677,9 +4590,7 @@ export default function Home() {
                     : "bg-white dark:bg-[#1E293B] text-slate-700 dark:text-slate-200 border border-[#E2E8F0] dark:border-[#334155] hover:bg-slate-50"
                 }`}
               >
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
+                <span>🏢</span>
                 <span>Yurtlar ve Şubeler ({yurtlar.length})</span>
               </button>
 
@@ -4692,9 +4603,7 @@ export default function Home() {
                     : "bg-white dark:bg-[#1E293B] text-slate-700 dark:text-slate-200 border border-[#E2E8F0] dark:border-[#334155] hover:bg-slate-50"
                 }`}
               >
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
+                <span>📊</span>
                 <span>Kullanıcı Hareketleri & GA4 Analitik</span>
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -4721,7 +4630,7 @@ export default function Home() {
             </div>
 
             {/* İstatistikler (Flat 5-Color Tones) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
               <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0F172A]">
                 <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Kayıtlı Yurt</div>
                 <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0F172A] mt-0.5 sm:mt-1">{yurtlar.length}</div>
@@ -4729,11 +4638,23 @@ export default function Home() {
               </div>
 
               <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0284C7]">
+                <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Yatak Kapasitesi</div>
+                <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0F172A] mt-0.5 sm:mt-1">{totalKapasite}</div>
+                <div className="text-[10px] sm:text-[11px] text-[#64748B] mt-0.5 sm:mt-1">Toplam kontenjan</div>
+              </div>
+
+              <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0284C7]">
                 <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Toplam Öğrenci</div>
                 <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0F172A] mt-0.5 sm:mt-1">{totalOgrenci}</div>
                 <div className="text-[10px] sm:text-[11px] font-bold text-[#0284C7] mt-0.5 sm:mt-1">
-                  Sistem Geneli Kayıtlı
+                  Doluluk: %{totalKapasite > 0 ? Math.round((totalOgrenci / totalKapasite) * 100) : 0}
                 </div>
+              </div>
+
+              <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-[#E2E8F0] border-t-3 sm:border-t-4 border-t-[#0284C7]">
+                <div className="text-[11px] sm:text-xs font-semibold text-[#64748B]">Boş Yatak</div>
+                <div className="text-xl sm:text-2xl md:text-3xl font-black text-[#0284C7] mt-0.5 sm:mt-1">{Math.max(0, totalKapasite - totalOgrenci)}</div>
+                <div className="text-[10px] sm:text-[11px] font-bold text-[#64748B] mt-0.5 sm:mt-1">Açık Kontenjan</div>
               </div>
             </div>
 
@@ -4780,6 +4701,7 @@ export default function Home() {
                   </div>
                 ) : (
                   filteredYurtlar.map((yurt) => {
+                    const fillRate = yurt.kapasite > 0 ? Math.round((yurt.mevcutOgrenci / yurt.kapasite) * 100) : 0;
                     return (
                       <div
                         key={yurt.id}
@@ -4807,22 +4729,30 @@ export default function Home() {
                           </span>
                         </div>
 
-                        {/* Kayıtlı Öğrenci */}
-                        <div className="bg-white p-2.5 rounded-xl border border-[#E2E8F0] flex justify-between items-center text-[11px]">
-                          <span className="text-[#64748B] font-medium">Kayıtlı Öğrenci</span>
-                          <span className="font-bold text-[#0F172A]">
-                            {yurt.mevcutOgrenci} Öğrenci
-                          </span>
+                        {/* Doluluk ve Kapasite */}
+                        <div className="space-y-1 bg-white p-2.5 rounded-xl border border-[#E2E8F0]">
+                          <div className="flex justify-between text-[11px] font-medium">
+                            <span className="text-[#64748B]">Kapasite & Doluluk</span>
+                            <span className="font-bold text-[#0F172A]">
+                              {yurt.mevcutOgrenci} / {yurt.kapasite} (%{fillRate})
+                            </span>
+                          </div>
+                          <div className="w-full bg-[#F8FAFC] h-2 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-[#0284C7]"
+                              style={{ width: `${Math.min(100, fillRate)}%` }}
+                            />
+                          </div>
                         </div>
 
                         {/* Yetkili & İletişim */}
                         <div className="text-[11px] space-y-0.5">
-                          <div className="text-[#0F172A]">Yetkili: <strong>{yurt.yetkiliAd}</strong></div>
+                          <div className="text-[#0F172A]">Yetkili: <strong>{yurt.yetkiliAd}</strong> ({yurt.yetkiliTel})</div>
                           <div className="text-[#64748B] text-[10px] truncate">{yurt.yetkiliEposta}</div>
                         </div>
 
                         {/* Aksiyon Butonları */}
-                        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-[#E2E8F0]">
+                        <div className="flex items-center gap-1.5 pt-2 border-t border-[#E2E8F0]">
                           <button
                             onClick={() => {
                               const managerUser = {
@@ -4838,19 +4768,19 @@ export default function Home() {
                               }
                               fetchDbData(yurt.id);
                             }}
-                            className="flex-1 py-1.5 px-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-lg text-xs transition-colors cursor-pointer text-center border border-[#0369A1] min-h-[36px]"
+                            className="flex-1 py-1.5 px-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-lg text-xs transition-colors cursor-pointer text-center border border-[#0369A1]"
                           >
                             Paneline Geç
                           </button>
                           <button
-                            onClick={() => handleOpenEditYurt(yurt)}
-                            className="py-1.5 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs transition-colors cursor-pointer border border-[#E2E8F0] min-h-[36px]"
+                            onClick={() => toggleYurtStatus(yurt.id, yurt.durum)}
+                            className="py-1.5 px-2.5 bg-white hover:bg-[#F8FAFC] text-[#0F172A] font-semibold rounded-lg text-xs transition-colors cursor-pointer border border-[#E2E8F0]"
                           >
-                            Düzenle
+                            {yurt.durum === "aktif" ? "Askıya Al" : "Aktifleştir"}
                           </button>
                           <button
                             onClick={() => deleteYurt(yurt.id, yurt.ad)}
-                            className="py-1.5 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-xs transition-colors cursor-pointer border border-rose-200 min-h-[36px]"
+                            className="py-1.5 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg text-xs transition-colors cursor-pointer border border-rose-200"
                           >
                             Sil
                           </button>
@@ -4868,7 +4798,7 @@ export default function Home() {
                     <tr>
                       <th className="p-4">Yurt Adı & Lokasyon</th>
                       <th className="p-4">Yetkili / İletişim</th>
-                      <th className="p-4">Kayıtlı Öğrenci</th>
+                      <th className="p-4">Kapasite & Doluluk</th>
                       <th className="p-4">Yurt Türü & Durum</th>
                       <th className="p-4 text-right">İşlemler</th>
                     </tr>
@@ -4885,6 +4815,7 @@ export default function Home() {
                       </tr>
                     ) : (
                       filteredYurtlar.map((yurt) => {
+                        const fillRate = yurt.kapasite > 0 ? Math.round((yurt.mevcutOgrenci / yurt.kapasite) * 100) : 0;
                         return (
                           <tr key={yurt.id} className="hover:bg-[#F8FAFC] transition-colors">
                             <td className="p-4">
@@ -4897,13 +4828,25 @@ export default function Home() {
 
                             <td className="p-4">
                               <div className="font-medium text-[#0F172A]">{yurt.yetkiliAd}</div>
+                              <div className="text-[#64748B] text-[11px] font-mono">{yurt.yetkiliTel}</div>
                               <div className="text-[#64748B] text-[11px]">{yurt.yetkiliEposta}</div>
                             </td>
 
                             <td className="p-4">
-                              <span className="font-bold text-[#0F172A] text-xs">
-                                {yurt.mevcutOgrenci} Öğrenci
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-[#0F172A]">
+                                  {yurt.mevcutOgrenci} / {yurt.kapasite}
+                                </span>
+                                <span className="text-[10px] text-emerald-600 font-semibold">
+                                  (%{fillRate})
+                                </span>
+                              </div>
+                              <div className="w-32 bg-[#F8FAFC] h-1.5 rounded-full mt-1.5 overflow-hidden">
+                                <div
+                                  className="h-full bg-[#0284C7]"
+                                  style={{ width: `${fillRate}%` }}
+                                ></div>
+                              </div>
                             </td>
 
                             <td className="p-4">
@@ -4950,10 +4893,10 @@ export default function Home() {
                               </button>
 
                               <button
-                                onClick={() => handleOpenEditYurt(yurt)}
-                                className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-[11px] transition-colors cursor-pointer border border-[#E2E8F0]"
+                                onClick={() => toggleYurtStatus(yurt.id, yurt.durum)}
+                                className="px-2 py-1.5 bg-[#F8FAFC] hover:bg-[#E2E8F0] text-[#0F172A] rounded-lg text-[11px] transition-colors cursor-pointer border border-[#E2E8F0]"
                               >
-                                Düzenle
+                                {yurt.durum === "aktif" ? "Askıya Al" : "Aktifleştir"}
                               </button>
 
                               <button
@@ -4979,17 +4922,6 @@ export default function Home() {
               setNewYurt={setNewYurt}
               onClose={() => setIsAddModalOpen(false)}
               onSubmit={handleCreateYurt}
-            />
-
-            {/* YURT DÜZENLEME MODALI */}
-            <EditYurtModal
-              isOpen={isEditModalOpen}
-              yurt={editingYurt}
-              onClose={() => {
-                setIsEditModalOpen(false);
-                setEditingYurt(null);
-              }}
-              onUpdate={handleUpdateYurt}
             />
               </>
             )}
@@ -5137,99 +5069,97 @@ export default function Home() {
                       </button>
                     </div>
 
-                    {/* 3. Günlük Yemeğe Katılım Durumu Kartı (Sadece Aktifken Görünür) */}
-                    {yurtSettings.yemekKatilimAktif !== false && (
-                      <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-4 sm:p-5 rounded-2xl sm:rounded-3xl space-y-3.5 shadow-xs transition-colors">
-                        <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#E2E8F0] dark:border-[#334155]">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm sm:text-base font-bold text-[#0F172A] dark:text-[#F1F5F9]">
-                              Yemek Katılımı
-                            </h3>
-                            <span className="text-xs text-[#64748B] dark:text-[#94A3B8]">
-                              Bugün
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setManagerTab("yemekhane")}
-                            className="text-xs font-bold text-[#0284C7] hover:underline cursor-pointer"
-                          >
-                            Menüye Git →
-                          </button>
-                        </div>
-
-                        {/* 2 Sade Sayaç */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between">
-                            <div>
-                              <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 block">
-                                Katılacak
-                              </span>
-                              <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400">
-                                {attendingCount}
-                              </span>
-                            </div>
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                          </div>
-
-                          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 flex items-center justify-between">
-                            <div>
-                              <span className="text-xs font-semibold text-rose-800 dark:text-rose-300 block">
-                                Katılmayacak
-                              </span>
-                              <span className="text-2xl font-black text-rose-700 dark:text-rose-400">
-                                {notAttendingCount}
-                              </span>
-                            </div>
-                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
-                          </div>
-                        </div>
-
-                        {/* Alt Kısım: Öğrenci Listesi Aç/Kapat */}
-                        <div className="pt-1 flex items-center justify-between text-xs">
-                          <button
-                            type="button"
-                            onClick={() => setIsAttendanceListOpen(!isAttendanceListOpen)}
-                            className="font-bold text-[#0284C7] hover:underline cursor-pointer"
-                          >
-                            {isAttendanceListOpen ? "Listeyi Kapat" : `Öğrenci Listesi (${todayMealAttendance.length})`}
-                          </button>
-                          <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-                            Toplam {students.length} öğrenci
+                    {/* 3. Günlük Yemeğe Katılım Durumu Kartı (Sade ve Net Görünüm) */}
+                    <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-4 sm:p-5 rounded-2xl sm:rounded-3xl space-y-3.5 shadow-xs transition-colors">
+                      <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[#E2E8F0] dark:border-[#334155]">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm sm:text-base font-bold text-[#0F172A] dark:text-[#F1F5F9]">
+                            Yemek Katılımı
+                          </h3>
+                          <span className="text-xs text-[#64748B] dark:text-[#94A3B8]">
+                            Bugün
                           </span>
                         </div>
-
-                        {/* Açılır Liste */}
-                        {isAttendanceListOpen && (
-                          <div className="pt-2 border-t border-[#E2E8F0] dark:border-[#334155] grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
-                            {todayMealAttendance.length === 0 ? (
-                              <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic py-1 col-span-2">
-                                Henüz bildirim yapılmadı.
-                              </p>
-                            ) : (
-                              todayMealAttendance.map((att) => (
-                                <div
-                                  key={att.id}
-                                  className="p-2 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between text-xs"
-                                >
-                                  <span className="font-semibold text-[#0F172A] dark:text-[#F1F5F9]">
-                                    {att.studentName}
-                                  </span>
-                                  <span
-                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${att.status === "var"
-                                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                                        : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                                      }`}
-                                  >
-                                    {att.status === "var" ? "Katılacak" : "Katılmayacak"}
-                                  </span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => setManagerTab("yemekhane")}
+                          className="text-xs font-bold text-[#0284C7] hover:underline cursor-pointer"
+                        >
+                          Menüye Git →
+                        </button>
                       </div>
-                    )}
+
+                      {/* 2 Sade Sayaç */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 block">
+                              Varım (Katılacak)
+                            </span>
+                            <span className="text-2xl font-black text-emerald-700 dark:text-emerald-400">
+                              {attendingCount}
+                            </span>
+                          </div>
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/40 flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-semibold text-rose-800 dark:text-rose-300 block">
+                              Yokum (Katılmayacak)
+                            </span>
+                            <span className="text-2xl font-black text-rose-700 dark:text-rose-400">
+                              {notAttendingCount}
+                            </span>
+                          </div>
+                          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+                        </div>
+                      </div>
+
+                      {/* Alt Kısım: Öğrenci Listesi Aç/Kapat */}
+                      <div className="pt-1 flex items-center justify-between text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setIsAttendanceListOpen(!isAttendanceListOpen)}
+                          className="font-bold text-[#0284C7] hover:underline cursor-pointer"
+                        >
+                          {isAttendanceListOpen ? "Listeyi Kapat" : `Öğrenci Listesi (${todayMealAttendance.length})`}
+                        </button>
+                        <span className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
+                          Toplam {students.length} öğrenci
+                        </span>
+                      </div>
+
+                      {/* Açılır Liste */}
+                      {isAttendanceListOpen && (
+                        <div className="pt-2 border-t border-[#E2E8F0] dark:border-[#334155] grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                          {todayMealAttendance.length === 0 ? (
+                            <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic py-1 col-span-2">
+                              Henüz bildirim yapılmadı.
+                            </p>
+                          ) : (
+                            todayMealAttendance.map((att) => (
+                              <div
+                                key={att.id}
+                                className="p-2 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between text-xs"
+                              >
+                                <span className="font-semibold text-[#0F172A] dark:text-[#F1F5F9]">
+                                  {att.studentName}
+                                </span>
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${att.status === "var"
+                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                                      : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                                    }`}
+                                >
+                                  {att.status === "var" ? "Varım" : "Yokum"}
+                                </span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
 
                     {/* 4. YURT DUYURULARI VE PANO BÖLÜMÜ */}
                     <div className="bg-white border border-[#E2E8F0] p-4 sm:p-6 rounded-2xl sm:rounded-3xl space-y-4">
@@ -5591,9 +5521,28 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* Günün Menü Değerlendirmeleri ve Öğrenci Yorumları (Sadece Aktifken Görünür) */}
-                    {yurtSettings.yemekDegerlendirmeAktif !== false && (
-                    <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-4 sm:p-5 rounded-2xl space-y-3 shadow-xs transition-colors">
+                    {/* Günün Menü Değerlendirmeleri ve Öğrenci Yorumları (Canlı Geri Bildirim) */}
+                    <div className="bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] p-5 sm:p-7 rounded-2xl sm:rounded-3xl space-y-5 shadow-xs transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E8F0] dark:border-[#334155]">
+                        <div>
+                          <h3 className="text-base sm:text-lg font-bold text-[#0F172A] dark:text-[#F1F5F9] flex items-center gap-2">
+                            <svg className="w-5 h-5 text-amber-500 fill-amber-500" viewBox="0 0 24 24">
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                            </svg>
+                            Günün Yemek Değerlendirmeleri ve Öğrenci Yorumları
+                          </h3>
+                          <p className="text-xs text-[#64748B] dark:text-[#94A3B8] mt-0.5">
+                            Öğrencilerin günün menüsüne verdiği yıldız puanları ve anlık geri bildirimleri
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-sky-500/10 text-[#0284C7] dark:text-sky-400 border border-[#0284C7]/20">
+                            <span className="w-2 h-2 rounded-full bg-[#0284C7] animate-pulse" />
+                            Anlık Takip
+                          </span>
+                        </div>
+                      </div>
+
                       {(() => {
                         const todayKey = getTodayDateKey();
                         const todayRatings = mealRatings.filter((r) => r.date === todayKey);
@@ -5606,75 +5555,110 @@ export default function Home() {
                           : 0;
 
                         return (
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between pb-2 border-b border-[#E2E8F0] dark:border-[#334155]">
-                              <div>
-                                <h4 className="text-sm font-bold text-[#0F172A] dark:text-[#F1F5F9]">
-                                  Yemek Değerlendirmeleri
-                                </h4>
-                                <p className="text-[11px] text-[#64748B] dark:text-[#94A3B8]">
-                                  Günün menüsüne ait öğrenci puan ve geri bildirimleri
-                                </p>
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div className="p-4 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155] flex items-center justify-between">
+                                <div>
+                                  <span className="text-[11px] font-semibold text-[#64748B] dark:text-[#94A3B8] block">Ortalama Puan</span>
+                                  <span className="text-2xl font-black text-[#0F172A] dark:text-[#F1F5F9] mt-0.5 block">
+                                    {avgScore} <span className="text-xs font-normal text-[#64748B]">/ 5.0</span>
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-0.5 text-amber-500">
+                                  {[1, 2, 3, 4, 5].map((s) => (
+                                    <svg
+                                      key={s}
+                                      className={`w-4 h-4 ${
+                                        s <= Math.round(Number(avgScore))
+                                          ? "fill-amber-400 text-amber-400"
+                                          : "fill-transparent stroke-slate-300 dark:stroke-slate-600"
+                                      }`}
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                                    </svg>
+                                  ))}
+                                </div>
                               </div>
-                              {todayRatings.length > 0 && (
-                                <span className="text-[11px] font-semibold text-[#0284C7] dark:text-[#38BDF8] bg-sky-50 dark:bg-sky-950/40 px-2.5 py-1 rounded-lg border border-sky-200 dark:border-sky-800/40">
-                                  {todayRatings.length} Yorum
+
+                              <div className="p-4 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155]">
+                                <span className="text-[11px] font-semibold text-[#64748B] dark:text-[#94A3B8] block">Toplam Değerlendirme</span>
+                                <span className="text-2xl font-black text-[#0F172A] dark:text-[#F1F5F9] mt-0.5 block">
+                                  {todayRatings.length} <span className="text-xs font-normal text-[#64748B]">öğrenci</span>
                                 </span>
-                              )}
+                              </div>
+
+                              <div className="p-4 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155]">
+                                <span className="text-[11px] font-semibold text-[#64748B] dark:text-[#94A3B8] block">Memnuniyet Oranı</span>
+                                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5 block">
+                                  %{satisfactionRate} <span className="text-xs font-normal text-[#64748B]">(4-5 Yıldız)</span>
+                                </span>
+                              </div>
                             </div>
 
-                            {/* Kompakt 3'lü İstatistik Şeridi (Mobilde dikey taşma yapmaz) */}
-                            <div className="grid grid-cols-3 gap-2 p-2.5 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-xl border border-[#E2E8F0] dark:border-[#334155] text-center">
-                              <div>
-                                <span className="text-[10.5px] font-medium text-[#64748B] dark:text-[#94A3B8] block">Ortalama</span>
-                                <span className="text-sm sm:text-base font-black text-[#0F172A] dark:text-[#F1F5F9]">
-                                  {avgScore} <span className="text-[10px] font-normal text-[#64748B]">/ 5</span>
-                                </span>
-                              </div>
-                              <div className="border-x border-[#E2E8F0] dark:border-[#334155]">
-                                <span className="text-[10.5px] font-medium text-[#64748B] dark:text-[#94A3B8] block">Katılım</span>
-                                <span className="text-sm sm:text-base font-black text-[#0F172A] dark:text-[#F1F5F9]">
-                                  {todayRatings.length} <span className="text-[10px] font-normal text-[#64748B]">öğrenci</span>
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-[10.5px] font-medium text-[#64748B] dark:text-[#94A3B8] block">Memnuniyet</span>
-                                <span className="text-sm sm:text-base font-black text-emerald-600 dark:text-emerald-400">
-                                  %{satisfactionRate}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Yorumlar Listesi veya Sade Bilgi Metni */}
+                            {/* Yorumlar Listesi */}
                             {todayRatings.length === 0 ? (
-                              <p className="text-xs text-[#64748B] dark:text-[#94A3B8] italic text-center py-2">
-                                Bugün için henüz değerlendirme yapılmadı.
-                              </p>
+                              <div className="p-8 text-center text-xs text-stone-500 bg-[#F8FAFC] dark:bg-[#0F172A] rounded-2xl border border-[#E2E8F0] dark:border-[#334155] space-y-1">
+                                <div className="font-bold text-stone-700 dark:text-stone-300">Henüz Değerlendirme Yok</div>
+                                <div>Öğrenciler bugünün yemeklerini puanlayıp yorum yaptığında anlık olarak burada listelenecektir.</div>
+                              </div>
                             ) : (
-                              <div className="space-y-2 max-h-72 overflow-y-auto pr-0.5">
+                              <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
                                 {todayRatings.map((r) => (
                                   <div
                                     key={r.id}
-                                    className="p-2.5 rounded-xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] space-y-1 text-xs"
+                                    className="p-3.5 rounded-2xl bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] space-y-2"
                                   >
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-1.5 font-semibold text-[#0F172A] dark:text-[#F1F5F9]">
-                                        <span>{r.studentName}</span>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className="font-bold text-xs text-[#0F172A] dark:text-[#F1F5F9] truncate">
+                                          {r.studentName}
+                                        </span>
                                         {r.odaNo && (
-                                          <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">
-                                            (Oda {r.odaNo})
+                                          <span className="text-[10px] px-2 py-0.5 rounded-md bg-white dark:bg-[#1E293B] border border-[#E2E8F0] dark:border-[#334155] text-stone-600 dark:text-stone-400 font-semibold shrink-0">
+                                            Oda {r.odaNo}
                                           </span>
                                         )}
                                       </div>
-                                      <span className="font-bold text-amber-600 dark:text-amber-400 text-xs">
-                                        {r.rating} / 5
-                                      </span>
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        <div className="flex items-center text-amber-500">
+                                          {[1, 2, 3, 4, 5].map((star) => (
+                                            <svg
+                                              key={star}
+                                              className={`w-3.5 h-3.5 ${
+                                                star <= r.rating
+                                                  ? "fill-amber-400 text-amber-400"
+                                                  : "fill-transparent stroke-slate-300 dark:stroke-slate-600"
+                                              }`}
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                                            </svg>
+                                          ))}
+                                        </div>
+                                        <span className="text-xs font-bold text-stone-700 dark:text-stone-300 ml-1">
+                                          {r.rating}/5
+                                        </span>
+                                      </div>
                                     </div>
+
                                     {r.comment && (
-                                      <p className="text-stone-700 dark:text-stone-300 text-[11.5px] leading-relaxed pt-0.5">
+                                      <p className="text-xs text-stone-700 dark:text-stone-300 font-medium leading-relaxed bg-white dark:bg-[#1E293B] p-2.5 rounded-xl border border-[#E2E8F0] dark:border-[#334155]">
                                         "{r.comment}"
                                       </p>
                                     )}
+
+                                    <div className="text-[10px] text-[#64748B] dark:text-[#94A3B8] flex items-center justify-between pt-1">
+                                      <span>
+                                        {new Date(r.createdAt).toLocaleTimeString("tr-TR", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })}
+                                      </span>
+                                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                                        Doğrulanmış Öğrenci
+                                      </span>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -5683,7 +5667,6 @@ export default function Home() {
                         );
                       })()}
                     </div>
-                    )}
                   </div>
                 )}
 
@@ -6525,6 +6508,16 @@ export default function Home() {
                               <span className="px-2.5 py-0.5 rounded-lg bg-[#F1F5F9] text-[#0284C7] font-bold text-xs border border-[#E2E8F0]">
                                 Oda {m.odaNo}
                               </span>
+                              <span
+                                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${m.oncelik === "Acil"
+                                    ? "bg-rose-50 text-rose-700 border-rose-200"
+                                    : m.oncelik === "Orta"
+                                      ? "bg-[#F1F5F9] text-[#0284C7] border-[#E2E8F0]"
+                                      : "bg-white text-[#64748B] border-[#E2E8F0]"
+                                  }`}
+                              >
+                                {m.oncelik}
+                              </span>
                             </div>
 
                             <h4 className="text-sm font-bold text-[#0F172A]">{m.baslik}</h4>
@@ -7100,15 +7093,15 @@ export default function Home() {
                                 Bugünün Yemek Saati Tarifesi
                               </label>
                               <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-md bg-[#F1F5F9] text-[#0F172A] border border-[#E2E8F0] self-start sm:self-auto">
-                                Geçerli: {dailyMenu.gunTipi === "haftasonu" ? "Hafta Sonu" : "Hafta İçi"}
+                                Geçerli: {dailyMenu.gunTipi === "haftasonu" ? "Hafta Sonu" : dailyMenu.gunTipi === "ozelgun" ? "Bayram / Özel Gün" : "Hafta İçi"}
                               </span>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
                               {/* 1. Hafta İçi Kartı */}
                               <div
                                 onClick={() => handleToggleGunTipi("haftaici")}
-                                className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${dailyMenu.gunTipi === "haftaici" || !dailyMenu.gunTipi || dailyMenu.gunTipi === "ozelgun"
+                                className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${dailyMenu.gunTipi === "haftaici" || !dailyMenu.gunTipi
                                     ? "bg-white border-2 border-[#0284C7] shadow-xs"
                                     : "bg-white border-[#E2E8F0] hover:border-[#0284C7]"
                                   }`}
@@ -7118,8 +7111,8 @@ export default function Home() {
                                     <div className="font-bold text-xs text-[#0F172A]">Hafta İçi</div>
                                     <div className="text-[10px] text-[#64748B]">Pzt - Cuma</div>
                                   </div>
-                                  {dailyMenu.gunTipi === "haftaici" || !dailyMenu.gunTipi || dailyMenu.gunTipi === "ozelgun" ? (
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0284C7] text-white border border-[#0369A1]">
+                                  {dailyMenu.gunTipi === "haftaici" || !dailyMenu.gunTipi ? (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0284C7] text-[#0F172A] border border-[#0369A1]">
                                       Geçerli
                                     </span>
                                   ) : (
@@ -7174,7 +7167,7 @@ export default function Home() {
                                     <div className="text-[10px] text-[#64748B]">Cmt - Pazar</div>
                                   </div>
                                   {dailyMenu.gunTipi === "haftasonu" ? (
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0284C7] text-white border border-[#0369A1]">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0284C7] text-[#0F172A] border border-[#0369A1]">
                                       Geçerli
                                     </span>
                                   ) : (
@@ -7214,79 +7207,61 @@ export default function Home() {
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          </div>
 
-                          {/* B. ÖĞRENCİ ETKİLEŞİM AYARLARI */}
-                          <div className="p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl space-y-2.5">
-                            <label className="text-xs font-bold text-[#0F172A] block">
-                              Öğrenci Özellikleri
-                            </label>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                              {/* 1. Katılım Bildirimi */}
-                              <button
-                                type="button"
-                                onClick={() => handleToggleYemekSetting("yemekKatilimAktif")}
-                                className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 text-left ${
-                                  yurtSettings.yemekKatilimAktif !== false
+                              {/* 3. Bayram / Özel Gün Kartı */}
+                              <div
+                                onClick={() => handleToggleGunTipi("ozelgun")}
+                                className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${dailyMenu.gunTipi === "ozelgun"
                                     ? "bg-white border-2 border-[#0284C7] shadow-xs"
                                     : "bg-white border-[#E2E8F0] hover:border-[#0284C7]"
-                                }`}
-                              >
-                                <div>
-                                  <div className="font-bold text-xs text-[#0F172A]">
-                                    Katılacak / Katılmayacak Bildirimi
-                                  </div>
-                                  <div className="text-[10px] text-[#64748B] mt-0.5">
-                                    Öğrenci katılım tercihi
-                                  </div>
-                                </div>
-
-                                <div
-                                  className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                                    yurtSettings.yemekKatilimAktif !== false ? "bg-[#0284C7]" : "bg-stone-300"
                                   }`}
-                                >
-                                  <span
-                                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                                      yurtSettings.yemekKatilimAktif !== false ? "translate-x-5" : "translate-x-0"
-                                    }`}
-                                  />
-                                </div>
-                              </button>
-
-                              {/* 2. Yemek Değerlendirme */}
-                              <button
-                                type="button"
-                                onClick={() => handleToggleYemekSetting("yemekDegerlendirmeAktif")}
-                                className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 text-left ${
-                                  yurtSettings.yemekDegerlendirmeAktif !== false
-                                    ? "bg-white border-2 border-[#0284C7] shadow-xs"
-                                    : "bg-white border-[#E2E8F0] hover:border-[#0284C7]"
-                                }`}
                               >
-                                <div>
-                                  <div className="font-bold text-xs text-[#0F172A]">
-                                    Yemek Değerlendirme
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="font-bold text-xs text-[#0F172A]">Bayram / Özel</div>
+                                    <div className="text-[10px] text-[#64748B]">Tatil & Özel Gün</div>
                                   </div>
-                                  <div className="text-[10px] text-[#64748B] mt-0.5">
-                                    Öğrenci puan ve yorumları
-                                  </div>
+                                  {dailyMenu.gunTipi === "ozelgun" ? (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#0284C7] text-[#0F172A] border border-[#0369A1]">
+                                      Geçerli
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleGunTipi("ozelgun");
+                                      }}
+                                      className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#F8FAFC] text-[#64748B] hover:bg-[#0284C7] hover:text-[#0F172A] transition-colors"
+                                    >
+                                      Seç
+                                    </button>
+                                  )}
                                 </div>
 
-                                <div
-                                  className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                                    yurtSettings.yemekDegerlendirmeAktif !== false ? "bg-[#0284C7]" : "bg-stone-300"
-                                  }`}
-                                >
-                                  <span
-                                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                                      yurtSettings.yemekDegerlendirmeAktif !== false ? "translate-x-5" : "translate-x-0"
-                                    }`}
-                                  />
+                                <div className="space-y-2 pt-2 border-t border-[#E2E8F0]" onClick={(e) => e.stopPropagation()}>
+                                  <div className="space-y-1">
+                                    <span className="text-[11px] font-semibold text-[#64748B] block">Kahvaltı</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => openTimePicker("ozelgun", "kahvalti", "Bayram / Özel • Sabah Kahvaltısı")}
+                                      className="w-full py-1.5 px-2 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs"
+                                    >
+                                      {formatDisplayHours(dailyMenu.saatler?.ozelgun?.kahvalti || "09:00 - 12:00")}
+                                    </button>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <span className="text-[11px] font-semibold text-[#64748B] block">Akşam</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => openTimePicker("ozelgun", "aksam", "Bayram / Özel • Akşam Yemeği")}
+                                      className="w-full py-1.5 px-2 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-[#0284C7] rounded-xl text-xs text-[#0F172A] text-center font-mono font-bold whitespace-nowrap cursor-pointer transition-all shadow-xs"
+                                    >
+                                      {formatDisplayHours(dailyMenu.saatler?.ozelgun?.aksam || "19:00 - 21:30")}
+                                    </button>
+                                  </div>
                                 </div>
-                              </button>
+                              </div>
                             </div>
                           </div>
                         </div>
