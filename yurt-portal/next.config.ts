@@ -12,14 +12,6 @@ const nextConfig: NextConfig = {
     "192.168.1.5:3000",
   ],
   devIndicators: false,
-  turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
-    },
-  },
 };
 
 export default nextConfig;
