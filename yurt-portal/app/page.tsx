@@ -4481,7 +4481,15 @@ export default function Home() {
               className="text-[10px] text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 transition-opacity cursor-pointer inline-flex items-center gap-1 opacity-30 hover:opacity-100 select-none"
               title="Sistem Yöneticisi Konsolu"
             >
-              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                width={12}
+                height={12}
+                style={{ width: "12px", height: "12px", maxWidth: "12px", maxHeight: "12px", flexShrink: 0 }}
+                className="w-3 h-3 inline-block"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
               <span>Yurtify Altyapı</span>
