@@ -328,6 +328,7 @@ export default function StudentPortalView({
 
   const isMenuPublished = Boolean(
     dailyMenu &&
+    (!dailyMenu.tarih || dailyMenu.tarih === todayDateStr) &&
     (dailyMenu.gorunumModu === "tek"
       ? (dailyMenu.aktifOgun === "kahvalti"
           ? Boolean(dailyMenu.kahvalti?.trim())
@@ -917,7 +918,7 @@ export default function StudentPortalView({
                       Yemek kalitesi ve lezzeti hakkında yurt yönetimine anlık geri bildirim iletin
                     </span>
                   </div>
-                  {todayUserRating && (
+                  {isMenuPublished && todayUserRating && (
                     <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-1 self-start sm:self-auto">
                       <svg className="w-3 h-3 fill-amber-500 text-amber-500" viewBox="0 0 24 24">
                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
@@ -927,79 +928,103 @@ export default function StudentPortalView({
                   )}
                 </div>
 
-                {/* Yıldız Puanlama */}
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => {
-                      const isActive = star <= (hoverRating || currentRating);
-                      return (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => setCurrentRating(star)}
-                          onMouseEnter={() => setHoverRating(star)}
-                          onMouseLeave={() => setHoverRating(0)}
-                          className="p-1 -m-1 text-slate-300 dark:text-slate-600 hover:scale-110 transition-transform cursor-pointer"
-                          title={`${star} Yıldız`}
-                        >
-                          <svg
-                            className={`w-6 h-6 transition-colors ${
-                              isActive
-                                ? "fill-amber-400 text-amber-400 drop-shadow-xs"
-                                : "fill-transparent stroke-current"
-                            }`}
-                            viewBox="0 0 24 24"
-                            strokeWidth="1.75"
-                          >
-                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                          </svg>
-                        </button>
-                      );
-                    })}
+                {!isMenuPublished ? (
+                  <div className="p-3.5 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/40 rounded-2xl flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <div className="text-xs">
+                      <p className="font-bold text-amber-900 dark:text-amber-300">
+                        Menü Henüz Yayınlanmadı
+                      </p>
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">
+                        Günün yemek menüsü yurt yönetimi tarafından yayınlandıktan sonra menüyü değerlendirebilirsiniz.
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-xs font-bold text-stone-700 dark:text-stone-300 ml-1">
-                    {currentRating === 5 && "Mükemmel (5/5)"}
-                    {currentRating === 4 && "Çok İyi (4/5)"}
-                    {currentRating === 3 && "Orta (3/5)"}
-                    {currentRating === 2 && "Geliştirilmeli (2/5)"}
-                    {currentRating === 1 && "Yetersiz (1/5)"}
-                    {currentRating === 0 && "Puan seçin"}
-                  </span>
-                </div>
+                ) : (
+                  <>
+                    {/* Yıldız Puanlama */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => {
+                          const isActive = star <= (hoverRating || currentRating);
+                          return (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setCurrentRating(star)}
+                              onMouseEnter={() => setHoverRating(star)}
+                              onMouseLeave={() => setHoverRating(0)}
+                              className="p-1 -m-1 text-slate-300 dark:text-slate-600 hover:scale-110 transition-transform cursor-pointer"
+                              title={`${star} Yıldız`}
+                            >
+                              <svg
+                                className={`w-6 h-6 transition-colors ${
+                                  isActive
+                                    ? "fill-amber-400 text-amber-400 drop-shadow-xs"
+                                    : "fill-transparent stroke-current"
+                                }`}
+                                viewBox="0 0 24 24"
+                                strokeWidth="1.75"
+                              >
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                              </svg>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <span className="text-xs font-bold text-stone-700 dark:text-stone-300 ml-1">
+                        {currentRating === 5 && "Mükemmel (5/5)"}
+                        {currentRating === 4 && "Çok İyi (4/5)"}
+                        {currentRating === 3 && "Orta (3/5)"}
+                        {currentRating === 2 && "Geliştirilmeli (2/5)"}
+                        {currentRating === 1 && "Yetersiz (1/5)"}
+                        {currentRating === 0 && "Puan seçin"}
+                      </span>
+                    </div>
 
-                {/* Yorum Kutusu */}
-                <div className="space-y-1.5">
-                  <textarea
-                    rows={2}
-                    value={ratingComment}
-                    onChange={(e) => setRatingComment(e.target.value)}
-                    placeholder="Yemekler nasıldı? Lezzet, porsiyon, sıcaklık veya önerilerinizi yazabilirsiniz (Yöneticiye anlık iletilir)..."
-                    className="w-full bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-xl px-3 py-2 text-xs text-[#0F172A] dark:text-[#F1F5F9] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 resize-none leading-relaxed shadow-2xs transition-colors"
-                  />
-                </div>
+                    {/* Yorum Kutusu */}
+                    <div className="space-y-1.5">
+                      <textarea
+                        rows={2}
+                        value={ratingComment}
+                        onChange={(e) => setRatingComment(e.target.value)}
+                        placeholder="Yemekler nasıldı? Lezzet, porsiyon, sıcaklık veya önerilerinizi yazabilirsiniz (Yöneticiye anlık iletilir)..."
+                        className="w-full bg-[#F8FAFC] dark:bg-[#0F172A] border border-[#E2E8F0] dark:border-[#334155] rounded-xl px-3 py-2 text-xs text-[#0F172A] dark:text-[#F1F5F9] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0284C7] focus:ring-2 focus:ring-[#0284C7]/20 resize-none leading-relaxed shadow-2xs transition-colors"
+                      />
+                    </div>
 
-                {/* Gönder Butonu */}
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (currentRating === 0) {
-                        showToast("Lütfen en az 1 yıldız puan verin.");
-                        return;
-                      }
-                      onSaveMealRating?.(currentRating, ratingComment);
-                      showToast(todayUserRating ? "Değerlendirmeniz güncellendi." : "Yemek değerlendirmeniz yöneticiye iletildi!");
-                    }}
-                    disabled={currentRating === 0}
-                    className="px-4 py-2 bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl cursor-pointer transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="22" y1="2" x2="11" y2="13" />
-                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                    </svg>
-                    <span>{todayUserRating ? "Değerlendirmeyi Güncelle" : "Değerlendirmeyi Gönder"}</span>
-                  </button>
-                </div>
+                    {/* Gönder Butonu */}
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isMenuPublished) {
+                            showToast("Günün yemek menüsü yayınlanmadan değerlendirme yapılamaz.");
+                            return;
+                          }
+                          if (currentRating === 0) {
+                            showToast("Lütfen en az 1 yıldız puan verin.");
+                            return;
+                          }
+                          onSaveMealRating?.(currentRating, ratingComment);
+                          showToast(todayUserRating ? "Değerlendirmeniz güncellendi." : "Yemek değerlendirmeniz yöneticiye iletildi!");
+                        }}
+                        disabled={currentRating === 0}
+                        className="px-4 py-2 bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl cursor-pointer transition-all shadow-xs active:scale-95 flex items-center gap-1.5"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="22" y1="2" x2="11" y2="13" />
+                          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                        </svg>
+                        <span>{todayUserRating ? "Değerlendirmeyi Güncelle" : "Değerlendirmeyi Gönder"}</span>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

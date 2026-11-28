@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   allowedDevOrigins: [
+    "yurtify.com.tr",
+    "*.yurtify.com.tr",
     "leave-computing-expert-helmet.trycloudflare.com",
     "*.trycloudflare.com",
     "localhost:3000",

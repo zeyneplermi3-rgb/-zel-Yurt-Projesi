@@ -3420,8 +3420,23 @@ export default function Home() {
 
   // Günün Yemek Menüsünü Puanlama & Yorum Kaydetme (Öğrenci)
   const handleSaveMealRating = async (rating: number, comment: string) => {
-    const targetYurtId = currentUser?.selectedYurtId || yurtlar[0]?.id || "af81f031-1988-401e-84af-42ac75b4d409";
     const today = getTodayDateKey();
+    const isMenuPublished = Boolean(
+      dailyMenu &&
+      (!dailyMenu.tarih || dailyMenu.tarih === today) &&
+      (dailyMenu.gorunumModu === "tek"
+        ? (dailyMenu.aktifOgun === "kahvalti"
+            ? Boolean(dailyMenu.kahvalti?.trim())
+            : Boolean(dailyMenu.aksam?.trim()))
+        : Boolean(dailyMenu.kahvalti?.trim() || dailyMenu.aksam?.trim()))
+    );
+
+    if (!isMenuPublished) {
+      showToast("Günün yemek menüsü yayınlanmadan değerlendirme yapılamaz.");
+      return;
+    }
+
+    const targetYurtId = currentUser?.selectedYurtId || yurtlar[0]?.id || "af81f031-1988-401e-84af-42ac75b4d409";
     const sName = currentUser?.name || "Öğrenci";
     const currentStudent = students.find((s) => s.adSoyad.trim().toLowerCase() === sName.trim().toLowerCase());
 
@@ -4351,20 +4366,22 @@ export default function Home() {
               >
                 Yurt Müdürü
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSuperAdminLogin(true);
-                  handleRoleChange("superadmin");
-                }}
-                className={`flex-1 min-h-[44px] py-1.5 px-1 rounded-lg transition-all cursor-pointer flex items-center justify-center text-center ${
-                  activeRole === "superadmin"
-                    ? "bg-[#0284C7] text-white shadow-xs font-bold"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                }`}
-              >
-                Süper Admin
-              </button>
+              {isSuperAdminLogin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSuperAdminLogin(true);
+                    handleRoleChange("superadmin");
+                  }}
+                  className={`flex-1 min-h-[44px] py-1.5 px-1 rounded-lg transition-all cursor-pointer flex items-center justify-center text-center ${
+                    activeRole === "superadmin"
+                      ? "bg-[#0284C7] text-white shadow-xs font-bold"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Süper Admin
+                </button>
+              )}
             </div>
 
             <form onSubmit={handleLogin} className="space-y-3">
@@ -4446,6 +4463,29 @@ export default function Home() {
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Gizli Sistem Masası Tetikleyicisi (Yalnızca tıklandığında Süper Admin sekmesini açar) */}
+          <div className="mt-3 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                const nextState = !isSuperAdminLogin;
+                setIsSuperAdminLogin(nextState);
+                if (nextState) {
+                  handleRoleChange("superadmin");
+                } else {
+                  handleRoleChange("ogrenci");
+                }
+              }}
+              className="text-[10px] text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-300 transition-opacity cursor-pointer inline-flex items-center gap-1 opacity-30 hover:opacity-100 select-none"
+              title="Sistem Yöneticisi Konsolu"
+            >
+              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <span>Yurtify Altyapı</span>
+            </button>
           </div>
         </div>
       </div>
